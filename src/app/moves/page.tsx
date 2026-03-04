@@ -1,6 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 import { MovesClient } from "./MovesClient";
-import type { MoveRow } from "./type";
+import type { MoveRow } from "./types";
 
 export const dynamic = "force-dynamic";
 

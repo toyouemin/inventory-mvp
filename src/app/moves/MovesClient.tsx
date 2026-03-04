@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MoveRow } from "./types";
+import type { MoveRow } from "./type";
 
 export function MovesClient({ moves }: { moves: MoveRow[] }) {
   const [visibleCount, setVisibleCount] = useState(10);

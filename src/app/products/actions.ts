@@ -174,6 +174,7 @@ export async function adjustStock(productId: string, delta: number, note?: strin
 
   revalidatePath("/products");
   revalidatePath("/moves");
+  revalidatePath("/status");  // ✅ 추가
 }
 
 // 입고/출고 기록 (필요하면 UI에서 이걸 쓰게 만들 수 있음)
@@ -323,6 +324,7 @@ export async function uploadProductsCsv(formData: FormData) {
 
   revalidatePath("/products");
   revalidatePath("/moves");
+  revalidatePath("/status");  // ✅ 추가
 }
 /* -----------------------------
  * Stock: move between locations (stub/implementation)

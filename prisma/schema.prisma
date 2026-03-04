@@ -1,0 +1,58 @@
+// Prisma schema for SQLite
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Product {
+  id        Int            @id @default(autoincrement())
+  sku       String         @unique
+  category  String?
+  nameSpec  String
+  imageUrl  String?
+  shipPrice Int?
+  salePrice Int?
+  memo      String?
+  createdAt DateTime       @default(now())
+  balances  StockBalance[]
+  moves     StockMove[]
+}
+
+model Location {
+  id      Int            @id @default(autoincrement())
+  code    String         @unique // WAREHOUSE1, WAREHOUSE2, STORE
+  name    String
+  balances StockBalance[]
+  movesFrom StockMove[]  @relation("FromLocation")
+  movesTo   StockMove[]  @relation("ToLocation")
+}
+
+model StockBalance {
+  id         Int      @id @default(autoincrement())
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  Int
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  locationId Int
+  qty        Int      @default(0)
+  @@unique([productId, locationId])
+}
+
+model StockMove {
+  id             Int       @id @default(autoincrement())
+  product        Product   @relation(fields: [productId], references: [id])
+  productId      Int
+  action         String    // "ADJUST" | "MOVE"
+  fromLocation   Location? @relation("FromLocation", fields: [fromLocationId], references: [id])
+  fromLocationId Int?
+  toLocation     Location? @relation("ToLocation", fields: [toLocationId], references: [id])
+  toLocationId   Int?
+  delta          Int       // 조정일 때 +/- , 이동일 때 수량(양수)
+  note           String?
+  createdAt      DateTime  @default(now())
+}

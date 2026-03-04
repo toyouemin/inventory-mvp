@@ -1,0 +1,19 @@
+export const metadata = {
+  title: "Inventory MVP",
+  description: "재고관리 프로그램",
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="ko">
+      <body style={{fontFamily:"Arial",padding:"20px"}}>
+        <nav style={{marginBottom:"20px"}}>
+          <a href="/products">상품</a> |
+          <a href="/moves"> 입출고</a> |
+          <a href="/status"> 재고현황</a>
+        </nav>
+        {children}
+      </body>
+    </html>
+  );
+}

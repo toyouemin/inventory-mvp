@@ -2,7 +2,7 @@ export type Product = {
   id: string;
   sku: string;
   category?: string | null;
-  nameSpec?: string | null;
+  nameSpec: string;
   imageUrl?: string | null;
   memo?: string | null;
   stock?: number | null;

@@ -50,10 +50,10 @@ export function ProductCard({
     setPending(true);
     try {
       await updateProduct(product.id, {
-        sku: sku.trim(),
-        category: category.trim() || null,
-        nameSpec: nameSpec.trim(),
-        imageUrl: imageUrl.trim() || null,
+        sku: (sku ?? "").trim(),
+        category: (category ?? "").trim() || null,
+        nameSpec: ((nameSpec ?? "").trim() || sku.trim()),
+        imageUrl: (imageUrl ?? "").trim() || null,
 
         // ✅ 저장도 3개로
         wholesalePrice: wholesalePrice === "" ? null : parseInt(wholesalePrice, 10),
@@ -74,7 +74,7 @@ export function ProductCard({
     <article className="product-card">
       <div className="product-card__image">
         {product.imageUrl ? (
-          <img src={product.imageUrl} alt={product.nameSpec} />
+      <img src={product.imageUrl} alt={(product.nameSpec ?? product.sku ?? "").toString()} />
         ) : (
           <div className="product-card__placeholder">이미지 없음</div>
         )}

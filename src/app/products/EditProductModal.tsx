@@ -32,7 +32,7 @@ export function EditProductModal({
     setPending(false);
     setSku(product.sku ?? "");
     setCategory(product.category ?? "");
-    SetNameSpec(product.nameSpec ?? "");
+    setNameSpec(product.nameSpec ?? "");
     setImageUrl(product.imageUrl ?? "");
 
     setWholesalePrice(product.wholesalePrice != null ? String(product.wholesalePrice) : "");

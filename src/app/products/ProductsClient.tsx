@@ -104,7 +104,7 @@ export function ProductsClient({ products }: { products: Product[] }) {
         </div>
 
         {/* 2줄: 작은 버튼들 */}
-        <div className="toolbar-row toolbar-row--actions">
+        <div className="toolbar-row toolbar-row--actions toolbar-row--scroll">
           <div className="view-toggle" role="group" aria-label="보기 방식 전환">
             <button
               type="button"

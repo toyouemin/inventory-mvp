@@ -564,3 +564,52 @@ button:hover {
     max-width: none;
   }
 }
+/* 액션 버튼들 한 줄 고정 + 가로 스크롤 */
+.toolbar-row--scroll {
+  flex-wrap: nowrap;          /* ✅ 줄바꿈 금지 */
+  overflow-x: auto;           /* ✅ 화면 좁으면 가로 스크롤 */
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;        /* 스크롤바랑 겹침 방지 */
+}
+
+.toolbar-row--scroll > * {
+  flex: 0 0 auto;             /* ✅ 각 버튼/그룹이 줄에서 줄어들지 않게 */
+}
+
+/* 보기토글/CSV 그룹도 한 줄 고정 */
+.view-toggle,
+.products-csv--compact {
+  flex-wrap: nowrap;
+}
+
+/* 모바일에서 버튼 더 촘촘하게 */
+@media (max-width: 768px) {
+  .btn-compact {
+    padding: 8px 9px;
+    font-size: 14px;
+  }
+}
+/* 버튼/라벨 글씨 중앙정렬 */
+.btn,
+label.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;        /* baseline 문제 방지 */
+}
+
+/* 검색줄 input/버튼 높이 맞추기 */
+.toolbar-row--search .products-search,
+.toolbar-row--search .btn-compact {
+  height: 44px;
+}
+
+/* compact 버튼도 높이 통일 */
+.btn-compact {
+  height: 44px;          /* 위와 동일 */
+  padding: 0 12px;       /* 세로 패딩 대신 좌우만 */
+}
+
+.toolbar-row--actions .btn-compact {
+  height: 40px;
+}

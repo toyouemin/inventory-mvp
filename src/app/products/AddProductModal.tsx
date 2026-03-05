@@ -1,16 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createProduct } from "./actions";
 
 export function AddProductModal({
   open,
   onClose,
+  initialSku,
+  initialNameSpec,
+  initialCategory,
 }: {
   open: boolean;
   onClose: () => void;
+  initialSku?: string;
+  initialNameSpec?: string;
+  initialCategory?: string;
 }) {
   const [pending, setPending] = useState(false);
+
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState("");
   const [nameSpec, setNameSpec] = useState("");
@@ -22,6 +29,22 @@ export function AddProductModal({
   const [salePrice, setSalePrice] = useState("");
 
   const [memo, setMemo] = useState("");
+
+  // ✅ 모달이 열릴 때 초기값(검색값 등) 자동 세팅
+  useEffect(() => {
+    if (!open) return;
+
+    setSku((initialSku ?? "").trim());
+    setCategory((initialCategory ?? "").trim());
+    setNameSpec((initialNameSpec ?? "").trim());
+
+    // 나머지는 항상 빈값으로 시작(원하면 유지하도록 바꿀 수도 있음)
+    setImageUrl("");
+    setWholesalePrice("");
+    setMsrpPrice("");
+    setSalePrice("");
+    setMemo("");
+  }, [open, initialSku, initialNameSpec, initialCategory]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +59,6 @@ export function AddProductModal({
         nameSpec: nameSpec.trim(),
         imageUrl: imageUrl.trim() || null,
 
-        // ✅ DB 컬럼에 맞춰 전달
         wholesalePrice: wholesalePrice === "" ? null : parseInt(wholesalePrice, 10),
         msrpPrice: msrpPrice === "" ? null : parseInt(msrpPrice, 10),
         salePrice: salePrice === "" ? null : parseInt(salePrice, 10),
@@ -44,6 +66,7 @@ export function AddProductModal({
         memo: memo.trim() || null,
       });
 
+      // 저장 후 초기화
       setSku("");
       setCategory("");
       setNameSpec("");
@@ -65,6 +88,7 @@ export function AddProductModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>상품 추가</h3>
+
         <form onSubmit={handleSubmit} className="modal-form">
           <label>품목코드 (SKU) *</label>
           <input
@@ -96,7 +120,6 @@ export function AddProductModal({
             placeholder="https://..."
           />
 
-          {/* ✅ 가격 3개 */}
           <label>출고가</label>
           <input
             type="number"

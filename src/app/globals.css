@@ -479,3 +479,43 @@ button:hover {
 .btn-row {
   padding: 8px 10px;
 }
+@media (max-width: 768px) {
+  main {
+    max-width: 100%;
+    margin: 12px auto 60px;
+    padding: 0 12px;
+  }
+
+  h1 {
+    font-size: 22px;
+  }
+}
+@media (max-width: 768px) {
+  .products-toolbar {
+    position: sticky;
+    top: 56px; /* nav 높이에 맞춰 조절 (필요하면 52~64로) */
+    z-index: 9;
+    background: var(--card);
+    padding: 10px 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+
+  .products-search {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    height: 44px;
+    font-size: 16px; /* iOS 확대 방지 */
+  }
+
+  .products-csv {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    height: 44px;
+    font-size: 15px;
+  }
+}

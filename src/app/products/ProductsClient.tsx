@@ -7,6 +7,11 @@ import { AddProductModal } from "./AddProductModal";
 import { adjustStock, uploadProductsCsv } from "./actions";
 import { EditProductModal } from "./EditProductModal";
 
+function isMobile() {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia("(max-width: 768px)").matches;
+}
+
 export function ProductsClient({ products }: { products: Product[] }) {
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -16,6 +21,12 @@ export function ProductsClient({ products }: { products: Product[] }) {
 
   type ViewMode = "card" | "list";
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+
+  useEffect(() => {
+    if (isMobile()) {
+      setViewMode("card");
+    }
+  }, []);
 
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem("products:viewMode") : null;
@@ -72,6 +83,13 @@ export function ProductsClient({ products }: { products: Product[] }) {
           onChange={(e) => setSearch(e.target.value)}
           className="products-search"
         />
+         <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setSearch(search)}
+         >
+          검색
+         </button>
 
           <div className="view-toggle" role="group" aria-label="보기 방식 전환">
           <button

@@ -3,6 +3,7 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 import { revalidatePath } from "next/cache";
 
+const LOG_MOVES = process.env.LOG_MOVES === "1";
 /* -----------------------------
  * Helpers: CSV delimiter detect + robust parsing
  * ----------------------------- */
@@ -164,17 +165,20 @@ export async function adjustStock(productId: string, delta: number, note?: strin
   const { error: upErr } = await supabaseServer.from("products").update({ stock: next }).eq("id", productId);
   if (upErr) throw new Error(upErr.message);
 
-  const { error: moveErr } = await supabaseServer.from("moves").insert({
-    product_id: productId,
-    type: "adjust",
-    qty: Math.abs(actualDelta),
-    note: note?.trim() || null,
-  });
-  if (moveErr) throw new Error(moveErr.message);
+  if (LOG_MOVES) {
+    const { error: moveErr } = await supabaseServer.from("moves").insert({
+      product_id: productId,
+      type: "adjust",
+      qty: Math.abs(actualDelta),
+      note: note?.trim() || null,
+    });
+    if (moveErr) throw new Error(moveErr.message);
+
+    revalidatePath("/moves");
+  }
 
   revalidatePath("/products");
-  revalidatePath("/moves");
-  revalidatePath("/status");  // ✅ 추가
+  revalidatePath("/status");
 }
 
 // 입고/출고 기록 (필요하면 UI에서 이걸 쓰게 만들 수 있음)
@@ -323,13 +327,16 @@ export async function uploadProductsCsv(formData: FormData) {
   }
 
   revalidatePath("/products");
-  revalidatePath("/moves");
-  revalidatePath("/status");  // ✅ 추가
+  revalidatePath("/status");
+
+  if (LOG_MOVES) {
+    revalidatePath("/moves");
+  }
 }
 /* -----------------------------
  * Stock: move between locations (stub/implementation)
  * ----------------------------- */
-
+/*
 // 재고 이동(로케이션 이동) — 지금은 기능 연결용으로 최소 구현
 export async function moveStock(input: {
   productId: string;
@@ -346,4 +353,4 @@ export async function moveStock(input: {
   // 여기선 일단 안전하게 아무것도 안 하고 리턴만.
   // 필요하면 나중에 supabase RPC로 from->to 차감/증가 트랜잭션 구현하자.
   return { ok: true };
-}
+}*/

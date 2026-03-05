@@ -7,32 +7,34 @@ import { AddProductModal } from "./AddProductModal";
 import { adjustStock, uploadProductsCsv } from "./actions";
 import { EditProductModal } from "./EditProductModal";
 
-function isMobile() {
-  if (typeof window === "undefined") return false;
-  return window.matchMedia("(max-width: 768px)").matches;
-}
+type ViewMode = "card" | "list";
 
 export function ProductsClient({ products }: { products: Product[] }) {
+  // ✅ 입력값(searchInput)과 실제 검색값(search) 분리
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+
   const [uploading, setUploading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
-  type ViewMode = "card" | "list";
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
+  // ✅ 모바일이면 기본 카드형
   useEffect(() => {
-    if (isMobile()) {
-      setViewMode("card");
-    }
+    if (typeof window === "undefined") return;
+    const m = window.matchMedia("(max-width: 768px)");
+    if (m.matches) setViewMode("card");
   }, []);
 
+  // ✅ 저장된 보기 방식 불러오기
   useEffect(() => {
     const saved = typeof window !== "undefined" ? window.localStorage.getItem("products:viewMode") : null;
     if (saved === "card" || saved === "list") setViewMode(saved);
   }, []);
 
+  // ✅ 보기 방식 저장
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("products:viewMode", viewMode);
@@ -63,70 +65,84 @@ export function ProductsClient({ products }: { products: Product[] }) {
     }
   }
 
+  function runSearch() {
+    setSearch(searchInput);
+  }
+
   return (
     <div className="products-page">
-      <div className="products-toolbar">
-      <button
-  type="button"
-  className="btn btn-secondary"
-  onClick={async () => {
-    await fetch("/api/gate/logout", { method: "POST" });
-    window.location.replace("/login");
-  }}
->
-  로그아웃
-</button>
-        <input
-          type="search"
-          placeholder="품목코드·품명·카테고리 검색"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="products-search"
-        />
-         <button
+      <div className="products-toolbar products-toolbar--compact">
+        {/* ✅ 로그인/로그아웃 나중에 쓸 수 있게 주석처리 */}
+        {/*
+        <button
           type="button"
           className="btn btn-secondary"
-          onClick={() => setSearch(search)}
-         >
-          검색
-         </button>
-
-          <div className="view-toggle" role="group" aria-label="보기 방식 전환">
-          <button
-          type="button"
-           className={`btn ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
-           onClick={() => setViewMode("list")}
-           style={{ whiteSpace: "nowrap" }}  >
-          리스트형
-          </button>
-
-        <button
-    type="button"
-    className={`btn ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
-    onClick={() => setViewMode("card")}
-  >
-    카드형
-  </button>
-</div>
-
-        <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>
-          상품 추가
+          onClick={async () => {
+            await fetch("/api/gate/logout", { method: "POST" });
+            window.location.replace("/login");
+          }}
+        >
+          로그아웃
         </button>
+        */}
 
-        <div className="products-csv">
-          <a href="/products/csv/products" download className="btn btn-secondary">
-            상품 CSV 다운로드
-          </a>
-          <label className="btn btn-secondary">
-            {uploading ? "업로드 중..." : "상품 CSV 업로드"}
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleProductsCsv}
-              disabled={uploading}
-              style={{ display: "none" }}
-            />
-          </label>
+        {/* 1줄: 검색창 + 검색버튼 */}
+        <div className="toolbar-row toolbar-row--search">
+          <input
+            type="search"
+            placeholder="품목코드·품명·카테고리"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") runSearch();
+            }}
+            className="products-search"
+          />
+          <button type="button" className="btn btn-primary btn-compact" onClick={runSearch}>
+            검색
+          </button>
+        </div>
+
+        {/* 2줄: 작은 버튼들 */}
+        <div className="toolbar-row toolbar-row--actions">
+          <div className="view-toggle" role="group" aria-label="보기 방식 전환">
+            <button
+              type="button"
+              className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setViewMode("list")}
+            >
+              리스트
+            </button>
+
+            <button
+              type="button"
+              className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
+              onClick={() => setViewMode("card")}
+            >
+              카드
+            </button>
+          </div>
+
+          <div className="products-csv products-csv--compact">
+            <a href="/products/csv/products" download className="btn btn-secondary btn-compact">
+              CSV↓
+            </a>
+
+            <label className="btn btn-secondary btn-compact">
+              {uploading ? "업로드..." : "CSV↑"}
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleProductsCsv}
+                disabled={uploading}
+                style={{ display: "none" }}
+              />
+            </label>
+          </div>
+
+          <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
+            +추가
+          </button>
         </div>
       </div>
 
@@ -138,7 +154,21 @@ export function ProductsClient({ products }: { products: Product[] }) {
       {viewMode === "card" ? (
         <div className="products-grid">
           {filtered.length === 0 ? (
-            <p className="muted">검색 결과가 없습니다.</p>
+            <div>
+              <p className="muted">검색 결과가 없습니다.</p>
+
+              {/* ✅ 검색값으로 바로 추가(모달에 SKU 자동 입력) */}
+              {search.trim() && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => setAddOpen(true)}
+                  style={{ marginTop: 8 }}
+                >
+                  '{search.trim()}' 추가
+                </button>
+              )}
+            </div>
           ) : (
             filtered.map((p) => (
               <ProductCard
@@ -155,7 +185,15 @@ export function ProductsClient({ products }: { products: Product[] }) {
       ) : (
         <div className="table-wrap">
           {filtered.length === 0 ? (
-            <p className="muted">검색 결과가 없습니다.</p>
+            <div>
+              <p className="muted">검색 결과가 없습니다.</p>
+
+              {search.trim() && (
+                <button type="button" className="btn btn-primary" onClick={() => setAddOpen(true)}>
+                  '{search.trim()}' 추가
+                </button>
+              )}
+            </div>
           ) : (
             <table className="table products-table">
               <thead>
@@ -178,7 +216,7 @@ export function ProductsClient({ products }: { products: Product[] }) {
                     <tr key={p.id}>
                       <td>
                         {p.imageUrl ? (
-                          <img className="thumb-small" src={p.imageUrl} alt={p.nameSpec} />
+                          <img className="thumb-small" src={p.imageUrl} alt={(p.nameSpec ?? p.sku ?? "").toString()} />
                         ) : (
                           <span className="thumb-empty">-</span>
                         )}
@@ -189,7 +227,6 @@ export function ProductsClient({ products }: { products: Product[] }) {
                         <div className="stock-cell">
                           <strong>{qty}</strong>
                           <div className="stock-buttons">
-                    
                             <button
                               type="button"
                               className="btn-mini"
@@ -198,14 +235,9 @@ export function ProductsClient({ products }: { products: Product[] }) {
                             >
                               -1
                             </button>
-                            <button
-                              type="button"
-                              className="btn-mini"
-                              onClick={async () => adjustStock(p.id, 1)}
-                            >
+                            <button type="button" className="btn-mini" onClick={async () => adjustStock(p.id, 1)}>
                               +1
                             </button>
-                        
                           </div>
                         </div>
                       </td>
@@ -235,7 +267,12 @@ export function ProductsClient({ products }: { products: Product[] }) {
         </div>
       )}
 
-      <AddProductModal open={addOpen} onClose={() => setAddOpen(false)} />
+      {/* ✅ 검색값을 SKU로 자동 채워서 추가 */}
+      <AddProductModal
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        initialSku={search.trim()}
+      />
 
       <EditProductModal
         open={editOpen}

@@ -519,3 +519,48 @@ button:hover {
     font-size: 15px;
   }
 }
+/* ===== Products toolbar compact (mobile friendly) ===== */
+
+.products-toolbar--compact {
+  gap: 10px;
+}
+
+.toolbar-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar-row--search {
+  width: 100%;
+}
+
+.toolbar-row--search .products-search {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 기존 global.css에서 button { width:100% }라서 모바일에서 다 커짐 → compact로 덮어쓰기 */
+.btn-compact {
+  width: auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.products-csv--compact {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 768px) {
+  .products-toolbar {
+    margin-bottom: 10px;
+  }
+  .products-search {
+    max-width: none;
+  }
+}

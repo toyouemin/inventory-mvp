@@ -613,3 +613,69 @@ label.btn {
 .toolbar-row--actions .btn-compact {
   height: 40px;
 }
+/* ===== actions row: left scroll + right pinned (+추가) ===== */
+.actions-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  flex-wrap: nowrap;          /* ✅ 전체 줄바꿈 금지 */
+}
+
+.actions-scroll {
+  flex: 1 1 auto;
+  min-width: 0;               /* ✅ overflow-x가 먹게 하는 핵심 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  flex-wrap: nowrap;          /* ✅ 내부도 줄바꿈 금지 */
+  overflow-x: auto;           /* ✅ 좁으면 가로 스크롤 */
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+}
+
+.actions-scroll > * {
+  flex: 0 0 auto;             /* ✅ 버튼그룹 줄어들지 않게 */
+}
+
+.actions-pin {
+  flex: 0 0 auto;             /* ✅ 오른쪽 고정 */
+  white-space: nowrap;
+  margin-left: auto;          /* ✅ 항상 맨 오른쪽으로 */
+}
+
+/* CSV 글씨 굵게 */
+.btn-strong {
+  font-weight: 700;
+}
+.products-toolbar--compact .btn-compact {
+  width: auto !important;
+}
+/* ===== products toolbar: action row one-line + fix width:100% ===== */
+
+/* toolbar 안에서는 버튼 width:100% 무력화 */
+.products-toolbar--compact button,
+.products-toolbar--compact a.btn,
+.products-toolbar--compact label.btn {
+  width: auto !important;
+}
+
+/* 한 줄 스크롤 */
+.products-toolbar--compact .toolbar-row--scroll {
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 6px;
+  align-items: center;
+}
+
+.products-toolbar--compact .toolbar-row--scroll > * {
+  flex: 0 0 auto;
+}
+
+/* CSV 글씨 굵게 */
+.btn-strong {
+  font-weight: 700;
+}

@@ -102,48 +102,46 @@ export function ProductsClient({ products }: { products: Product[] }) {
             검색
           </button>
         </div>
+{/* 2줄: 작은 버튼들 (한 줄 스크롤) */}
+<div className="toolbar-row toolbar-row--actions toolbar-row--scroll">
+  <div className="view-toggle" role="group" aria-label="보기 방식 전환">
+    <button
+      type="button"
+      className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
+      onClick={() => setViewMode("list")}
+    >
+      리스트
+    </button>
+    <button
+      type="button"
+      className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
+      onClick={() => setViewMode("card")}
+    >
+      카드
+    </button>
+  </div>
 
-        {/* 2줄: 작은 버튼들 */}
-        <div className="toolbar-row toolbar-row--actions toolbar-row--scroll">
-          <div className="view-toggle" role="group" aria-label="보기 방식 전환">
-            <button
-              type="button"
-              className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => setViewMode("list")}
-            >
-              리스트
-            </button>
+  <div className="products-csv products-csv--compact">
+    <a href="/products/csv/products" download className="btn btn-secondary btn-compact btn-strong">
+      CSV↓
+    </a>
 
-            <button
-              type="button"
-              className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
-              onClick={() => setViewMode("card")}
-            >
-              카드
-            </button>
-          </div>
+    <label className="btn btn-secondary btn-compact btn-strong">
+      {uploading ? "업로드..." : "CSV↑"}
+      <input
+        type="file"
+        accept=".csv"
+        onChange={handleProductsCsv}
+        disabled={uploading}
+        style={{ display: "none" }}
+      />
+    </label>
+  </div>
 
-          <div className="products-csv products-csv--compact">
-            <a href="/products/csv/products" download className="btn btn-secondary btn-compact">
-              CSV↓
-            </a>
-
-            <label className="btn btn-secondary btn-compact">
-              {uploading ? "업로드..." : "CSV↑"}
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleProductsCsv}
-                disabled={uploading}
-                style={{ display: "none" }}
-              />
-            </label>
-          </div>
-
-          <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
-            +추가
-          </button>
-        </div>
+  <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
+    +추가
+  </button>
+</div>
       </div>
 
       <p className="products-count">

@@ -17,7 +17,7 @@ export default async function ProductsPage() {
   const { data, error } = await supabaseServer
     .from("products")
     .select("id, sku, category, name_spec, image_url, ship_price, wholesale_price, msrp_price, sale_price, memo, stock, created_at, updated_at")
-    .order("sku", { ascending: true });
+    .order("sku", { ascending: true })
     .order("created_at", { ascending: false });
 
      

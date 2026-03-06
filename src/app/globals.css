@@ -228,18 +228,20 @@ button:hover {
 
 .toolbar-actions {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .toolbar-scroll {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  flex-wrap: wrap;
   min-width: 0;
   overflow-x: auto;
-  flex-wrap: nowrap;
   -webkit-overflow-scrolling: touch;
 }
 

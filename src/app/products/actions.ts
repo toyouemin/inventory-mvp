@@ -79,7 +79,7 @@ function parseCsvRows(lines: string[], delimiter: string, col: CsvColMap): Parse
     const sku = (cols[col.sku] ?? "").trim();
     if (!sku) continue;
     const category = col.category >= 0 ? (cols[col.category] ?? "").trim() || null : null;
-    const nameSpec = col.name >= 0 ? (cols[col.name] ?? "").trim() || sku : sku;
+    const nameSpec = col.name >= 0 ? (cols[col.name] ?? "").trim() : "";
     const imageUrl = col.imageUrl >= 0 ? (cols[col.imageUrl] ?? "").trim() || null : null;
     const size = col.size >= 0 ? (cols[col.size] ?? "").trim() || "" : "";
     const stockRaw = col.stock >= 0 ? toIntOrNaN(cols[col.stock]) : NaN;
@@ -102,6 +102,42 @@ function parseCsvRows(lines: string[], delimiter: string, col: CsvColMap): Parse
     });
   }
   return rows;
+}
+
+/** Within each SKU group, fill empty category/name/imageUrl/prices/memo from another row with same SKU. Do NOT fill size or stock. If two non-empty values conflict, throw. Run before validateSkuConsistency. */
+function normalizeSkuGroups(rows: ParsedCsvRow[]): void {
+  const bySku = new Map<string, ParsedCsvRow[]>();
+  for (const r of rows) {
+    const arr = bySku.get(r.sku) ?? [];
+    arr.push(r);
+    bySku.set(r.sku, arr);
+  }
+  const fillableKeys: (keyof ParsedCsvRow)[] = ["category", "nameSpec", "imageUrl", "wholesale", "msrp", "sale", "memo"];
+  const isEmpty = (val: unknown): boolean =>
+    val === null || val === undefined || (typeof val === "string" && val.trim() === "");
+
+  for (const [, group] of bySku) {
+    if (group.length <= 1) continue;
+    const canon: Partial<ParsedCsvRow> = {};
+    for (const r of group) {
+      for (const key of fillableKeys) {
+        const val = r[key];
+        if (isEmpty(val)) continue;
+        const existing = canon[key];
+        if (existing !== undefined && String(existing) !== String(val)) {
+          throw new Error("CSV 오류: 동일한 SKU의 상품 정보가 서로 다릅니다.");
+        }
+        if (existing === undefined) (canon as Record<string, unknown>)[key] = val;
+      }
+    }
+    for (const r of group) {
+      for (const key of fillableKeys) {
+        if (isEmpty(r[key]) && (canon as Record<string, unknown>)[key] !== undefined) {
+          (r as Record<string, unknown>)[key] = (canon as Record<string, unknown>)[key];
+        }
+      }
+    }
+  }
 }
 
 /** Same SKU must have identical category, name, imageUrl, wholesale, msrp, sale, memo. Only size and stock may differ. */
@@ -148,7 +184,7 @@ async function applyCsvRows(rows: ParsedCsvRow[]): Promise<Set<string>> {
     csvSkus.add(row.sku);
     const payload = {
       category: row.category,
-      name_spec: row.nameSpec,
+      name_spec: row.nameSpec?.trim() || row.sku,
       image_url: row.imageUrl,
       wholesale_price: row.wholesale,
       msrp_price: row.msrp,
@@ -477,6 +513,7 @@ export async function uploadProductsCsv(formData: FormData, fullSync?: boolean) 
       memo: headers.findIndex((h) => h === "memo" || h === "비고"),
     };
     const rows = parseCsvRows(lines, delimiter, col);
+    normalizeSkuGroups(rows);
     validateSkuConsistency(rows);
     const csvSkus = await applyCsvRows(rows);
     if (fullSync) await deleteProductsNotInCsv(csvSkus);

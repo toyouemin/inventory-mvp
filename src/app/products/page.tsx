@@ -1,11 +1,37 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 import { ProductsClient } from "./ProductsClient";
-import type { Product } from "./types";
+import type { Product, ProductVariant } from "./types";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductsPage() {
+function mapProduct(row: Record<string, unknown>): Product {
+  return {
+    id: String(row.id),
+    sku: String(row.sku ?? ""),
+    category: (row.category as string) ?? null,
+    nameSpec: String(row.name_spec ?? row.sku ?? ""),
+    imageUrl: (row.image_url as string) ?? null,
+    wholesalePrice: row.wholesale_price != null ? Number(row.wholesale_price) : null,
+    msrpPrice: row.msrp_price != null ? Number(row.msrp_price) : null,
+    salePrice: row.sale_price != null ? Number(row.sale_price) : null,
+    memo: (row.memo as string) ?? null,
+    stock: row.stock != null ? Number(row.stock) : 0,
+    createdAt: row.created_at as string | null,
+    updatedAt: row.updated_at as string | null,
+  };
+}
 
+function mapVariant(row: Record<string, unknown>): ProductVariant {
+  return {
+    id: String(row.id),
+    productId: String(row.product_id),
+    size: String(row.size ?? ""),
+    stock: Number(row.stock ?? 0),
+    createdAt: (row.created_at as string) ?? null,
+  };
+}
+
+export default async function ProductsPage() {
   if (!supabaseServer) {
     return (
       <div style={{ padding: 24, color: "crimson" }}>
@@ -16,11 +42,10 @@ export default async function ProductsPage() {
 
   const { data, error } = await supabaseServer
     .from("products")
-    .select("id, sku, category, name_spec, image_url, ship_price, wholesale_price, msrp_price, sale_price, memo, stock, created_at, updated_at")
+    .select("id, sku, category, name_spec, image_url, wholesale_price, msrp_price, sale_price, memo, stock, created_at, updated_at")
     .order("sku", { ascending: true })
     .order("created_at", { ascending: false });
 
-     
   if (error) {
     return (
       <div style={{ padding: 24 }}>
@@ -30,23 +55,37 @@ export default async function ProductsPage() {
     );
   }
 
-  const products: Product[] = (data ?? []).map((row: any) => ({
-    id: row.id,
-    sku: row.sku,
-    category: row.category,
-    nameSpec: row.name_spec ?? row.sku,
-    imageUrl: row.image_url,
-    shipPrice: row.ship_price,
+  const products: Product[] = (data ?? []).map((row: Record<string, unknown>) => mapProduct(row));
+  const productIds = products.map((p) => p.id);
 
-    wholesalePrice: row.wholesale_price,
-    msrpPrice: row.msrp_price,
-    salePrice: row.sale_price,
+  let variantsByProductId: Record<string, ProductVariant[]> = {};
+  if (productIds.length > 0) {
+    try {
+      const { data: variantsData } = await supabaseServer
+        .from("product_variants")
+        .select("id, product_id, size, stock, created_at")
+        .in("product_id", productIds);
+      const variants = (variantsData ?? []).map((r: Record<string, unknown>) => mapVariant(r));
+      variants.forEach((v) => {
+        if (!variantsByProductId[v.productId]) variantsByProductId[v.productId] = [];
+        variantsByProductId[v.productId].push(v);
+      });
+    } catch {
+      variantsByProductId = {};
+    }
+  }
 
-    memo: row.memo,
-    stock: row.stock ?? 0,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  }));
+  const categories = Array.from(
+    new Set(
+      (data ?? []).map((r: { category?: string | null }) => r.category).filter((c): c is string => Boolean(c?.trim()))
+    )
+  ).sort();
 
-  return <ProductsClient products={products} />;
+  return (
+    <ProductsClient
+      products={products}
+      categories={categories}
+      variantsByProductId={variantsByProductId}
+    />
+  );
 }

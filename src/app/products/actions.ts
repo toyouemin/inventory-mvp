@@ -57,6 +57,48 @@ function toIntOrNaN(v: string | undefined) {
   return Number.isFinite(n) ? n : NaN;
 }
 
+async function uploadCsvWithSizes(
+  lines: string[],
+  delimiter: string,
+  headers: string[],
+  skuIdx: number,
+  sizeIdx: number,
+  nameIdx: number,
+  stockIdx: number
+) {
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i], delimiter);
+    const sku = (cols[skuIdx] ?? "").trim();
+    if (!sku) continue;
+
+    const size = (cols[sizeIdx] ?? "").trim() || "";
+    const nameSpec = nameIdx >= 0 ? (cols[nameIdx] ?? "").trim() || sku : sku;
+    const stock = stockIdx >= 0 ? toIntOrNaN(cols[stockIdx]) : 0;
+    const stockVal = Number.isFinite(stock) ? Math.max(0, stock) : 0;
+
+    let productId: string;
+    const { data: existing } = await supabaseServer.from("products").select("id").eq("sku", sku).maybeSingle();
+    if (existing?.id) {
+      productId = existing.id;
+      await supabaseServer.from("products").update({ name_spec: nameSpec }).eq("id", productId);
+    } else {
+      const { data: inserted, error: insErr } = await supabaseServer
+        .from("products")
+        .insert({ sku, name_spec: nameSpec, stock: 0 })
+        .select("id")
+        .single();
+      if (insErr) throw new Error(insErr.message);
+      productId = inserted.id;
+    }
+
+    const { error: upsertErr } = await supabaseServer.from("product_variants").upsert(
+      { product_id: productId, size, stock: stockVal },
+      { onConflict: "product_id,size" }
+    );
+    if (upsertErr) throw new Error(upsertErr.message);
+  }
+}
+
 /* -----------------------------
  * Products: create / update
  * ----------------------------- */
@@ -140,6 +182,36 @@ export async function updateProduct(
   revalidatePath("/products");
 }
 
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Upload image to Supabase Storage bucket product-images; returns public URL. */
+export async function uploadProductImage(formData: FormData): Promise<{ url: string }> {
+  const file = formData.get("file") as File | null;
+  if (!file || !(file instanceof File)) throw new Error("파일이 없습니다.");
+
+  const type = file.type?.toLowerCase() ?? "";
+  if (!ALLOWED_IMAGE_TYPES.includes(type)) {
+    throw new Error("jpg, png, webp만 업로드할 수 있습니다.");
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("파일 크기는 5MB 이하여야 합니다.");
+  }
+
+  const ext = type === "image/jpeg" ? "jpg" : type === "image/png" ? "png" : "webp";
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+  const { error } = await supabaseServer.storage.from("product-images").upload(path, file, {
+    contentType: type,
+    upsert: true,
+  });
+
+  if (error) throw new Error(error.message);
+
+  const { data: urlData } = supabaseServer.storage.from("product-images").getPublicUrl(path);
+  return { url: urlData.publicUrl };
+}
+
 /* -----------------------------
  * Stock: adjust + moves record
  * ----------------------------- */
@@ -191,6 +263,54 @@ export async function addMove(productId: string, type: "in" | "out", qty: number
 }
 
 /* -----------------------------
+ * Size-based variants (product_variants table)
+ * ----------------------------- */
+
+export async function adjustVariantStock(
+  variantId: string,
+  delta: number,
+  note?: string | null
+) {
+  if (!variantId || !Number.isFinite(delta) || delta === 0) return;
+
+  const { data: row, error: readErr } = await supabaseServer
+    .from("product_variants")
+    .select("stock")
+    .eq("id", variantId)
+    .single();
+
+  if (readErr || !row) throw new Error(readErr?.message ?? "Variant not found");
+
+  const prev = Number(row.stock) ?? 0;
+  const next = Math.max(0, prev + delta);
+  const actualDelta = next - prev;
+  if (actualDelta === 0) return;
+
+  const { error: upErr } = await supabaseServer
+    .from("product_variants")
+    .update({ stock: next })
+    .eq("id", variantId);
+
+  if (upErr) throw new Error(upErr.message);
+
+  if (LOG_MOVES) {
+    const { data: v } = await supabaseServer.from("product_variants").select("product_id").eq("id", variantId).single();
+    if (v?.product_id) {
+      await supabaseServer.from("moves").insert({
+        product_id: v.product_id,
+        type: "adjust",
+        qty: Math.abs(actualDelta),
+        note: note?.trim() || null,
+      });
+    }
+    revalidatePath("/moves");
+  }
+
+  revalidatePath("/products");
+  revalidatePath("/status");
+}
+
+/* -----------------------------
  * CSV Upload: upsert + stock -> moves via RPC
  * ----------------------------- */
 
@@ -236,8 +356,19 @@ export async function uploadProductsCsv(formData: FormData) {
     throw new Error(`CSV 헤더에 sku(또는 품목코드)가 없습니다. 현재 헤더: ${headers.join("|")}`);
   }
 
+  const sizeIdx = headers.findIndex((h) => h === "size" || h === "사이즈");
+  const hasSizeColumn = sizeIdx >= 0;
+
+  if (hasSizeColumn) {
+    await uploadCsvWithSizes(lines, delimiter, headers, skuIdx, sizeIdx, headers.findIndex((h) => h === "name" || h === "품명"), headers.findIndex((h) => h === "stock" || h === "재고"));
+    revalidatePath("/products");
+    revalidatePath("/status");
+    if (LOG_MOVES) revalidatePath("/moves");
+    return;
+  }
+
   const catIdx = headers.findIndex((h) => h === "category" || h === "카테고리");
-  const nameIdx = headers.findIndex((h) => h === "namespec" || h === "품명");
+  const nameIdx = headers.findIndex((h) => h === "namespec" || h === "품명" || h === "name");
   const imgIdx = headers.findIndex((h) => h === "imageurl" || h === "이미지url");
 
   const wholesaleIdx = headers.findIndex((h) => h === "wholesaleprice" || h === "출고가");

@@ -1,3 +1,4 @@
+/* ========== BASE ========== */
 :root {
   --bg: #f6f3ee;
   --text: #1f1f1f;
@@ -19,6 +20,24 @@ body {
   color: var(--text);
 }
 
+/* Toolbars: override global full-width so buttons stay compact */
+.products-toolbar input,
+.products-toolbar select,
+.products-toolbar button,
+.products-toolbar .btn,
+.products-toolbar label.btn {
+  width: auto !important;
+}
+
+.toolbar-bottom-bar input,
+.toolbar-bottom-bar select,
+.toolbar-bottom-bar button,
+.toolbar-bottom-bar .btn,
+.toolbar-bottom-bar label.btn {
+  width: auto !important;
+}
+
+/* ========== LAYOUT ========== */
 main {
   max-width: 960px;
   margin: 32px auto 80px;
@@ -51,23 +70,10 @@ h1 {
   font-size: 28px;
 }
 
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
-}
-
-label {
-  display: block;
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-input, select, button {
+/* ========== BUTTONS ========== */
+input,
+select,
+button {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -87,34 +93,70 @@ button:hover {
   filter: brightness(0.95);
 }
 
-.form-grid {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.table th, .table td {
-  border-bottom: 1px solid var(--border);
-  padding: 10px;
-  text-align: left;
+.btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
   font-size: 14px;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
-.bad {
-  color: var(--danger);
+.btn-secondary {
+  background: #e8e4de;
+  color: var(--text);
+}
+
+.btn-secondary:hover {
+  background: #ddd9d2;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: white;
+}
+
+.btn-compact {
+  width: auto;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.btn-strong {
   font-weight: 700;
 }
 
-.muted {
-  color: var(--muted);
+.btn-mini {
+  width: auto;
+  min-width: 44px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #e8e4de;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
 }
 
-/* 상품 페이지 */
+.btn-mini:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========== TOOLBAR ========== */
 .products-page {
   padding: 0 8px;
 }
@@ -127,6 +169,10 @@ button:hover {
   margin-bottom: 16px;
 }
 
+.products-toolbar--compact {
+  gap: 10px;
+}
+
 .products-search {
   flex: 1;
   min-width: 200px;
@@ -137,35 +183,76 @@ button:hover {
   font-size: 15px;
 }
 
-.products-csv {
+.products-csv,
+.products-csv--compact {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.toolbar-row {
   display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar-row--search {
+  width: 100%;
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.btn {
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  font-size: 14px;
-  border: none;
-  display: inline-block;
+.toolbar-row--search .products-search {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 12px;
 }
 
-.btn-secondary {
-  background: #e8e4de;
-  color: var(--text);
+.toolbar-row--search .btn-compact {
+  height: 44px;
+  padding: 0 14px;
 }
 
-.btn-secondary:hover {
-  background: #ddd9d2;
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.products-count {
-  font-size: 14px;
-  color: var(--muted);
+.toolbar-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.toolbar-scroll > * {
+  flex: 0 0 auto;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+/* ========== CARDS ========== */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
   margin-bottom: 16px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
 }
 
 .products-grid {
@@ -174,7 +261,6 @@ button:hover {
   gap: 16px;
 }
 
-/* 상품 카드 (휴대폰 친화) */
 .product-card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -223,7 +309,20 @@ button:hover {
   min-height: 2.6em;
 }
 
-.product-card__stock {
+.product-card__sku {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.product-card__category {
+  font-size: 12px;
+  color: var(--accent);
+  margin-left: 6px;
+}
+
+.product-card__stock,
+.product-card__stock-label {
   font-size: 14px;
 }
 
@@ -240,6 +339,28 @@ button:hover {
   color: var(--muted);
 }
 
+.product-card__memo {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.product-card__stocks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.product-card__stock-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.product-card__stock-row .product-card__adjust {
+  margin-left: auto;
+}
+
 .product-card__adjust {
   display: flex;
   align-items: center;
@@ -254,10 +375,26 @@ button:hover {
   font-size: 14px;
 }
 
+.product-card__size-select {
+  width: auto;
+  min-width: 60px;
+  padding: 6px 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
 .product-card__adjust-label {
   font-size: 12px;
   color: var(--muted);
   margin: 0 4px;
+}
+
+.product-card__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .product-card__edit-btn {
@@ -296,12 +433,95 @@ button:hover {
   color: var(--text);
 }
 
-.btn-primary {
-  background: var(--accent);
-  color: white;
+/* ========== TABLES ========== */
+label {
+  display: block;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 6px;
 }
 
-/* 모달 */
+.form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--border);
+  padding: 10px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.products-table th,
+.products-table td {
+  vertical-align: middle;
+}
+
+.thumb-small {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: #f0ebe5;
+}
+
+.thumb-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stock-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.stock-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-row {
+  padding: 8px 10px;
+}
+
+.bad {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.products-count {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+/* ========== MODALS ========== */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -350,466 +570,109 @@ button:hover {
   color: var(--text);
 }
 
-/* 상품 카드 - 확장형 */
-.product-card__sku {
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.product-card__category {
-  font-size: 12px;
-  color: var(--accent);
-  margin-left: 6px;
-}
-
-.product-card__memo {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.product-card__stocks {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.product-card__stock-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.product-card__stock-label {
-  font-size: 13px;
-  min-width: 56px;
-}
-
-.product-card__stock-row .product-card__adjust {
-  margin-left: auto;
-}
-
-.product-card__actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.product-card__move-btn {
-  flex: 1;
-  background: #2d7a4a;
-  color: white;
-}
-
-.product-card__move-btn:hover {
-  filter: brightness(0.95);
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-/* 보기 방식 전환 */
-.view-toggle {
-  display: flex;
-  gap: 8px;
-}
-
-.view-toggle .btn {
-  padding: 10px 12px;
-}
-
-/* 리스트형 테이블 */
-.products-table th,
-.products-table td {
-  vertical-align: middle;
-}
-
-.thumb-small {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 1px solid var(--border);
-  background: #f0ebe5;
-}
-
-.thumb-empty {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.stock-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.stock-buttons {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.btn-mini {
-  width: auto;
-  min-width: 44px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #e8e4de;
-  color: var(--text);
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.btn-mini:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.row-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.btn-row {
-  padding: 8px 10px;
-}
+/* ========== MOBILE ========== */
 @media (max-width: 768px) {
   main {
     max-width: 100%;
-    margin: 12px auto 60px;
-    padding: 0 12px;
+    margin: 10px auto 72px;
+    padding: 0 10px;
   }
 
   h1 {
-    font-size: 22px;
+    font-size: 18px;
   }
-}
-@media (max-width: 768px) {
+
+  /* Compact header/toolbar: ~20% smaller */
   .products-toolbar {
     position: sticky;
-    top: 56px; /* nav 높이에 맞춰 조절 (필요하면 52~64로) */
+    top: 45px;
     z-index: 9;
     background: var(--card);
-    padding: 10px 8px;
+    padding: 8px 6px;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 10px;
+    margin-bottom: 8px;
   }
 
   .products-search {
     width: 100%;
     max-width: none;
     min-width: 0;
-    height: 44px;
-    font-size: 16px; /* iOS 확대 방지 */
-  }
-
-  .products-csv {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-
-  .btn {
-    height: 44px;
-    font-size: 15px;
-  }
-}
-/* ===== Products toolbar compact (mobile friendly) ===== */
-
-.products-toolbar--compact {
-  gap: 10px;
-}
-
-.toolbar-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.toolbar-row--search {
-  width: 100%;
-}
-
-.toolbar-row--search .products-search {
-  flex: 1;
-  min-width: 0;
-}
-
-/* 기존 global.css에서 button { width:100% }라서 모바일에서 다 커짐 → compact로 덮어쓰기 */
-.btn-compact {
-  width: auto;
-  min-width: 0;
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.products-csv--compact {
-  display: flex;
-  gap: 8px;
-}
-
-@media (max-width: 768px) {
-  .products-toolbar {
-    margin-bottom: 10px;
-  }
-  .products-search {
-    max-width: none;
-  }
-}
-/* 액션 버튼들 한 줄 고정 + 가로 스크롤 */
-.toolbar-row--scroll {
-  flex-wrap: nowrap;          /* ✅ 줄바꿈 금지 */
-  overflow-x: auto;           /* ✅ 화면 좁으면 가로 스크롤 */
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 6px;        /* 스크롤바랑 겹침 방지 */
-}
-
-.toolbar-row--scroll > * {
-  flex: 0 0 auto;             /* ✅ 각 버튼/그룹이 줄에서 줄어들지 않게 */
-}
-
-/* 보기토글/CSV 그룹도 한 줄 고정 */
-.view-toggle,
-.products-csv--compact {
-  flex-wrap: nowrap;
-}
-
-/* 모바일에서 버튼 더 촘촘하게 */
-@media (max-width: 768px) {
-  .btn-compact {
-    padding: 8px 9px;
+    height: 35px;
     font-size: 14px;
+    padding: 0 10px;
+  }
+
+  .toolbar-row--search .products-search,
+  .toolbar-row--search .btn-compact {
+    height: 35px;
+  }
+
+  .toolbar-row--search .btn-compact {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .products-toolbar .btn-compact,
+  .products-toolbar .btn,
+  .products-toolbar label.btn {
+    height: 35px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  .products-csv--compact .btn-compact,
+  .products-csv--compact label.btn {
+    height: 35px;
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  /* Top toolbar hidden on mobile when bottom bar is used; only search row visible */
+  .products-toolbar--compact .toolbar-actions-desktop {
+    display: none;
   }
 }
-/* 버튼/라벨 글씨 중앙정렬 */
-.btn,
-label.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;        /* baseline 문제 방지 */
+
+/* Mobile: bottom sticky action bar */
+.toolbar-bottom-bar {
+  display: none;
 }
 
-/* 검색줄 input/버튼 높이 맞추기 */
-.toolbar-row--search .products-search,
-.toolbar-row--search .btn-compact {
-  height: 44px;
+@media (max-width: 768px) {
+  .toolbar-bottom-bar {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    padding: 8px 10px;
+    gap: 8px;
+    align-items: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .toolbar-bottom-bar .btn-compact {
+    flex: 0 0 auto;
+    height: 36px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .toolbar-actions-desktop {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
 }
 
-/* compact 버튼도 높이 통일 */
-.btn-compact {
-  height: 44px;          /* 위와 동일 */
-  padding: 0 12px;       /* 세로 패딩 대신 좌우만 */
-}
-
-.toolbar-row--actions .btn-compact {
-  height: 40px;
-}
-/* ===== actions row: left scroll + right pinned (+추가) ===== */
-.actions-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  flex-wrap: nowrap;          /* ✅ 전체 줄바꿈 금지 */
-}
-
-.actions-scroll {
-  flex: 1 1 auto;
-  min-width: 0;               /* ✅ overflow-x가 먹게 하는 핵심 */
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  flex-wrap: nowrap;          /* ✅ 내부도 줄바꿈 금지 */
-  overflow-x: auto;           /* ✅ 좁으면 가로 스크롤 */
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 6px;
-}
-
-.actions-scroll > * {
-  flex: 0 0 auto;             /* ✅ 버튼그룹 줄어들지 않게 */
-}
-
-.actions-pin {
-  flex: 0 0 auto;             /* ✅ 오른쪽 고정 */
-  white-space: nowrap;
-  margin-left: auto;          /* ✅ 항상 맨 오른쪽으로 */
-}
-
-/* CSV 글씨 굵게 */
-.btn-strong {
-  font-weight: 700;
-}
-.products-toolbar--compact .btn-compact {
-  width: auto !important;
-}
-/* ===== products toolbar: action row one-line + fix width:100% ===== */
-
-/* toolbar 안에서는 버튼 width:100% 무력화 */
-.products-toolbar--compact button,
-.products-toolbar--compact a.btn,
-.products-toolbar--compact label.btn {
-  width: auto !important;
-}
-
-/* 한 줄 스크롤 */
-.products-toolbar--compact .toolbar-row--scroll {
-  flex-wrap: nowrap !important;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding-bottom: 6px;
-  align-items: center;
-}
-
-.products-toolbar--compact .toolbar-row--scroll > * {
-  flex: 0 0 auto;
-}
-
-/* CSV 글씨 굵게 */
-.btn-strong {
-  font-weight: 700;
-}
-/* === Products toolbar: align + keep +추가 visible === */
-.products-toolbar button,
-.products-toolbar .btn,
-.products-toolbar label.btn {
-  width: auto !important; /* 전역 button{width:100%} 영향 제거 */
-}
-
-.toolbar-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.toolbar-scroll {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  flex-wrap: nowrap;
-  -webkit-overflow-scrolling: touch;
-}
-
-.toolbar-scroll > * {
-  flex: 0 0 auto;
-}
-
-.btn-compact,
-.products-csv--compact .btn-compact,
-.products-csv--compact label.btn-compact {
-  height: 40px;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.btn-strong {
-  font-weight: 700; /* CSV도 +추가처럼 굵게 */
-}
-
-.view-toggle,
-.products-csv--compact {
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: nowrap;
-}
-/* ===== Products toolbar alignment FIX ===== */
-
-/* 툴바 안에서는 전역 width:100% 무조건 해제 */
-.products-toolbar input,
-.products-toolbar button,
-.products-toolbar .btn,
-.products-toolbar label.btn {
-  width: auto !important;
-}
-
-/* 1줄 검색: 인풋/버튼 높이 통일 */
-.toolbar-row--search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toolbar-row--search .products-search {
-  flex: 1;
-  min-width: 0;
-  height: 44px;
-  padding: 0 12px;
-  line-height: 44px;   /* 기준선 문제 방지 */
-}
-
-.toolbar-row--search .btn-compact {
-  height: 44px;
-  padding: 0 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
-
-/* 2줄 버튼 라인: 한 줄 유지 + 세로 가운데 정렬 */
-.toolbar-actions {
-  display: flex;
-  align-items: center; /* ✅ 세로정렬 핵심 */
-  gap: 8px;
-}
-
-.toolbar-scroll {
-  display: flex;
-  align-items: center; /* ✅ 세로정렬 핵심 */
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  flex-wrap: nowrap;
-  -webkit-overflow-scrolling: touch;
-}
-
-.toolbar-scroll > * {
-  flex: 0 0 auto;
-}
-
-/* 버튼 공통: 글씨/칸 중앙정렬 + 높이 통일 */
-.products-toolbar .btn-compact,
-.products-toolbar .btn,
-.products-toolbar label.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  line-height: 1;     /* baseline 흔들림 제거 */
-  height: 40px;
-  padding: 0 12px;
-  white-space: nowrap;
-}
-
-/* CSV도 +추가처럼 굵게 */
-.btn-strong {
-  font-weight: 700;
-}
-
-/* 그룹도 한줄 + 가운데정렬 */
-.view-toggle,
-.products-csv--compact {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
+@media (min-width: 769px) {
+  .toolbar-bottom-bar {
+    display: none !important;
+  }
 }

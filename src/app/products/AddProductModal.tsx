@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createProduct } from "./actions";
+import { createProduct, uploadProductImage } from "./actions";
+import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 
 export function AddProductModal({
   open,
@@ -22,15 +23,15 @@ export function AddProductModal({
   const [category, setCategory] = useState("");
   const [nameSpec, setNameSpec] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // ✅ 가격 3개로 분리
   const [wholesalePrice, setWholesalePrice] = useState("");
   const [msrpPrice, setMsrpPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
 
   const [memo, setMemo] = useState("");
 
-  // ✅ 모달이 열릴 때 초기값(검색값 등) 자동 세팅
   useEffect(() => {
     if (!open) return;
 
@@ -40,6 +41,8 @@ export function AddProductModal({
 
     // 나머지는 항상 빈값으로 시작(원하면 유지하도록 바꿀 수도 있음)
     setImageUrl("");
+    setImageFile(null);
+    setImagePreview(null);
     setWholesalePrice("");
     setMsrpPrice("");
     setSalePrice("");
@@ -53,11 +56,19 @@ export function AddProductModal({
 
     setPending(true);
     try {
+      let finalImageUrl = imageUrl.trim() || null;
+      if (imageFile) {
+        const resized = await resizeAndCompressImage(imageFile);
+        const fd = new FormData();
+        fd.append("file", resized);
+        const { url } = await uploadProductImage(fd);
+        finalImageUrl = url;
+      }
       await createProduct({
         sku: sku.trim(),
         category: category.trim() || null,
         nameSpec: nameSpec.trim(),
-        imageUrl: imageUrl.trim() || null,
+        imageUrl: finalImageUrl,
 
         wholesalePrice: wholesalePrice === "" ? null : parseInt(wholesalePrice, 10),
         msrpPrice: msrpPrice === "" ? null : parseInt(msrpPrice, 10),
@@ -66,11 +77,12 @@ export function AddProductModal({
         memo: memo.trim() || null,
       });
 
-      // 저장 후 초기화
       setSku("");
       setCategory("");
       setNameSpec("");
       setImageUrl("");
+      setImageFile(null);
+      setImagePreview(null);
       setWholesalePrice("");
       setMsrpPrice("");
       setSalePrice("");
@@ -113,11 +125,36 @@ export function AddProductModal({
             required
           />
 
-          <label>이미지 URL</label>
+          <label>이미지</label>
+          {(imagePreview || imageUrl) && (
+            <div style={{ marginBottom: 8 }}>
+              <img
+                src={imagePreview || imageUrl}
+                alt="미리보기"
+                style={{ maxWidth: "100%", maxHeight: 160, objectFit: "contain", borderRadius: 8, border: "1px solid var(--border)" }}
+              />
+            </div>
+          )}
           <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              setImageFile(f);
+              setImageUrl("");
+              try {
+                setImagePreview(await readAsDataURL(f));
+              } catch {
+                setImagePreview(null);
+              }
+            }}
+          />
+          <input
+            type="text"
             value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://..."
+            onChange={(e) => { setImageUrl(e.target.value); if (e.target.value) setImageFile(null); setImagePreview(null); }}
+            placeholder="또는 이미지 URL 입력"
           />
 
           <label>출고가</label>

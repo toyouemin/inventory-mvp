@@ -1,26 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { adjustStock, updateProduct } from "./actions";
-import type { Product } from "./types";
+import { useState, useMemo, useEffect } from "react";
+import { adjustStock, adjustVariantStock, updateProduct } from "./actions";
+import type { Product, ProductVariant } from "./types";
 
 export function ProductCard({
   product,
+  variants = [],
   onEditClick,
 }: {
   product: Product;
+  variants?: ProductVariant[];
   onEditClick?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
 
-  // 수정 폼 상태
   const [sku, setSku] = useState(product.sku);
   const [category, setCategory] = useState(product.category ?? "");
   const [nameSpec, setNameSpec] = useState(product.nameSpec);
   const [imageUrl, setImageUrl] = useState(product.imageUrl ?? "");
 
-  // ✅ 가격 3개
   const [wholesalePrice, setWholesalePrice] = useState(
     product.wholesalePrice != null ? String(product.wholesalePrice) : ""
   );
@@ -33,13 +33,30 @@ export function ProductCard({
 
   const [memo, setMemo] = useState(product.memo ?? "");
 
-  const qty = product.stock ?? 0;
+  const hasVariants = variants.length > 0;
+  const firstSize = variants[0]?.size ?? "";
+  const [selectedSize, setSelectedSize] = useState(firstSize);
+  useEffect(() => {
+    if (hasVariants && !variants.some((v) => v.size === selectedSize)) {
+      setSelectedSize(firstSize);
+    }
+  }, [hasVariants, variants, selectedSize, firstSize]);
+
+  const selectedVariant = useMemo(
+    () => variants.find((v) => v.size === selectedSize),
+    [variants, selectedSize]
+  );
+  const qty = hasVariants ? (selectedVariant?.stock ?? 0) : (product.stock ?? 0);
 
   async function handleAdjust(delta: number) {
     if (pending) return;
     setPending(true);
     try {
-      await adjustStock(product.id, delta);
+      if (hasVariants && selectedVariant) {
+        await adjustVariantStock(selectedVariant.id, delta);
+      } else {
+        await adjustStock(product.id, delta);
+      }
     } finally {
       setPending(false);
     }
@@ -85,7 +102,6 @@ export function ProductCard({
         {product.category && <span className="product-card__category">{product.category}</span>}
         <h3 className="product-card__name">{product.nameSpec}</h3>
 
-        {/* ✅ 가격 표시 3개 */}
         <div className="product-card__prices">
           <span>
             출고가:{" "}
@@ -105,17 +121,32 @@ export function ProductCard({
 
         <div className="product-card__stocks">
           <div className="product-card__stock-row">
+            {hasVariants && (
+              <>
+                <span className="product-card__stock-label">사이즈</span>
+                <select
+                  className="product-card__size-select"
+                  value={selectedSize}
+                  onChange={(e) => setSelectedSize(e.target.value)}
+                  aria-label="사이즈 선택"
+                >
+                  {variants.map((v) => (
+                    <option key={v.id} value={v.size}>
+                      {v.size || "(없음)"}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
             <span className="product-card__stock-label">재고:</span>
             <strong>{qty}</strong>
             <div className="product-card__adjust">
-              
               <button type="button" onClick={() => handleAdjust(-1)} disabled={pending || qty < 1}>
                 -1
               </button>
               <button type="button" onClick={() => handleAdjust(1)} disabled={pending}>
                 +1
               </button>
-             
             </div>
           </div>
         </div>

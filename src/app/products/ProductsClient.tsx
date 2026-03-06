@@ -1,18 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Product } from "./types";
+import type { Product, ProductVariant, ProductRow } from "./types";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
-import { adjustStock, uploadProductsCsv } from "./actions";
+import { adjustStock, adjustVariantStock, uploadProductsCsv } from "./actions";
 import { EditProductModal } from "./EditProductModal";
 
 type ViewMode = "card" | "list";
 
-export function ProductsClient({ products }: { products: Product[] }) {
-  // 입력값(searchInput)과 실제 검색값(search) 분리
+export function ProductsClient({
+  products,
+  categories = [],
+  variantsByProductId = {},
+}: {
+  products: Product[];
+  categories?: string[];
+  variantsByProductId?: Record<string, ProductVariant[]>;
+}) {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("");
 
   const [uploading, setUploading] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -61,17 +69,42 @@ export function ProductsClient({ products }: { products: Product[] }) {
     });
   }, [products]);
 
-  // 검색은 orderedProducts 기준으로만 필터링(순서 유지)
+  // 검색 + 카테고리: orderedProducts 기준 필터링(순서 유지)
   const filtered = useMemo(() => {
-    if (!search.trim()) return orderedProducts;
+    let list = orderedProducts;
+    if (categoryFilter) {
+      list = list.filter((p) => (p.category ?? "").trim() === categoryFilter);
+    }
+    if (!search.trim()) return list;
     const q = search.trim().toLowerCase();
-    return orderedProducts.filter(
+    return list.filter(
       (p) =>
         p.sku.toLowerCase().includes(q) ||
         (p.nameSpec && p.nameSpec.toLowerCase().includes(q)) ||
         (p.category && p.category.toLowerCase().includes(q))
     );
-  }, [orderedProducts, search]);
+  }, [orderedProducts, search, categoryFilter]);
+
+  /** List view: one row per (product, size). No total stock. */
+  const listRows = useMemo((): ProductRow[] => {
+    const rows: ProductRow[] = [];
+    for (const p of filtered) {
+      const variants = variantsByProductId[p.id] ?? [];
+      if (variants.length > 0) {
+        for (const v of variants) {
+          rows.push({ ...p, variantId: v.id, size: v.size, variantStock: v.stock });
+        }
+      } else {
+        rows.push({
+          ...p,
+          variantId: "",
+          size: "",
+          variantStock: p.stock ?? 0,
+        });
+      }
+    }
+    return rows;
+  }, [filtered, variantsByProductId]);
 
   async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -91,10 +124,47 @@ export function ProductsClient({ products }: { products: Product[] }) {
     setSearch(searchInput);
   }
 
+  const actionButtons = (
+    <>
+      <div className="view-toggle" role="group" aria-label="보기 방식 전환">
+        <button
+          type="button"
+          className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => setViewMode("list")}
+        >
+          리스트
+        </button>
+        <button
+          type="button"
+          className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => setViewMode("card")}
+        >
+          카드
+        </button>
+      </div>
+      <a href="/products/csv/products" download className="btn btn-secondary btn-compact btn-strong">
+        CSV↓
+      </a>
+      <label className="btn btn-secondary btn-compact btn-strong">
+        {uploading ? "업로드..." : "CSV↑"}
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleProductsCsv}
+          disabled={uploading}
+          style={{ display: "none" }}
+        />
+      </label>
+      <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
+        +추가
+      </button>
+    </>
+  );
+
   return (
     <div className="products-page">
       <div className="products-toolbar products-toolbar--compact">
-        {/* 1줄: 검색창 + 검색버튼 */}
+        {/* 1줄: 검색 + 검색버튼 + 카테고리 */}
         <div className="toolbar-row toolbar-row--search">
           <input
             type="search"
@@ -109,50 +179,32 @@ export function ProductsClient({ products }: { products: Product[] }) {
           <button type="button" className="btn btn-primary btn-compact" onClick={runSearch}>
             검색
           </button>
+          <select
+            className="btn btn-secondary btn-compact"
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            aria-label="카테고리 필터"
+          >
+            <option value="">전체</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* 2줄: 왼쪽만 스크롤 + 오른쪽 +추가 고정 */}
-        <div className="toolbar-actions">
+        {/* 데스크톱 전용: 리스트/카드/CSV/+추가 */}
+        <div className="toolbar-actions toolbar-actions-desktop">
           <div className="toolbar-scroll">
-            <div className="view-toggle" role="group" aria-label="보기 방식 전환">
-              <button
-                type="button"
-                className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => setViewMode("list")}
-              >
-                리스트
-              </button>
-              <button
-                type="button"
-                className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
-                onClick={() => setViewMode("card")}
-              >
-                카드
-              </button>
-            </div>
-
-            <div className="products-csv products-csv--compact">
-              <a href="/products/csv/products" download className="btn btn-secondary btn-compact btn-strong">
-                CSV↓
-              </a>
-
-              <label className="btn btn-secondary btn-compact btn-strong">
-                {uploading ? "업로드..." : "CSV↑"}
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleProductsCsv}
-                  disabled={uploading}
-                  style={{ display: "none" }}
-                />
-              </label>
-            </div>
+            {actionButtons}
           </div>
-
-          <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
-            +추가
-          </button>
         </div>
+      </div>
+
+      {/* 모바일 전용: 하단 고정 액션 바 */}
+      <div className="toolbar-bottom-bar" aria-hidden="true">
+        {actionButtons}
       </div>
 
       <p className="products-count">
@@ -182,6 +234,7 @@ export function ProductsClient({ products }: { products: Product[] }) {
               <ProductCard
                 key={p.id}
                 product={p}
+                variants={variantsByProductId[p.id] ?? []}
                 onEditClick={() => {
                   setEditingProduct(p);
                   setEditOpen(true);
@@ -209,6 +262,7 @@ export function ProductsClient({ products }: { products: Product[] }) {
                   <th>이미지</th>
                   <th>SKU</th>
                   <th>품명</th>
+                  <th>사이즈</th>
                   <th>재고</th>
                   <th>출고가</th>
                   <th>판매가</th>
@@ -217,20 +271,23 @@ export function ProductsClient({ products }: { products: Product[] }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p) => {
-                  const qty = p.stock ?? 0;
-
+                {listRows.map((row) => {
+                  const qty = row.variantStock;
+                  const isVariant = Boolean(row.variantId);
+                  const adjust = (delta: number) =>
+                    isVariant ? adjustVariantStock(row.variantId, delta) : adjustStock(row.id, delta);
                   return (
-                    <tr key={p.id}>
+                    <tr key={row.variantId ? `${row.id}-${row.size}` : row.id}>
                       <td>
-                        {p.imageUrl ? (
-                          <img className="thumb-small" src={p.imageUrl} alt={(p.nameSpec ?? p.sku ?? "").toString()} />
+                        {row.imageUrl ? (
+                          <img className="thumb-small" src={row.imageUrl} alt={(row.nameSpec ?? row.sku ?? "").toString()} />
                         ) : (
                           <span className="thumb-empty">-</span>
                         )}
                       </td>
-                      <td>{p.sku}</td>
-                      <td>{p.nameSpec}</td>
+                      <td>{row.sku}</td>
+                      <td>{row.nameSpec}</td>
+                      <td>{row.size || "-"}</td>
                       <td>
                         <div className="stock-cell">
                           <strong>{qty}</strong>
@@ -239,26 +296,26 @@ export function ProductsClient({ products }: { products: Product[] }) {
                               type="button"
                               className="btn-mini"
                               disabled={qty < 1}
-                              onClick={async () => adjustStock(p.id, -1)}
+                              onClick={async () => adjust(-1)}
                             >
                               -1
                             </button>
-                            <button type="button" className="btn-mini" onClick={async () => adjustStock(p.id, 1)}>
+                            <button type="button" className="btn-mini" onClick={async () => adjust(1)}>
                               +1
                             </button>
                           </div>
                         </div>
                       </td>
-                      <td>{p.wholesalePrice != null ? `${p.wholesalePrice.toLocaleString()}원` : "-"}</td>
-                      <td>{p.msrpPrice != null ? `${p.msrpPrice.toLocaleString()}원` : "-"}</td>
-                      <td>{p.salePrice != null ? `${p.salePrice.toLocaleString()}원` : "-"}</td>
+                      <td>{row.wholesalePrice != null ? `${row.wholesalePrice.toLocaleString()}원` : "-"}</td>
+                      <td>{row.msrpPrice != null ? `${row.msrpPrice.toLocaleString()}원` : "-"}</td>
+                      <td>{row.salePrice != null ? `${row.salePrice.toLocaleString()}원` : "-"}</td>
                       <td>
                         <div className="row-actions">
                           <button
                             type="button"
                             className="btn btn-secondary btn-row"
                             onClick={() => {
-                              setEditingProduct(p);
+                              setEditingProduct(row);
                               setEditOpen(true);
                             }}
                           >

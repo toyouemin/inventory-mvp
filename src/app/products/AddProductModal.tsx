@@ -32,6 +32,9 @@ export function AddProductModal({
 
   const [memo, setMemo] = useState("");
 
+  type SizeRow = { size: string; stock: string };
+  const [sizeRows, setSizeRows] = useState<SizeRow[]>([]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -47,7 +50,18 @@ export function AddProductModal({
     setMsrpPrice("");
     setSalePrice("");
     setMemo("");
+    setSizeRows([]);
   }, [open, initialSku, initialNameSpec, initialCategory]);
+
+  function addSizeRow() {
+    setSizeRows((prev) => [...prev, { size: "", stock: "0" }]);
+  }
+  function removeSizeRow(index: number) {
+    setSizeRows((prev) => prev.filter((_, i) => i !== index));
+  }
+  function updateSizeRow(index: number, field: "size" | "stock", value: string) {
+    setSizeRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,17 +78,23 @@ export function AddProductModal({
         const { url } = await uploadProductImage(fd);
         finalImageUrl = url;
       }
+      const variants = sizeRows
+        .filter((r) => (r.size ?? "").trim() !== "")
+        .map((r) => ({
+          size: (r.size ?? "").trim(),
+          stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
+        }));
+
       await createProduct({
         sku: sku.trim(),
         category: category.trim() || null,
         nameSpec: nameSpec.trim(),
         imageUrl: finalImageUrl,
-
         wholesalePrice: wholesalePrice === "" ? null : parseInt(wholesalePrice, 10),
         msrpPrice: msrpPrice === "" ? null : parseInt(msrpPrice, 10),
         salePrice: salePrice === "" ? null : parseInt(salePrice, 10),
-
         memo: memo.trim() || null,
+        variants: variants.length > 0 ? variants : undefined,
       });
 
       setSku("");
@@ -87,6 +107,7 @@ export function AddProductModal({
       setMsrpPrice("");
       setSalePrice("");
       setMemo("");
+      setSizeRows([]);
 
       onClose();
     } finally {
@@ -187,6 +208,34 @@ export function AddProductModal({
             onChange={(e) => setMemo(e.target.value)}
             placeholder="(선택)"
           />
+
+          <div>
+            <label>사이즈 추가</label>
+            {sizeRows.map((row, index) => (
+              <div key={index} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                <input
+                  value={row.size}
+                  onChange={(e) => updateSizeRow(index, "size", e.target.value)}
+                  placeholder="S / M / L"
+                  style={{ flex: 1, minWidth: 0 }}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={row.stock}
+                  onChange={(e) => updateSizeRow(index, "stock", e.target.value)}
+                  placeholder="0"
+                  style={{ width: 80 }}
+                />
+                <button type="button" onClick={() => removeSizeRow(index)} className="btn btn-secondary" style={{ padding: "8px 12px" }}>
+                  삭제
+                </button>
+              </div>
+            ))}
+            <button type="button" onClick={addSizeRow} className="btn btn-secondary" style={{ marginTop: 8 }}>
+              + 사이즈 추가
+            </button>
+          </div>
 
           <div className="modal-actions">
             <button type="submit" disabled={pending}>

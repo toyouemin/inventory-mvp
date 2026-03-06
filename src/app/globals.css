@@ -121,6 +121,15 @@ button:hover {
   color: white;
 }
 
+.btn-danger {
+  background: #c0392b;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #a93226;
+}
+
 .btn-compact {
   width: auto;
   min-width: 0;
@@ -408,6 +417,13 @@ button:hover {
   background: #ddd9d2;
 }
 
+.product-card__delete-btn {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
 .product-card__edit-form {
   display: flex;
   flex-direction: column;
@@ -631,6 +647,13 @@ label {
   /* Top toolbar hidden on mobile when bottom bar is used; only search row visible */
   .products-toolbar--compact .toolbar-actions-desktop {
     display: none;
+  }
+
+  /* Bottom sticky bar: prevent last product/card from being covered */
+  .products-page,
+  .products-grid,
+  .table-wrap {
+    padding-bottom: 90px;
   }
 }
 

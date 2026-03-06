@@ -8,10 +8,12 @@ export function ProductCard({
   product,
   variants = [],
   onEditClick,
+  onDeleteClick,
 }: {
   product: Product;
   variants?: ProductVariant[];
   onEditClick?: () => void;
+  onDeleteClick?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [pending, setPending] = useState(false);
@@ -161,13 +163,24 @@ export function ProductCard({
               취소
             </button>
           ) : (
-            <button
-              type="button"
-              className="product-card__edit-btn"
-              onClick={() => setEditing(true)}
-            >
-              수정
-            </button>
+            <>
+              <button
+                type="button"
+                className="product-card__edit-btn"
+                onClick={() => setEditing(true)}
+              >
+                수정
+              </button>
+              {onDeleteClick && (
+                <button
+                  type="button"
+                  className="btn btn-danger product-card__delete-btn"
+                  onClick={onDeleteClick}
+                >
+                  삭제
+                </button>
+              )}
+            </>
           )}
         </div>
 

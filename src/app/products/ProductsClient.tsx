@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product, ProductVariant, ProductRow } from "./types";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
-import { adjustStock, adjustVariantStock, uploadProductsCsv } from "./actions";
+import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } from "./actions";
 import { EditProductModal } from "./EditProductModal";
 
 type ViewMode = "card" | "list";
@@ -106,14 +106,18 @@ export function ProductsClient({
     return rows;
   }, [filtered, variantsByProductId]);
 
-  async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>, fullSync: boolean) {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (fullSync && !confirm("CSV에 없는 기존 상품은 모두 삭제됩니다. 계속하시겠습니까?")) {
+      e.target.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await uploadProductsCsv(fd);
+      await uploadProductsCsv(fd, fullSync);
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -150,7 +154,17 @@ export function ProductsClient({
         <input
           type="file"
           accept=".csv"
-          onChange={handleProductsCsv}
+          onChange={(e) => handleProductsCsv(e, false)}
+          disabled={uploading}
+          style={{ display: "none" }}
+        />
+      </label>
+      <label className="btn btn-danger btn-compact btn-strong">
+        {uploading ? "동기화 중..." : "전체동기화"}
+        <input
+          type="file"
+          accept=".csv"
+          onChange={(e) => handleProductsCsv(e, true)}
           disabled={uploading}
           style={{ display: "none" }}
         />
@@ -239,6 +253,10 @@ export function ProductsClient({
                   setEditingProduct(p);
                   setEditOpen(true);
                 }}
+                onDeleteClick={async () => {
+                  if (!confirm("이 상품을 삭제하시겠습니까?")) return;
+                  await deleteProduct(p.id);
+                }}
               />
             ))
           )}
@@ -320,6 +338,16 @@ export function ProductsClient({
                             }}
                           >
                             수정
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-row"
+                            onClick={async () => {
+                              if (!confirm("이 상품을 삭제하시겠습니까?")) return;
+                              await deleteProduct(row.id);
+                            }}
+                          >
+                            삭제
                           </button>
                         </div>
                       </td>

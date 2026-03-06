@@ -9,32 +9,88 @@ function csvEscape(v: unknown) {
   return s;
 }
 
+const CSV_HEADER = [
+  "sku",
+  "category",
+  "name",
+  "imageUrl",
+  "size",
+  "stock",
+  "wholesalePrice",
+  "msrpPrice",
+  "salePrice",
+  "memo",
+];
+
 export async function GET() {
   if (!supabaseServer) {
     return new Response("Supabase server client not ready. Check env vars.", { status: 500 });
   }
 
-  const { data, error } = await supabaseServer
+  const { data: products, error: productsErr } = await supabaseServer
     .from("products")
-    .select("sku, name_spec, stock")
+    .select("id, sku, category, name_spec, image_url, wholesale_price, msrp_price, sale_price, memo, stock")
     .order("sku", { ascending: true });
 
-  if (error) {
-    return new Response(`Supabase error: ${error.message}`, { status: 500 });
+  if (productsErr) {
+    return new Response(`Supabase error: ${productsErr.message}`, { status: 500 });
   }
 
-  const rows = data ?? [];
+  const list = products ?? [];
+  const productIds = list.map((p: { id: string }) => p.id);
 
-  // 엑셀 깨짐 방지 BOM
-  const header = ["sku", "nameSpec", "stock"];
-  const lines = [
-    header.join(","),
-    ...rows.map((r: any) =>
-      [r.sku, r.name_spec ?? r.sku, r.stock ?? 0].map(csvEscape).join(",")
-    ),
-  ];
+  let variants: { product_id: string; size: string; stock: number }[] = [];
+  if (productIds.length > 0) {
+    const { data: variantsData } = await supabaseServer
+      .from("product_variants")
+      .select("product_id, size, stock")
+      .in("product_id", productIds);
+    variants = variantsData ?? [];
+  }
 
-  const csv = "\uFEFF" + lines.join("\n");
+  const variantsByProductId = new Map<string, { size: string; stock: number }[]>();
+  for (const v of variants) {
+    const arr = variantsByProductId.get(v.product_id) ?? [];
+    arr.push({ size: v.size, stock: Number(v.stock) ?? 0 });
+    variantsByProductId.set(v.product_id, arr);
+  }
+
+  const rows: string[][] = [];
+  for (const p of list) {
+    const productVariants = variantsByProductId.get(p.id) ?? [];
+    if (productVariants.length > 0) {
+      for (const v of productVariants) {
+        rows.push([
+          csvEscape(p.sku),
+          csvEscape(p.category),
+          csvEscape(p.name_spec ?? p.sku),
+          csvEscape(p.image_url),
+          csvEscape(v.size),
+          csvEscape(v.stock),
+          csvEscape(p.wholesale_price ?? ""),
+          csvEscape(p.msrp_price ?? ""),
+          csvEscape(p.sale_price ?? ""),
+          csvEscape(p.memo ?? ""),
+        ]);
+      }
+    } else {
+      rows.push([
+        csvEscape(p.sku),
+        csvEscape(p.category),
+        csvEscape(p.name_spec ?? p.sku),
+        csvEscape(p.image_url),
+        "",
+        csvEscape(p.stock ?? 0),
+        csvEscape(p.wholesale_price ?? ""),
+        csvEscape(p.msrp_price ?? ""),
+        csvEscape(p.sale_price ?? ""),
+        csvEscape(p.memo ?? ""),
+      ]);
+    }
+  }
+
+  const lines = [CSV_HEADER.join(","), ...rows.map((r) => r.join(","))];
+  const csv = "\uFEFF" + lines.join("\r\n");
 
   return new Response(csv, {
     headers: {

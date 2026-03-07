@@ -666,14 +666,8 @@ label {
 
 @media (max-width: 768px) {
   .toolbar-bottom-bar {
-    display: flex;
-
-/* --- 여기에 추가된 부분 --- */
-    height: 38px !important;  /* 높이를 딱 고정해서 정렬! */
-    margin: 0 !important;    /* 위로 뜨게 만드는 여백 제거! */
-    /* ------------------------ */
-    
-position: fixed;
+    display: flex;  
+    position: fixed;
     bottom: 0;
     left: 0;
     right: 0;

@@ -683,7 +683,7 @@ label {
   }
 
   .toolbar-bottom-bar .btn-compact {
-    flex: 1;  /* 0 auto; */
+    flex: 0  0 auto;
     height: 36px;
     padding: 0 12px;
     font-size: 13px;

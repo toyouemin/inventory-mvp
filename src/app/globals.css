@@ -674,7 +674,7 @@ label {
     z-index: 20;
     background: var(--card);
     border-top: 1px solid var(--border);
-    padding: 4px 10px;
+    padding: 0px 10px;
     gap: 8px;
     align-items: center;
     overflow-x: auto;

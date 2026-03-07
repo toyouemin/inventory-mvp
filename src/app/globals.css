@@ -676,14 +676,14 @@ label {
     border-top: 1px solid var(--border);
     padding: 8px 10px;
     gap: 8px;
-    align-items: center;
+    align-items: stretch ;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
   }
 
   .toolbar-bottom-bar .btn-compact {
-    flex: 0  0 auto;
+    flex: 0 0 auto;
     height: 36px;
     padding: 0 12px;
     font-size: 13px;

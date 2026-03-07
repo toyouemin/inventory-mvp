@@ -676,7 +676,7 @@ label {
     border-top: 1px solid var(--border);
     padding: 8px 10px;
     gap: 8px;
-    align-items: stretch ;
+    align-items: stretch ; /*center*/
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);

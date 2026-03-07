@@ -664,16 +664,9 @@ label {
   display: none;
 }
 
-  @media (max-width: 768px) /*{
-   .toolbar-bottom-bar {*/
-   {
-  .toolbar-bottom-bar .btn-compact,
-  .toolbar-bottom-bar button,
-  .toolbar-bottom-bar .btn,
-  .toolbar-bottom-bar label.btn {
-
-
- display: flex;  
+  @media (max-width: 768px) {
+   .toolbar-bottom-bar {
+    display: flex;  
     position: fixed;
     bottom: 0;
     left: 0;

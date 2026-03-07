@@ -665,6 +665,22 @@ label {
 }
 
 @media (max-width: 768px) {
+  .toolbar-bottom-bar .btn-compact,
+  .toolbar-bottom-bar button,
+  .toolbar-bottom-bar .btn,
+  .toolbar-bottom-bar label.btn {
+    height: 36px;
+    padding: 0 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    margin: 0;
+    box-sizing: border-box;
+  }
+}
+
+/* @media (max-width: 768px) {
   .toolbar-bottom-bar {
     display: flex;  
     position: fixed;
@@ -680,7 +696,7 @@ label {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
-  }
+  } */
 
   .toolbar-bottom-bar .btn-compact {
     flex: 0 0 auto;

@@ -226,7 +226,7 @@ button:hover {
   padding: 0 14px;
 }
 
-/* .toolbar-actions {
+.toolbar-actions {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -246,34 +246,7 @@ button:hover {
 } 
 .toolbar-scroll > * {
   flex: 0 0 auto;
-} */
-
-.toolbar-actions {
-  display: flex;
-  justify-content: center;
-  align-items: stretch;
-  gap: 8px;
-  flex-wrap: nowrap;
-}
-
-.toolbar-scroll {
-  display: flex;
-  justify-content: center;
-  align-items: stretch;
-  gap: 8px;
-  flex-wrap: nowrap;
-  min-width: 0;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.toolbar-actions > *,
-.toolbar-scroll > * {
-  flex: 0 0 auto;
-}
-
-
-
+} 
 
 .view-toggle {
   display: inline-flex;

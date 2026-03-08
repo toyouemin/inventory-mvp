@@ -243,6 +243,9 @@ button:hover {
   min-width: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+} 
+.toolbar-scroll > * {
+  flex: 0 0 auto;
 } */
 
 .toolbar-actions {
@@ -264,9 +267,13 @@ button:hover {
   -webkit-overflow-scrolling: touch;
 }
 
+.toolbar-actions > *,
 .toolbar-scroll > * {
   flex: 0 0 auto;
 }
+
+
+
 
 .view-toggle {
   display: inline-flex;

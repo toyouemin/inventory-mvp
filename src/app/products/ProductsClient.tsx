@@ -26,6 +26,7 @@ export function ProductsClient({
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingVariants, setEditingVariants] = useState<ProductVariant[]>([]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
@@ -250,7 +251,12 @@ export function ProductsClient({
                 product={p}
                 variants={variantsByProductId[p.id] ?? []}
                 onEditClick={() => {
+                  const v = variantsByProductId[p.id] ?? [];
+                  if (process.env.NODE_ENV === "development") {
+                    console.log("[ProductsClient] edit product:", p.id, p.sku, "variants:", v.length);
+                  }
                   setEditingProduct(p);
+                  setEditingVariants(v);
                   setEditOpen(true);
                 }}
                 onDeleteClick={async () => {
@@ -333,7 +339,12 @@ export function ProductsClient({
                             type="button"
                             className="btn btn-secondary btn-row"
                             onClick={() => {
+                              const v = variantsByProductId[row.id] ?? [];
+                              if (process.env.NODE_ENV === "development") {
+                                console.log("[ProductsClient] edit row:", row.id, row.sku, "variants:", v.length);
+                              }
                               setEditingProduct(row);
+                              setEditingVariants(v);
                               setEditOpen(true);
                             }}
                           >
@@ -363,12 +374,14 @@ export function ProductsClient({
       <AddProductModal open={addOpen} onClose={() => setAddOpen(false)} initialSku={search.trim()} />
 
       <EditProductModal
+        key={editingProduct?.id ?? "closed"}
         open={editOpen}
         product={editingProduct}
-        variants={editingProduct ? (variantsByProductId[editingProduct.id] ?? []) : []}
+        variants={editingVariants}
         onClose={() => {
           setEditOpen(false);
           setEditingProduct(null);
+          setEditingVariants([]);
         }}
       />
     </div>

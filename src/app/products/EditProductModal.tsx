@@ -57,13 +57,6 @@ export function EditProductModal({
   useEffect(() => {
     if (!open || !product) return;
 
-    const v = variants ?? [];
-    const rows = toVariantRows(v, product.stock ?? 0);
-    if (process.env.NODE_ENV === "development") {
-      console.log("[EditProductModal] product.id:", product.id, "variants:", v.length, "rows:", rows.length);
-    }
-    setVariantRows(rows);
-
     setPending(false);
     setSku(product.sku ?? "");
     setCategory(product.category ?? "");
@@ -77,6 +70,7 @@ export function EditProductModal({
     setSalePrice(product.salePrice != null ? String(product.salePrice) : "");
 
     setMemo(product.memo ?? "");
+    setVariantRows(toVariantRows(variants ?? [], product.stock ?? 0));
     setVariantError("");
   }, [open, product, variants]);
 
@@ -167,7 +161,7 @@ export function EditProductModal({
           <label>품명 *</label>
           <input value={nameSpec} onChange={(e) => setNameSpec(e.target.value)} required />
 
-          <div className="variant-editor-section" data-section="variant-editor">
+          <div className="variant-editor-section">
             <VariantEditor
               rows={variantRows}
               onRowsChange={setVariantRows}

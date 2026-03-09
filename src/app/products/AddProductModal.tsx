@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
+import { VariantEditor, type VariantRow } from "./VariantEditor";
 
 export function AddProductModal({
   open,
@@ -32,8 +33,8 @@ export function AddProductModal({
 
   const [memo, setMemo] = useState("");
 
-  type SizeRow = { size: string; stock: string };
-  const [sizeRows, setSizeRows] = useState<SizeRow[]>([]);
+  const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
+  const [variantError, setVariantError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -50,23 +51,27 @@ export function AddProductModal({
     setMsrpPrice("");
     setSalePrice("");
     setMemo("");
-    setSizeRows([]);
+    setVariantRows([]);
+    setVariantError("");
   }, [open, initialSku, initialNameSpec, initialCategory]);
-
-  function addSizeRow() {
-    setSizeRows((prev) => [...prev, { size: "", stock: "0" }]);
-  }
-  function removeSizeRow(index: number) {
-    setSizeRows((prev) => prev.filter((_, i) => i !== index));
-  }
-  function updateSizeRow(index: number, field: "size" | "stock", value: string) {
-    setSizeRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)));
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!sku.trim() || !nameSpec.trim()) return;
     if (pending) return;
+
+    const emptySizeRows = variantRows.filter((r) => (r.size ?? "").trim() === "");
+    const rowsWithSize = variantRows.filter((r) => (r.size ?? "").trim() !== "");
+    if (emptySizeRows.length > 0 && (variantRows.length > 1 || rowsWithSize.length > 0)) {
+      setVariantError("사이즈가 비어 있는 행이 있습니다. 사이즈를 입력하거나 해당 행을 삭제해 주세요.");
+      return;
+    }
+    const sizes = rowsWithSize.map((r) => (r.size ?? "").trim());
+    if (new Set(sizes).size !== sizes.length) {
+      setVariantError("중복된 사이즈가 있습니다.");
+      return;
+    }
+    setVariantError("");
 
     setPending(true);
     try {
@@ -78,12 +83,10 @@ export function AddProductModal({
         const { url } = await uploadProductImage(fd);
         finalImageUrl = url;
       }
-      const variants = sizeRows
-        .filter((r) => (r.size ?? "").trim() !== "")
-        .map((r) => ({
-          size: (r.size ?? "").trim(),
-          stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
-        }));
+      const variants = rowsWithSize.map((r) => ({
+        size: (r.size ?? "").trim(),
+        stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
+      }));
 
       await createProduct({
         sku: sku.trim(),
@@ -107,7 +110,8 @@ export function AddProductModal({
       setMsrpPrice("");
       setSalePrice("");
       setMemo("");
-      setSizeRows([]);
+      setVariantRows([]);
+      setVariantError("");
 
       onClose();
     } finally {
@@ -181,6 +185,7 @@ export function AddProductModal({
           <label>출고가</label>
           <input
             type="number"
+            inputMode="decimal"
             value={wholesalePrice}
             onChange={(e) => setWholesalePrice(e.target.value)}
             placeholder="0"
@@ -189,6 +194,7 @@ export function AddProductModal({
           <label>소비자가</label>
           <input
             type="number"
+            inputMode="decimal"
             value={msrpPrice}
             onChange={(e) => setMsrpPrice(e.target.value)}
             placeholder="0"
@@ -197,6 +203,7 @@ export function AddProductModal({
           <label>실판매가</label>
           <input
             type="number"
+            inputMode="decimal"
             value={salePrice}
             onChange={(e) => setSalePrice(e.target.value)}
             placeholder="0"
@@ -209,33 +216,12 @@ export function AddProductModal({
             placeholder="(선택)"
           />
 
-          <div>
-            <label>사이즈 추가</label>
-            {sizeRows.map((row, index) => (
-              <div key={index} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
-                <input
-                  value={row.size}
-                  onChange={(e) => updateSizeRow(index, "size", e.target.value)}
-                  placeholder="S / M / L"
-                  style={{ flex: 1, minWidth: 0 }}
-                />
-                <input
-                  type="number"
-                  min={0}
-                  value={row.stock}
-                  onChange={(e) => updateSizeRow(index, "stock", e.target.value)}
-                  placeholder="0"
-                  style={{ width: 80 }}
-                />
-                <button type="button" onClick={() => removeSizeRow(index)} className="btn btn-secondary" style={{ padding: "8px 12px" }}>
-                  삭제
-                </button>
-              </div>
-            ))}
-            <button type="button" onClick={addSizeRow} className="btn btn-secondary" style={{ marginTop: 8 }}>
-              + 사이즈 추가
-            </button>
-          </div>
+          <VariantEditor
+            rows={variantRows}
+            onRowsChange={setVariantRows}
+            error={variantError}
+            autoFocusLastAdded
+          />
 
           <div className="modal-actions">
             <button type="submit" disabled={pending}>

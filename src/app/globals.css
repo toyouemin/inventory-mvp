@@ -587,6 +587,46 @@ label {
   color: var(--text);
 }
 
+/* VariantEditor: size/stock row - 모바일 터치·입력 안정화 */
+.variant-editor-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.variant-editor-size-input {
+  flex: 1.5 1 120px;
+  min-width: 100px;
+  width: auto !important;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 16px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.variant-editor-stock-input {
+  flex: 1 1 80px;
+  min-width: 70px;
+  width: auto !important;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 16px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.variant-editor-row .btn {
+  flex: 0 0 auto;
+  min-height: 44px;
+  align-self: center;
+}
+
 /* ========== MOBILE ========== */
 @media (max-width: 768px) {
   main {

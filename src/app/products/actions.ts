@@ -286,6 +286,11 @@ export async function updateProduct(
     salePrice?: number | null;
 
     memo?: string | null;
+    variants?: {
+      updates: Array<{ id?: string; size: string; stock: number }>;
+      deleteIds: string[];
+    };
+    stock?: number;
   }
 ) {
   if (!productId) return;
@@ -308,11 +313,38 @@ export async function updateProduct(
   }
 
   if (data.memo !== undefined) updateData.memo = data.memo?.trim() || null;
+  if (data.stock !== undefined)
+    updateData.stock = Number.isFinite(Number(data.stock)) ? Math.max(0, Number(data.stock)) : 0;
+  if (data.variants && data.variants.updates.length > 0)
+    updateData.stock = 0;
 
   const { error } = await supabaseServer.from("products").update(updateData).eq("id", productId);
   if (error) throw new Error(error.message);
 
+  if (data.variants) {
+    const { updates, deleteIds } = data.variants;
+    for (const id of deleteIds) {
+      if (id) {
+        await supabaseServer.from("product_variants").delete().eq("id", id);
+      }
+    }
+    for (const u of updates) {
+      const size = (u.size ?? "").trim();
+      const stock = Number.isFinite(Number(u.stock)) ? Math.max(0, Number(u.stock)) : 0;
+      if (u.id) {
+        await supabaseServer.from("product_variants").update({ size, stock }).eq("id", u.id);
+      } else {
+        await supabaseServer.from("product_variants").insert({
+          product_id: productId,
+          size,
+          stock,
+        });
+      }
+    }
+  }
+
   revalidatePath("/products");
+  revalidatePath("/status");
 }
 
 // 상품 삭제 (cascade로 product_variants 자동 삭제)

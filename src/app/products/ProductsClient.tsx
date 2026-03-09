@@ -365,6 +365,7 @@ export function ProductsClient({
       <EditProductModal
         open={editOpen}
         product={editingProduct}
+        variants={editingProduct ? (variantsByProductId[editingProduct.id] ?? []) : []}
         onClose={() => {
           setEditOpen(false);
           setEditingProduct(null);

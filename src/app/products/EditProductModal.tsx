@@ -1,17 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
-import type { Product } from "./types";
+import type { Product, ProductVariant } from "./types";
+import { VariantEditor, generateRowId, type VariantRow } from "./VariantEditor";
+
+/** rowId: UI 전용(React key). variantId: DB id. 절대 섞이지 않음. */
+function toVariantRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
+  if (variants.length > 0) {
+    return variants.map((v) => ({
+      rowId: generateRowId(),
+      size: (v.size ?? "").trim(),
+      stock: String(v.stock),
+      variantId: v.id,
+    }));
+  }
+  return [
+    { rowId: generateRowId(), size: "", stock: String(fallbackStock ?? 0), variantId: undefined },
+  ];
+}
 
 export function EditProductModal({
   open,
   product,
+  variants = [],
   onClose,
 }: {
   open: boolean;
   product: Product | null;
+  variants?: ProductVariant[];
   onClose: () => void;
 }) {
   const [pending, setPending] = useState(false);
@@ -28,6 +46,13 @@ export function EditProductModal({
   const [salePrice, setSalePrice] = useState("");
 
   const [memo, setMemo] = useState("");
+  const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
+  const [variantError, setVariantError] = useState("");
+
+  const initialVariantIds = useMemo(
+    () => (variants ?? []).map((v) => v.id),
+    [variants]
+  );
 
   useEffect(() => {
     if (!open || !product) return;
@@ -45,13 +70,42 @@ export function EditProductModal({
     setSalePrice(product.salePrice != null ? String(product.salePrice) : "");
 
     setMemo(product.memo ?? "");
-  }, [open, product]);
+    setVariantRows(toVariantRows(variants ?? [], product.stock ?? 0));
+    setVariantError("");
+  }, [open, product, variants]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!product) return;
     if (!sku.trim() || !nameSpec.trim()) return;
     if (pending) return;
+
+    const emptySizeRows = variantRows.filter((r) => (r.size ?? "").trim() === "");
+    const rowsWithNonEmptySize = variantRows.filter((r) => (r.size ?? "").trim() !== "");
+    if (emptySizeRows.length > 0 && (variantRows.length > 1 || rowsWithNonEmptySize.length > 0)) {
+      setVariantError("사이즈가 비어 있는 행이 있습니다. 사이즈를 입력하거나 해당 행을 삭제해 주세요.");
+      return;
+    }
+    const sizes = rowsWithNonEmptySize.map((r) => (r.size ?? "").trim());
+    if (new Set(sizes).size !== sizes.length) {
+      setVariantError("중복된 사이즈가 있습니다.");
+      return;
+    }
+    setVariantError("");
+
+    const rowsWithSize = rowsWithNonEmptySize;
+    const singleStockRow = variantRows.find((r) => (r.size ?? "").trim() === "");
+    const updates = rowsWithSize.map((r) => ({
+      id: r.variantId,
+      size: (r.size ?? "").trim(),
+      stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
+    }));
+    const remainingIds = new Set(rowsWithSize.map((r) => r.variantId).filter(Boolean));
+    const deleteIds = initialVariantIds.filter((id) => !remainingIds.has(id));
+    const stockForSingle =
+      updates.length === 0 && singleStockRow
+        ? Math.max(0, parseInt(String(singleStockRow.stock), 10) || 0)
+        : undefined;
 
     setPending(true);
     try {
@@ -68,13 +122,12 @@ export function EditProductModal({
         category: category.trim() || null,
         nameSpec: nameSpec.trim(),
         imageUrl: finalImageUrl,
-
-        // ✅ DB 컬럼에 맞춰 전달
         wholesalePrice: wholesalePrice === "" ? null : parseInt(wholesalePrice, 10),
         msrpPrice: msrpPrice === "" ? null : parseInt(msrpPrice, 10),
         salePrice: salePrice === "" ? null : parseInt(salePrice, 10),
-
         memo: memo.trim() || null,
+        variants: { updates, deleteIds },
+        stock: stockForSingle,
       });
 
       onClose();
@@ -143,6 +196,7 @@ export function EditProductModal({
           <label>출고가</label>
           <input
             type="number"
+            inputMode="decimal"
             value={wholesalePrice}
             onChange={(e) => setWholesalePrice(e.target.value)}
             placeholder="0"
@@ -151,6 +205,7 @@ export function EditProductModal({
           <label>소비자가</label>
           <input
             type="number"
+            inputMode="decimal"
             value={msrpPrice}
             onChange={(e) => setMsrpPrice(e.target.value)}
             placeholder="0"
@@ -159,6 +214,7 @@ export function EditProductModal({
           <label>실판매가</label>
           <input
             type="number"
+            inputMode="decimal"
             value={salePrice}
             onChange={(e) => setSalePrice(e.target.value)}
             placeholder="0"
@@ -166,6 +222,13 @@ export function EditProductModal({
 
           <label>비고</label>
           <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
+
+          <VariantEditor
+            rows={variantRows}
+            onRowsChange={setVariantRows}
+            error={variantError}
+            autoFocusLastAdded
+          />
 
           <div className="modal-actions">
             <button type="submit" disabled={pending}>

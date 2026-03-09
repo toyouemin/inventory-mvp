@@ -156,7 +156,7 @@ export function EditProductModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>상품 수정</h3>
+        <h3>상품 수정 테스트 123</h3>
         <form onSubmit={handleSave} className="modal-form">
         {product.updatedAt && (
   <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
@@ -176,38 +176,98 @@ export function EditProductModal({
           <label>품명 *</label>
           <input value={nameSpec} onChange={(e) => setNameSpec(e.target.value)} required />
 
-          <div style={{ background: "yellow", padding: 8 }}>edit variant ui test</div>
+          <div style={{ background: "yellow", padding: 8, marginBottom: 8 }}>
+            edit variant ui test
+          </div>
 
-          <div className="variant-editor-section">
-            <label>사이즈 추가</label>
+          <div style={{ background: "#fee", padding: 8, borderRadius: 6, marginBottom: 12 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 8,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              <span>사이즈 / 수량</span>
+              <button
+                type="button"
+                onClick={addVariantRow}
+                style={{
+                  padding: "6px 10px",
+                  fontSize: 13,
+                  borderRadius: 4,
+                  border: "1px solid #ccc",
+                  background: "#fff",
+                  cursor: "pointer",
+                }}
+              >
+                + 사이즈 추가
+              </button>
+            </div>
+
             {rowsToShow.map((row) => (
-              <div key={row.rowId} className="variant-editor-row">
+              <div
+                key={row.rowId}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 80px 56px",
+                  gap: 8,
+                  marginBottom: 8,
+                }}
+              >
                 <input
                   type="text"
-                  className="variant-editor-size-input"
+                  placeholder="사이즈"
                   value={row.size}
                   onChange={(e) => updateVariantRow(row.rowId, "size", e.target.value)}
-                  placeholder="사이즈"
-                  autoComplete="off"
+                  style={{
+                    height: 40,
+                    border: "1px solid #ccc",
+                    borderRadius: 4,
+                    padding: "0 8px",
+                    fontSize: 14,
+                    boxSizing: "border-box",
+                  }}
                 />
                 <input
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  className="variant-editor-stock-input"
+                  placeholder="수량"
                   value={row.stock}
                   onChange={(e) => updateVariantRow(row.rowId, "stock", e.target.value)}
-                  placeholder="재고"
+                  style={{
+                    height: 40,
+                    border: "1px solid #ccc",
+                    borderRadius: 4,
+                    padding: "0 8px",
+                    fontSize: 14,
+                    boxSizing: "border-box",
+                  }}
                 />
-                <button type="button" className="btn btn-secondary" onClick={() => removeVariantRow(row.rowId)}>
+                <button
+                  type="button"
+                  onClick={() => removeVariantRow(row.rowId)}
+                  style={{
+                    height: 40,
+                    border: "1px solid #ccc",
+                    borderRadius: 4,
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                >
                   삭제
                 </button>
               </div>
             ))}
-            {variantError && <div style={{ color: "crimson", fontSize: 13, marginTop: 6 }}>{variantError}</div>}
-            <button type="button" className="btn btn-secondary" style={{ marginTop: 8 }} onClick={addVariantRow}>
-              + 사이즈 추가
-            </button>
+
+            {variantError && (
+              <div style={{ color: "crimson", fontSize: 13, marginTop: 4 }}>{variantError}</div>
+            )}
           </div>
 
           <label>이미지</label>

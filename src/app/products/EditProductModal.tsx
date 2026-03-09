@@ -4,21 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
-import { VariantEditor, generateRowId, type VariantRow } from "./VariantEditor";
 
-/** rowId: UI 전용(React key). variantId: DB id. 절대 섞이지 않음. */
-function toVariantRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
+type VariantRow = { rowId: string; size: string; stock: string; variantId?: string };
+
+function makeRow(size = "", stock = "0", variantId?: string): VariantRow {
+  return { rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, size, stock, variantId };
+}
+
+function variantsToRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
   if (variants.length > 0) {
-    return variants.map((v) => ({
-      rowId: generateRowId(),
-      size: (v.size ?? "").trim(),
-      stock: String(v.stock),
-      variantId: v.id,
-    }));
+    return variants.map((v) => makeRow((v.size ?? "").trim(), String(v.stock), v.id));
   }
-  return [
-    { rowId: generateRowId(), size: "", stock: String(fallbackStock ?? 0), variantId: undefined },
-  ];
+  return [makeRow("", String(fallbackStock ?? 0))];
 }
 
 export function EditProductModal({
@@ -46,7 +43,7 @@ export function EditProductModal({
   const [salePrice, setSalePrice] = useState("");
 
   const [memo, setMemo] = useState("");
-  const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
+  const [variantRows, setVariantRows] = useState<VariantRow[]>(() => [makeRow()]);
   const [variantError, setVariantError] = useState("");
 
   const initialVariantIds = useMemo(
@@ -70,7 +67,8 @@ export function EditProductModal({
     setSalePrice(product.salePrice != null ? String(product.salePrice) : "");
 
     setMemo(product.memo ?? "");
-    setVariantRows(toVariantRows(variants ?? [], product.stock ?? 0));
+    const rows = variantsToRows(variants ?? [], product.stock ?? 0);
+    setVariantRows(rows.length > 0 ? rows : [makeRow("", String(product.stock ?? 0))]);
     setVariantError("");
   }, [open, product, variants]);
 
@@ -138,6 +136,23 @@ export function EditProductModal({
 
   if (!open || !product) return null;
 
+  const rowsToShow = variantRows.length > 0 ? variantRows : variantsToRows(variants ?? [], product.stock ?? 0);
+
+  function addVariantRow() {
+    setVariantRows((prev) => [...prev, makeRow()]);
+  }
+  function updateVariantRow(rowId: string, field: "size" | "stock", value: string) {
+    setVariantRows((prev) =>
+      prev.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
+    );
+  }
+  function removeVariantRow(rowId: string) {
+    setVariantRows((prev) => {
+      const next = prev.filter((r) => r.rowId !== rowId);
+      return next.length > 0 ? next : [makeRow()];
+    });
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -161,13 +176,38 @@ export function EditProductModal({
           <label>품명 *</label>
           <input value={nameSpec} onChange={(e) => setNameSpec(e.target.value)} required />
 
+          <div style={{ background: "yellow", padding: 8 }}>edit variant ui test</div>
+
           <div className="variant-editor-section">
-            <VariantEditor
-              rows={variantRows}
-              onRowsChange={setVariantRows}
-              error={variantError}
-              autoFocusLastAdded
-            />
+            <label>사이즈 추가</label>
+            {rowsToShow.map((row) => (
+              <div key={row.rowId} className="variant-editor-row">
+                <input
+                  type="text"
+                  className="variant-editor-size-input"
+                  value={row.size}
+                  onChange={(e) => updateVariantRow(row.rowId, "size", e.target.value)}
+                  placeholder="사이즈"
+                  autoComplete="off"
+                />
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  className="variant-editor-stock-input"
+                  value={row.stock}
+                  onChange={(e) => updateVariantRow(row.rowId, "stock", e.target.value)}
+                  placeholder="재고"
+                />
+                <button type="button" className="btn btn-secondary" onClick={() => removeVariantRow(row.rowId)}>
+                  삭제
+                </button>
+              </div>
+            ))}
+            {variantError && <div style={{ color: "crimson", fontSize: 13, marginTop: 6 }}>{variantError}</div>}
+            <button type="button" className="btn btn-secondary" style={{ marginTop: 8 }} onClick={addVariantRow}>
+              + 사이즈 추가
+            </button>
           </div>
 
           <label>이미지</label>

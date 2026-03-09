@@ -26,6 +26,7 @@ export function ProductsClient({
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingVariants, setEditingVariants] = useState<ProductVariant[]>([]);
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
@@ -251,6 +252,7 @@ export function ProductsClient({
                 variants={variantsByProductId[p.id] ?? []}
                 onEditClick={() => {
                   setEditingProduct(p);
+                  setEditingVariants(variantsByProductId[p.id] ?? []);
                   setEditOpen(true);
                 }}
                 onDeleteClick={async () => {
@@ -334,6 +336,7 @@ export function ProductsClient({
                             className="btn btn-secondary btn-row"
                             onClick={() => {
                               setEditingProduct(row);
+                              setEditingVariants(variantsByProductId[row.id] ?? []);
                               setEditOpen(true);
                             }}
                           >
@@ -363,12 +366,14 @@ export function ProductsClient({
       <AddProductModal open={addOpen} onClose={() => setAddOpen(false)} initialSku={search.trim()} />
 
       <EditProductModal
+        key={editingProduct?.id ?? "closed"}
         open={editOpen}
         product={editingProduct}
-        variants={editingProduct ? (variantsByProductId[editingProduct.id] ?? []) : []}
+        variants={editingVariants}
         onClose={() => {
           setEditOpen(false);
           setEditingProduct(null);
+          setEditingVariants([]);
         }}
       />
     </div>

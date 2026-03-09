@@ -39,16 +39,21 @@ export function VariantEditor({
 
   const removeRow = useCallback(
     (rowId: string) => {
-      onRowsChange(rows.filter((r) => r.rowId !== rowId));
+      const next = rows.filter((r) => r.rowId !== rowId);
+      onRowsChange(next.length > 0 ? next : [{ rowId: generateRowId(), size: "", stock: "0", variantId: undefined }]);
     },
     [rows, onRowsChange]
   );
 
   const updateRow = useCallback(
     (rowId: string, field: "size" | "stock", value: string) => {
-      onRowsChange(
-        rows.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
-      );
+      if (rows.length === 0) {
+        onRowsChange([{ rowId: generateRowId(), size: field === "size" ? value : "", stock: field === "stock" ? value : "0", variantId: undefined }]);
+      } else {
+        onRowsChange(
+          rows.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
+        );
+      }
     },
     [rows, onRowsChange]
   );
@@ -72,10 +77,12 @@ export function VariantEditor({
     });
   }, [rows.length, autoFocusLastAdded]);
 
+  const displayRows = rows.length > 0 ? rows : [{ rowId: "empty-1", size: "", stock: "0", variantId: undefined }];
+
   return (
-    <div>
+    <div style={{ display: "block", minHeight: 80 }}>
       <label>사이즈 추가</label>
-      {rows.map((row) => (
+      {displayRows.map((row) => (
         <div key={row.rowId} className="variant-editor-row">
           <input
             type="text"

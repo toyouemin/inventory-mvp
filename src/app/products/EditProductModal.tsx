@@ -161,6 +161,15 @@ export function EditProductModal({
           <label>품명 *</label>
           <input value={nameSpec} onChange={(e) => setNameSpec(e.target.value)} required />
 
+          <div className="variant-editor-section">
+            <VariantEditor
+              rows={variantRows}
+              onRowsChange={setVariantRows}
+              error={variantError}
+              autoFocusLastAdded
+            />
+          </div>
+
           <label>이미지</label>
           {(imagePreview || imageUrl) && (
             <div style={{ marginBottom: 8 }}>
@@ -222,13 +231,6 @@ export function EditProductModal({
 
           <label>비고</label>
           <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
-
-          <VariantEditor
-            rows={variantRows}
-            onRowsChange={setVariantRows}
-            error={variantError}
-            autoFocusLastAdded
-          />
 
           <div className="modal-actions">
             <button type="submit" disabled={pending}>

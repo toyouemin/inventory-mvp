@@ -150,6 +150,15 @@ export function AddProductModal({
             required
           />
 
+          <div className="variant-editor-section">
+            <VariantEditor
+              rows={variantRows}
+              onRowsChange={setVariantRows}
+              error={variantError}
+              autoFocusLastAdded
+            />
+          </div>
+
           <label>이미지</label>
           {(imagePreview || imageUrl) && (
             <div style={{ marginBottom: 8 }}>
@@ -214,13 +223,6 @@ export function AddProductModal({
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="(선택)"
-          />
-
-          <VariantEditor
-            rows={variantRows}
-            onRowsChange={setVariantRows}
-            error={variantError}
-            autoFocusLastAdded
           />
 
           <div className="modal-actions">

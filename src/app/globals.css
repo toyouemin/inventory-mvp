@@ -544,7 +544,7 @@ label {
   inset: 0;
   background: rgba(0, 0, 0, 0.4);
   display: flex;
-  align-items: stretch; /* center;*/
+  align-items: center;
   justify-content: center;
   z-index: 100;
   padding: 16px;
@@ -558,6 +558,8 @@ label {
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
@@ -587,20 +589,21 @@ label {
   color: var(--text);
 }
 
-/* VariantEditor: size/stock row - 모바일 터치·입력 안정화 */
+/* VariantEditor: size/stock row - 모바일 한 줄 내 수용 */
 .variant-editor-row {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(90px, 1.4fr) minmax(64px, 1fr) 44px;
+  gap: 6px;
+  align-items: center;
   margin-top: 6px;
+  min-width: 0;
 }
 
 .variant-editor-size-input {
-  flex: 1.5 1 120px;
-  min-width: 100px;
-  width: auto !important;
+  min-width: 0;
+  width: 100% !important;
   min-height: 44px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 16px;
@@ -609,11 +612,10 @@ label {
 }
 
 .variant-editor-stock-input {
-  flex: 1 1 80px;
-  min-width: 70px;
-  width: auto !important;
+  min-width: 0;
+  width: 100% !important;
   min-height: 44px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 16px;
@@ -622,9 +624,41 @@ label {
 }
 
 .variant-editor-row .btn {
-  flex: 0 0 auto;
-  min-height: 44px;
-  align-self: center;
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.variant-editor-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 모바일: variant row 더 좁은 화면 대응 */
+@media (max-width: 768px) {
+  .variant-editor-row {
+    grid-template-columns: minmax(80px, 1.4fr) minmax(56px, 1fr) 40px;
+    gap: 6px;
+  }
+  .variant-editor-row .btn {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+    font-size: 11px;
+  }
+  .variant-editor-size-input,
+  .variant-editor-stock-input {
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 15px;
+  }
 }
 
 /* ========== MOBILE ========== */

@@ -156,7 +156,7 @@ export function EditProductModal({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>상품 수정 테스트 123</h3>
+        <h3>상품 수정</h3>
         <form onSubmit={handleSave} className="modal-form">
         {product.updatedAt && (
   <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
@@ -176,46 +176,17 @@ export function EditProductModal({
           <label>품명 *</label>
           <input value={nameSpec} onChange={(e) => setNameSpec(e.target.value)} required />
 
-          <div style={{ background: "yellow", padding: 8, marginBottom: 8 }}>
-            edit variant ui test
-          </div>
-
-          <div style={{ background: "#fee", padding: 8, borderRadius: 6, marginBottom: 12 }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 8,
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              <span>사이즈 / 수량</span>
-              <button
-                type="button"
-                onClick={addVariantRow}
-                style={{
-                  padding: "6px 10px",
-                  fontSize: 13,
-                  borderRadius: 4,
-                  border: "1px solid #ccc",
-                  background: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                + 사이즈 추가
-              </button>
-            </div>
-
+          <label>사이즈 추가</label>
+          <div style={{ display: "block", minHeight: 80, marginTop: 4 }}>
             {rowsToShow.map((row) => (
               <div
                 key={row.rowId}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 80px 56px",
-                  gap: 8,
-                  marginBottom: 8,
+                  gridTemplateColumns: "1fr 80px 48px",
+                  gap: 6,
+                  marginTop: 6,
+                  alignItems: "center",
                 }}
               >
                 <input
@@ -224,11 +195,12 @@ export function EditProductModal({
                   value={row.size}
                   onChange={(e) => updateVariantRow(row.rowId, "size", e.target.value)}
                   style={{
-                    height: 40,
-                    border: "1px solid #ccc",
-                    borderRadius: 4,
-                    padding: "0 8px",
-                    fontSize: 14,
+                    minHeight: 44,
+                    height: 44,
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 16,
                     boxSizing: "border-box",
                   }}
                 />
@@ -236,15 +208,16 @@ export function EditProductModal({
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  placeholder="수량"
+                  placeholder="재고"
                   value={row.stock}
                   onChange={(e) => updateVariantRow(row.rowId, "stock", e.target.value)}
                   style={{
-                    height: 40,
-                    border: "1px solid #ccc",
-                    borderRadius: 4,
-                    padding: "0 8px",
-                    fontSize: 14,
+                    minHeight: 44,
+                    height: 44,
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 16,
                     boxSizing: "border-box",
                   }}
                 />
@@ -252,22 +225,46 @@ export function EditProductModal({
                   type="button"
                   onClick={() => removeVariantRow(row.rowId)}
                   style={{
-                    height: 40,
-                    border: "1px solid #ccc",
-                    borderRadius: 4,
-                    background: "#fff",
+                    width: 48,
+                    minWidth: 48,
+                    height: 44,
+                    padding: 0,
+                    border: "none",
+                    borderRadius: 8,
+                    background: "#c62828",
+                    color: "#fff",
+                    fontSize: 16,
+                    fontWeight: 600,
                     cursor: "pointer",
-                    fontSize: 13,
+                    lineHeight: 1,
                   }}
                 >
-                  삭제
+                  ✕
                 </button>
               </div>
             ))}
-
             {variantError && (
-              <div style={{ color: "crimson", fontSize: 13, marginTop: 4 }}>{variantError}</div>
+              <div style={{ color: "crimson", fontSize: 13, marginTop: 6 }}>{variantError}</div>
             )}
+            <button
+              type="button"
+              onClick={addVariantRow}
+              style={{
+                marginTop: 8,
+                width: "100%",
+                height: 44,
+                minHeight: 44,
+                border: "1px solid #ccc",
+                borderRadius: 8,
+                background: "#e0e0e0",
+                color: "#212121",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              + 사이즈 추가
+            </button>
           </div>
 
           <label>이미지</label>

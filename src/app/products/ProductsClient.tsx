@@ -365,8 +365,6 @@ export function ProductsClient({
 
       <AddProductModal open={addOpen} onClose={() => setAddOpen(false)} initialSku={search.trim()} />
 
-      <div style={{ background: "lime", padding: 8 }}>products client test</div>
-
       <EditProductModal
         key={editingProduct?.id ?? "closed"}
         open={editOpen}

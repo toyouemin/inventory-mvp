@@ -147,7 +147,7 @@ export function ProductsClient({
           카드
         </button>
       </div>
-      <a href="/products/csv/products" download className="btn btn-secondary btn-compact btn-strong">
+      <a href="/products/csv/products" download="products.csv" className="btn btn-secondary btn-compact btn-strong">
         CSV↓
       </a>
       <label className="btn btn-secondary btn-compact btn-strong">

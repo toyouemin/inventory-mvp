@@ -4,6 +4,24 @@ import { supabaseServer } from "@/lib/supabaseClient";
 import { revalidatePath } from "next/cache";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
+
+/**
+ * imageUrl이 비어 있을 때만 SKU 기반 경로로 보완.
+ * - 우선순위: 명시 URL(trim 후) > 환경변수 기반 URL > `/images/{sku}.jpg`
+ * - 스토리지 절대 URL: PRODUCT_IMAGE_SKU_BASE_URL 예) https://xxx.supabase.co/storage/v1/object/public/bucket/products
+ */
+function resolveProductImageUrl(sku: string, imageUrl: string | null | undefined): string | null {
+  const explicit = (imageUrl ?? "").trim();
+  if (explicit) return explicit;
+  const s = (sku ?? "").trim();
+  if (!s) return null;
+  const base = (process.env.PRODUCT_IMAGE_SKU_BASE_URL ?? "").trim().replace(/\/$/, "");
+  if (base) {
+    return `${base}/${encodeURIComponent(s)}.jpg`;
+  }
+  return `/images/${encodeURIComponent(s)}.jpg`;
+}
+
 /* -----------------------------
  * Helpers: CSV delimiter detect + robust parsing
  * ----------------------------- */
@@ -70,14 +88,125 @@ type ParsedCsvRow = {
   msrp: number | null;
   sale: number | null;
   memo: string | null;
+  /** 헤더 제외, 유효 SKU가 있는 데이터 행 기준 번호(1부터) */
+  dataRowIndex: number;
 };
 
-function parseCsvRows(lines: string[], delimiter: string, col: CsvColMap): ParsedCsvRow[] {
+/** 다운로드와 동일하게 영문 10컬럼만 허용(표기·대소문자 무관, 공백 무시). */
+const REQUIRED_CSV_COLUMNS = [
+  "sku",
+  "category",
+  "name",
+  "imageurl",
+  "size",
+  "stock",
+  "wholesaleprice",
+  "msrpprice",
+  "saleprice",
+  "memo",
+] as const;
+
+function assertStrictProductCsvHeaders(rawHeaders: string[]): CsvColMap {
+  const normalized = rawHeaders.map((h) => h.trim().toLowerCase().replace(/\s/g, ""));
+  if (normalized.length !== REQUIRED_CSV_COLUMNS.length) {
+    throw new Error(
+      `CSV 오류: 헤더는 정확히 10개 컬럼이어야 합니다.\n필요: sku, category, name, imageUrl, size, stock, wholesalePrice, msrpPrice, salePrice, memo\n현재 ${normalized.length}개: ${rawHeaders.join(", ")}`
+    );
+  }
+  if (new Set(normalized).size !== normalized.length) {
+    throw new Error(`CSV 오류: 헤더에 중복된 컬럼명이 있습니다. (${rawHeaders.join(", ")})`);
+  }
+  for (const req of REQUIRED_CSV_COLUMNS) {
+    if (!normalized.includes(req)) {
+      throw new Error(
+        `CSV 오류: 필수 컬럼이 없습니다 (누락: ${req}).\n필요(순서 무관): sku, category, name, imageUrl, size, stock, wholesalePrice, msrpPrice, salePrice, memo\n현재: ${rawHeaders.join(", ")}`
+      );
+    }
+  }
+  const idx = (key: (typeof REQUIRED_CSV_COLUMNS)[number]) => normalized.indexOf(key);
+  return {
+    sku: idx("sku"),
+    category: idx("category"),
+    name: idx("name"),
+    imageUrl: idx("imageurl"),
+    size: idx("size"),
+    stock: idx("stock"),
+    wholesale: idx("wholesaleprice"),
+    msrp: idx("msrpprice"),
+    sale: idx("saleprice"),
+    memo: idx("memo"),
+  };
+}
+
+/** 같은 SKU에서 사이즈 있음/없음 혼재 금지. 사이즈 없음은 해당 SKU당 1행만. */
+function validateSkuVariantRules(rows: ParsedCsvRow[]): void {
+  const bySku = new Map<string, ParsedCsvRow[]>();
+  for (const r of rows) {
+    const arr = bySku.get(r.sku) ?? [];
+    arr.push(r);
+    bySku.set(r.sku, arr);
+  }
+  for (const [sku, arr] of bySku) {
+    const hasEmpty = arr.some((r) => r.size === "");
+    const hasFilled = arr.some((r) => r.size !== "");
+    if (hasEmpty && hasFilled) {
+      const nums = arr.map((r) => r.dataRowIndex).join(", ");
+      throw new Error(
+        `CSV 오류 (SKU: ${sku}): 사이즈가 비어 있는 행과 사이즈가 있는 행이 함께 있습니다. (데이터 행: ${nums})\n한 SKU는「전부 사이즈 비움(products.stock)」또는「전부 사이즈 지정(variant)」만 가능합니다.`
+      );
+    }
+    if (hasEmpty && arr.length > 1) {
+      throw new Error(
+        `CSV 오류 (SKU: ${sku}): 사이즈가 없을 때는 한 SKU당 1행만 허용합니다. (${arr.length}행, 데이터 행: ${arr.map((r) => r.dataRowIndex).join(", ")})`
+      );
+    }
+  }
+}
+
+async function zeroAllVariantStocks(productId: string): Promise<void> {
+  const { error } = await supabaseServer.from("product_variants").update({ stock: 0 }).eq("product_id", productId);
+  if (error) throw new Error(error.message);
+}
+
+/** CSV에 없는 기존 size(variant 행)는 재고 0으로 동기화 (행 삭제 없음). */
+async function zeroVariantStockNotInSizes(productId: string, sizesInCsv: Set<string>): Promise<void> {
+  const { data: variants, error } = await supabaseServer
+    .from("product_variants")
+    .select("id, size")
+    .eq("product_id", productId);
+  if (error) throw new Error(error.message);
+  for (const v of variants ?? []) {
+    if (!sizesInCsv.has(v.size)) {
+      const { error: uErr } = await supabaseServer.from("product_variants").update({ stock: 0 }).eq("id", v.id);
+      if (uErr) throw new Error(uErr.message);
+    }
+  }
+}
+
+function parseCsvRows(
+  lines: string[],
+  delimiter: string,
+  col: CsvColMap,
+  headerLineIndex: number
+): { rows: ParsedCsvRow[]; skippedRows: number[] } {
   const rows: ParsedCsvRow[] = [];
-  for (let i = 1; i < lines.length; i++) {
+  const skippedRows: number[] = [];
+
+  let dataRowIndex = 0; // 유효 SKU가 있는 데이터 행 기준(에러 메시지용)
+
+  for (let i = headerLineIndex + 1; i < lines.length; i++) {
+    if (!lines[i] || lines[i].trim() === "") continue;
+
     const cols = parseCsvLine(lines[i], delimiter);
     const sku = (cols[col.sku] ?? "").trim();
-    if (!sku) continue;
+    if (!sku) {
+      // Excel/CSV에서 사용자가 보는 "파일 라인 번호(헤더 포함)" 기준으로 반환
+      skippedRows.push(i + 1);
+      continue;
+    }
+
+    dataRowIndex += 1;
+
     const category = col.category >= 0 ? (cols[col.category] ?? "").trim() || null : null;
     const nameSpec = col.name >= 0 ? (cols[col.name] ?? "").trim() : "";
     const imageUrl = col.imageUrl >= 0 ? (cols[col.imageUrl] ?? "").trim() || null : null;
@@ -88,6 +217,7 @@ function parseCsvRows(lines: string[], delimiter: string, col: CsvColMap): Parse
     const msrp = col.msrp >= 0 ? toIntOrNaN(cols[col.msrp]) : null;
     const sale = col.sale >= 0 ? toIntOrNaN(cols[col.sale]) : null;
     const memo = col.memo >= 0 ? (cols[col.memo] ?? "").trim() || null : null;
+
     rows.push({
       sku,
       category,
@@ -99,9 +229,11 @@ function parseCsvRows(lines: string[], delimiter: string, col: CsvColMap): Parse
       msrp: msrp != null && Number.isFinite(msrp) ? msrp : null,
       sale: sale != null && Number.isFinite(sale) ? sale : null,
       memo,
+      dataRowIndex,
     });
   }
-  return rows;
+
+  return { rows, skippedRows };
 }
 
 /** Within each SKU group, fill empty category/name/imageUrl/prices/memo from another row with same SKU. Do NOT fill size or stock. If two non-empty values conflict, throw. Run before validateSkuConsistency. */
@@ -125,7 +257,10 @@ function normalizeSkuGroups(rows: ParsedCsvRow[]): void {
         if (isEmpty(val)) continue;
         const existing = canon[key];
         if (existing !== undefined && String(existing) !== String(val)) {
-          throw new Error("CSV 오류: 동일한 SKU의 상품 정보가 서로 다릅니다.");
+          const skus = [...new Set(group.map((x) => x.sku))].join(", ");
+          throw new Error(
+            `CSV 오류 (SKU: ${skus}): 동일한 SKU의 상품 정보(카테고리·품명·이미지·가격·비고 등)가 서로 다릅니다. (데이터 행: ${group.map((x) => x.dataRowIndex).join(", ")})`
+          );
         }
         if (existing === undefined) (canon as Record<string, unknown>)[key] = val;
       }
@@ -162,7 +297,9 @@ function validateSkuConsistency(rows: ParsedCsvRow[]): void {
         String(first.sale ?? "") !== String(r.sale ?? "") ||
         (first.memo ?? "") !== (r.memo ?? "")
       ) {
-        throw new Error("CSV 오류: 동일한 SKU의 상품 정보가 서로 다릅니다.");
+        throw new Error(
+          `CSV 오류 (SKU: ${first.sku}): 동일한 SKU의 상품 정보가 일치하지 않습니다. (데이터 행: ${first.dataRowIndex}, ${r.dataRowIndex})`
+        );
       }
     }
   }
@@ -178,41 +315,71 @@ async function deleteProductsNotInCsv(csvSkus: Set<string>): Promise<void> {
   }
 }
 
-async function applyCsvRows(rows: ParsedCsvRow[]): Promise<Set<string>> {
+/**
+ * SKU별로 그룹 적용. variant 모드: products.stock=0, CSV에 없는 기존 size는 variant 재고 0.
+ * 단일 재고 모드: products.stock 반영, 해당 상품의 모든 variant 재고 0.
+ */
+async function applyCsvProductRowsGrouped(rows: ParsedCsvRow[]): Promise<Set<string>> {
+  const skuOrder: string[] = [];
+  const bySku = new Map<string, ParsedCsvRow[]>();
+  for (const r of rows) {
+    if (!bySku.has(r.sku)) {
+      skuOrder.push(r.sku);
+      bySku.set(r.sku, []);
+    }
+    bySku.get(r.sku)!.push(r);
+  }
+
   const csvSkus = new Set<string>();
-  for (const row of rows) {
-    csvSkus.add(row.sku);
+  for (const sku of skuOrder) {
+    const group = bySku.get(sku)!;
+    csvSkus.add(sku);
+    const row0 = group[0];
+    const variantMode = row0.size !== "";
+
     const payload = {
-      category: row.category,
-      name_spec: row.nameSpec?.trim() || row.sku,
-      image_url: row.imageUrl,
-      wholesale_price: row.wholesale,
-      msrp_price: row.msrp,
-      sale_price: row.sale,
-      memo: row.memo,
+      category: row0.category,
+      name_spec: row0.nameSpec?.trim() || sku,
+      image_url: resolveProductImageUrl(sku, row0.imageUrl),
+      wholesale_price: row0.wholesale,
+      msrp_price: row0.msrp,
+      sale_price: row0.sale,
+      memo: row0.memo,
     };
+
+    const stockVal = variantMode ? 0 : row0.stockVal;
     let productId: string;
-    const { data: existing } = await supabaseServer.from("products").select("id").eq("sku", row.sku).maybeSingle();
+    const { data: existing } = await supabaseServer.from("products").select("id").eq("sku", sku).maybeSingle();
     if (existing?.id) {
       productId = existing.id;
-      await supabaseServer.from("products").update(payload).eq("id", productId);
+      const { error: upErr } = await supabaseServer
+        .from("products")
+        .update({ ...payload, stock: stockVal })
+        .eq("id", productId);
+      if (upErr) throw new Error(upErr.message);
     } else {
       const { data: inserted, error: insErr } = await supabaseServer
         .from("products")
-        .insert({ sku: row.sku, ...payload, stock: 0 })
+        .insert({ sku, ...payload, stock: stockVal })
         .select("id")
         .single();
       if (insErr) throw new Error(insErr.message);
       productId = inserted.id;
     }
-    if (row.size !== "") {
-      const { error: upsertErr } = await supabaseServer.from("product_variants").upsert(
-        { product_id: productId, size: row.size, stock: row.stockVal },
-        { onConflict: "product_id,size" }
-      );
-      if (upsertErr) throw new Error(upsertErr.message);
+
+    if (variantMode) {
+      const sizesInCsv = new Set<string>();
+      for (const r of group) {
+        sizesInCsv.add(r.size);
+        const { error: upsertErr } = await supabaseServer.from("product_variants").upsert(
+          { product_id: productId, size: r.size, stock: r.stockVal },
+          { onConflict: "product_id,size" }
+        );
+        if (upsertErr) throw new Error(upsertErr.message);
+      }
+      await zeroVariantStockNotInSizes(productId, sizesInCsv);
     } else {
-      await supabaseServer.from("products").update({ stock: row.stockVal }).eq("id", productId);
+      await zeroAllVariantStocks(productId);
     }
   }
   return csvSkus;
@@ -243,7 +410,7 @@ export async function createProduct(data: {
     sku,
     category: data.category?.trim() || null,
     name_spec: (data.nameSpec ?? "").trim(),
-    image_url: data.imageUrl?.trim() || null,
+    image_url: resolveProductImageUrl(sku, data.imageUrl),
     wholesale_price:
       data.wholesalePrice != null && Number.isFinite(data.wholesalePrice) ? data.wholesalePrice : null,
     msrp_price: data.msrpPrice != null && Number.isFinite(data.msrpPrice) ? data.msrpPrice : null,
@@ -299,7 +466,14 @@ export async function updateProduct(
   if (data.sku !== undefined) updateData.sku = data.sku.trim();
   if (data.category !== undefined) updateData.category = data.category?.trim() || null;
   if (data.nameSpec !== undefined) updateData.name_spec = data.nameSpec?.trim();
-  if (data.imageUrl !== undefined) updateData.image_url = data.imageUrl?.trim() || null;
+  if (data.imageUrl !== undefined) {
+    let skuForImg = data.sku?.trim() ?? "";
+    if (!skuForImg) {
+      const { data: row } = await supabaseServer.from("products").select("sku").eq("id", productId).maybeSingle();
+      skuForImg = (row?.sku as string | undefined)?.trim() ?? "";
+    }
+    updateData.image_url = resolveProductImageUrl(skuForImg, data.imageUrl);
+  }
 
   if (data.wholesalePrice !== undefined) {
     updateData.wholesale_price =
@@ -485,7 +659,7 @@ export async function adjustVariantStock(
 }
 
 /* -----------------------------
- * CSV Upload: upsert + stock -> moves via RPC
+ * CSV Upload: 고정 10컬럼 + SKU 그룹 variant 동기화(stock 0)
  * ----------------------------- */
 
 // 상품 CSV 업로드 (sku 기준 upsert). fullSync=true면 CSV에 없는 기존 상품 삭제.
@@ -517,143 +691,34 @@ export async function uploadProductsCsv(formData: FormData, fullSync?: boolean) 
   
   const text = decodeWithFallback(raw);
 
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 2) return;
-
-  const delimiter = detectDelimiter(lines[0]);
-
-  const headers = parseCsvLine(lines[0], delimiter).map((h) => h.toLowerCase().replace(/\s/g, ""));
-  const skuIdx = headers.findIndex((h) => h === "sku" || h === "품목코드");
-  if (skuIdx < 0) {
-    throw new Error(`CSV 헤더에 sku(또는 품목코드)가 없습니다. 현재 헤더: ${headers.join("|")}`);
+  const rawLines = text.split(/\r?\n/);
+  const headerLineIndex = rawLines.findIndex((l) => (l ?? "").trim().length > 0);
+  if (headerLineIndex < 0) {
+    throw new Error("CSV 오류: 헤더 라인이 없습니다.");
   }
 
-  const sizeIdx = headers.findIndex((h) => h === "size" || h === "사이즈");
-  const hasSizeColumn = sizeIdx >= 0;
+  const delimiter = detectDelimiter(rawLines[headerLineIndex] ?? "");
 
-  if (hasSizeColumn) {
-    const col: CsvColMap = {
-      sku: skuIdx,
-      category: headers.findIndex((h) => h === "category" || h === "카테고리"),
-      name: headers.findIndex((h) => h === "name" || h === "품명" || h === "namespec"),
-      imageUrl: headers.findIndex((h) => h === "imageurl" || h === "이미지url"),
-      size: sizeIdx,
-      stock: headers.findIndex((h) => h === "stock" || h === "재고"),
-      wholesale: headers.findIndex((h) => h === "wholesaleprice" || h === "출고가"),
-      msrp: headers.findIndex((h) => h === "msrpprice" || h === "소비자가"),
-      sale: headers.findIndex((h) => h === "saleprice" || h === "실판매가" || h === "판매가"),
-      memo: headers.findIndex((h) => h === "memo" || h === "비고"),
-    };
-    const rows = parseCsvRows(lines, delimiter, col);
-    normalizeSkuGroups(rows);
-    validateSkuConsistency(rows);
-    const csvSkus = await applyCsvRows(rows);
-    if (fullSync) await deleteProductsNotInCsv(csvSkus);
-    revalidatePath("/products");
-    revalidatePath("/status");
-    if (LOG_MOVES) revalidatePath("/moves");
-    return;
+  const rawHeaders = parseCsvLine(rawLines[headerLineIndex] ?? "", delimiter);
+  const col = assertStrictProductCsvHeaders(rawHeaders);
+
+  const { rows, skippedRows } = parseCsvRows(rawLines, delimiter, col, headerLineIndex);
+  if (rows.length === 0) {
+    throw new Error("CSV 오류: 유효한 SKU가 있는 데이터 행이 없습니다.");
   }
-
-  const csvSkus = new Set<string>();
-  const catIdx = headers.findIndex((h) => h === "category" || h === "카테고리");
-  const nameIdx = headers.findIndex((h) => h === "namespec" || h === "품명" || h === "name");
-  const imgIdx = headers.findIndex((h) => h === "imageurl" || h === "이미지url");
-
-  const wholesaleIdx = headers.findIndex((h) => h === "wholesaleprice" || h === "출고가");
-  const msrpIdx = headers.findIndex((h) => h === "msrpprice" || h === "소비자가");
-  const saleIdx = headers.findIndex((h) => h === "saleprice" || h === "실판매가" || h === "판매가");
-
-  const memoIdx = headers.findIndex((h) => h === "memo" || h === "비고");
-  const stockIdx = headers.findIndex((h) => h === "stock" || h === "재고");
-
-  for (let i = 1; i < lines.length; i++) {
-    const cols = parseCsvLine(lines[i], delimiter);
-
-    const sku = (cols[skuIdx] ?? "").trim();
-    if (!sku) continue;
-    csvSkus.add(sku);
-
-    const category = catIdx >= 0 ? (cols[catIdx] ?? "").trim() || null : null;
-    const nameSpec = nameIdx >= 0 ? (cols[nameIdx] ?? "").trim() : "";
-    const imageUrl = imgIdx >= 0 ? (cols[imgIdx] ?? "").trim() || null : null;
-
-    const wholesalePrice = wholesaleIdx >= 0 ? toIntOrNaN(cols[wholesaleIdx]) : NaN;
-    const msrpPrice = msrpIdx >= 0 ? toIntOrNaN(cols[msrpIdx]) : NaN;
-    const salePrice = saleIdx >= 0 ? toIntOrNaN(cols[saleIdx]) : NaN;
-
-    const memo = memoIdx >= 0 ? (cols[memoIdx] ?? "").trim() || null : null;
-    const stock = stockIdx >= 0 ? toIntOrNaN(cols[stockIdx]) : NaN;
-
-    // sku로 기존 상품 찾기
-    const { data: existing, error: findErr } = await supabaseServer
-      .from("products")
-      .select("id")
-      .eq("sku", sku)
-      .maybeSingle();
-
-    if (findErr) throw new Error(findErr.message);
-
-    // ✅ stock은 여기서 직접 update하지 않음 (로그 남기기 위해 RPC가 담당)
-    const payload: any = {
-      category,
-      name_spec: nameSpec || sku,
-      image_url: imageUrl,
-
-      wholesale_price: Number.isFinite(wholesalePrice) ? wholesalePrice : null,
-      msrp_price: Number.isFinite(msrpPrice) ? msrpPrice : null,
-      sale_price: Number.isFinite(salePrice) ? salePrice : null,
-
-      memo,
-    };
-
-    if (existing?.id) {
-      // 1) 일반 정보 업데이트
-      const { error: upErr } = await supabaseServer.from("products").update(payload).eq("id", existing.id);
-      if (upErr) throw new Error(upErr.message);
-
-      // 2) ✅ stock이 있으면: RPC로 재고 세팅 + moves(adjust) 기록
-      if (Number.isFinite(stock)) {
-        const { error: rpcErr } = await supabaseServer.rpc("set_stock_with_move", {
-          p_product_id: existing.id,
-          p_new_stock: Math.max(0, stock),
-          p_note: "CSV 업로드",
-        });
-        if (rpcErr) throw new Error(rpcErr.message);
-      }
-    } else {
-      // 신규 insert (우선 stock 0으로 넣고)
-      const { data: inserted, error: insErr } = await supabaseServer
-        .from("products")
-        .insert({
-          sku,
-          ...payload,
-          stock: 0,
-        })
-        .select("id")
-        .single();
-
-      if (insErr) throw new Error(insErr.message);
-
-      // ✅ 초기 재고도 기록 남기고 싶으면 RPC 호출
-      if (Number.isFinite(stock)) {
-        const { error: rpcErr } = await supabaseServer.rpc("set_stock_with_move", {
-          p_product_id: inserted.id,
-          p_new_stock: Math.max(0, stock),
-          p_note: "CSV 신규등록 초기재고",
-        });
-        if (rpcErr) throw new Error(rpcErr.message);
-      }
-    }
-  }
-
+  normalizeSkuGroups(rows);
+  validateSkuVariantRules(rows);
+  validateSkuConsistency(rows);
+  const csvSkus = await applyCsvProductRowsGrouped(rows);
   if (fullSync) await deleteProductsNotInCsv(csvSkus);
   revalidatePath("/products");
   revalidatePath("/status");
+  if (LOG_MOVES) revalidatePath("/moves");
 
-  if (LOG_MOVES) {
-    revalidatePath("/moves");
-  }
+  return {
+    skippedCount: skippedRows.length,
+    skippedRows,
+  };
 }
 /* -----------------------------
  * Stock: move between locations (stub/implementation)

@@ -118,7 +118,16 @@ export function ProductsClient({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      await uploadProductsCsv(fd, fullSync);
+      const result = await uploadProductsCsv(fd, fullSync);
+      if (result?.skippedCount && result.skippedCount > 0) {
+        alert(
+          `${result.skippedCount}개 행의 SKU가 비어 있어 스킵했습니다.\n` +
+            `스킵된 데이터 행 번호: ${result.skippedRows.join(", ")}`
+        );
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(msg);
     } finally {
       setUploading(false);
       e.target.value = "";

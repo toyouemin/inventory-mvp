@@ -2,6 +2,7 @@
 
 import { supabaseServer } from "@/lib/supabaseClient";
 import { revalidatePath } from "next/cache";
+import { normalizeSizeWithMeta } from "./sizeUtils";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
 
@@ -210,7 +211,16 @@ function parseCsvRows(
     const category = col.category >= 0 ? (cols[col.category] ?? "").trim() || null : null;
     const nameSpec = col.name >= 0 ? (cols[col.name] ?? "").trim() : "";
     const imageUrl = col.imageUrl >= 0 ? (cols[col.imageUrl] ?? "").trim() || null : null;
-    const size = col.size >= 0 ? (cols[col.size] ?? "").trim() || "" : "";
+    let size = col.size >= 0 ? (cols[col.size] ?? "").trim() || "" : "";
+    if (size) {
+      const normalizedSize = normalizeSizeWithMeta(size);
+      size = normalizedSize.normalized;
+      if (!normalizedSize.recoverable) {
+        console.warn(
+          `[CSV] size 보정 경고: 원본="${(cols[col.size] ?? "").trim()}" -> 정규화="${size}", reason=${normalizedSize.reason ?? "unknown"}`
+        );
+      }
+    }
     const stockRaw = col.stock >= 0 ? toIntOrNaN(cols[col.stock]) : NaN;
     const stockVal = Number.isFinite(stockRaw) ? Math.max(0, stockRaw) : 0;
     const wholesale = col.wholesale >= 0 ? toIntOrNaN(cols[col.wholesale]) : null;
@@ -662,8 +672,8 @@ export async function adjustVariantStock(
  * CSV Upload: 고정 10컬럼 + SKU 그룹 variant 동기화(stock 0)
  * ----------------------------- */
 
-// 상품 CSV 업로드 (sku 기준 upsert). fullSync=true면 CSV에 없는 기존 상품 삭제.
-export async function uploadProductsCsv(formData: FormData, fullSync?: boolean) {
+// 상품 CSV 업로드 (sku 기준 upsert). 항상 CSV 기준으로 완전 동기화(없는 SKU 삭제).
+export async function uploadProductsCsv(formData: FormData) {
   const file = formData.get("file") as File | null;
   if (!file) return;
 
@@ -710,7 +720,7 @@ export async function uploadProductsCsv(formData: FormData, fullSync?: boolean) 
   validateSkuVariantRules(rows);
   validateSkuConsistency(rows);
   const csvSkus = await applyCsvProductRowsGrouped(rows);
-  if (fullSync) await deleteProductsNotInCsv(csvSkus);
+  await deleteProductsNotInCsv(csvSkus);
   revalidatePath("/products");
   revalidatePath("/status");
   if (LOG_MOVES) revalidatePath("/moves");

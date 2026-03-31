@@ -107,18 +107,14 @@ export function ProductsClient({
     return rows;
   }, [filtered, variantsByProductId]);
 
-  async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>, fullSync: boolean) {
+  async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (fullSync && !confirm("CSV에 없는 기존 상품은 모두 삭제됩니다. 계속하시겠습니까?")) {
-      e.target.value = "";
-      return;
-    }
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const result = await uploadProductsCsv(fd, fullSync);
+      const result = await uploadProductsCsv(fd);
       if (result?.skippedCount && result.skippedCount > 0) {
         alert(
           `${result.skippedCount}개 행의 SKU가 비어 있어 스킵했습니다.\n` +
@@ -160,21 +156,11 @@ export function ProductsClient({
         CSV↓
       </a>
       <label className="btn btn-secondary btn-compact btn-strong">
-        {uploading ? "업로드..." : "CSV↑"}
+        {uploading ? "동기화..." : "CSV동기화"}
         <input
           type="file"
           accept=".csv"
-          onChange={(e) => handleProductsCsv(e, false)}
-          disabled={uploading}
-          style={{ display: "none" }}
-        />
-      </label>
-      <label className="btn btn-danger btn-compact btn-strong">
-        {uploading ? "동기화 중..." : "전체동기화"}
-        <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => handleProductsCsv(e, true)}
+          onChange={(e) => handleProductsCsv(e)}
           disabled={uploading}
           style={{ display: "none" }}
         />

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { adjustStock, adjustVariantStock } from "./actions";
 import type { Product, ProductVariant } from "./types";
+import { sortSizes } from "./sizeUtils";
 
 export function ProductCard({
   product,
@@ -17,18 +18,22 @@ export function ProductCard({
 }) {
   const [pending, setPending] = useState(false);
 
-  const hasVariants = variants.length > 0;
-  const firstSize = variants[0]?.size ?? "";
+  const sortedVariants = useMemo(
+    () => [...variants].sort((a, b) => sortSizes(a.size ?? "", b.size ?? "")),
+    [variants]
+  );
+  const hasVariants = sortedVariants.length > 0;
+  const firstSize = sortedVariants[0]?.size ?? "";
   const [selectedSize, setSelectedSize] = useState(firstSize);
   useEffect(() => {
-    if (hasVariants && !variants.some((v) => v.size === selectedSize)) {
+    if (hasVariants && !sortedVariants.some((v) => v.size === selectedSize)) {
       setSelectedSize(firstSize);
     }
-  }, [hasVariants, variants, selectedSize, firstSize]);
+  }, [hasVariants, sortedVariants, selectedSize, firstSize]);
 
   const selectedVariant = useMemo(
-    () => variants.find((v) => v.size === selectedSize),
-    [variants, selectedSize]
+    () => sortedVariants.find((v) => v.size === selectedSize),
+    [sortedVariants, selectedSize]
   );
   const qty = hasVariants ? (selectedVariant?.stock ?? 0) : (product.stock ?? 0);
 
@@ -89,7 +94,7 @@ export function ProductCard({
                   onChange={(e) => setSelectedSize(e.target.value)}
                   aria-label="사이즈 선택"
                 >
-                  {variants.map((v) => (
+                  {sortedVariants.map((v) => (
                     <option key={v.id} value={v.size}>
                       {v.size || "(없음)"}
                     </option>

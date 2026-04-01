@@ -10,6 +10,15 @@ function toOptionDisplay(v: ProductVariant): string {
   return value || "(없음)";
 }
 
+function PriceLabel({ full, mobile }: { full: string; mobile: string }) {
+  return (
+    <>
+      <span className="product-card__label-full">{full}</span>
+      <span className="product-card__label-mobile">{mobile}</span>
+    </>
+  );
+}
+
 export function ProductCard({
   product,
   variants = [],
@@ -22,6 +31,7 @@ export function ProductCard({
   onDeleteClick?: () => void;
 }) {
   const [pending, setPending] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
   const safeVariants = Array.isArray(variants) ? variants : [];
 
   const sortedVariants = useMemo(() => {
@@ -29,6 +39,7 @@ export function ProductCard({
     return copy.sort((a, b) => sortSizes(a.size ?? "", b.size ?? ""));
   }, [safeVariants]);
   const hasVariants = sortedVariants.length > 0;
+  const hasImage = Boolean(product?.imageUrl);
   async function handleAdjustProduct(delta: number) {
     if (pending) return;
     setPending(true);
@@ -59,34 +70,59 @@ export function ProductCard({
 
   return (
     <article className="product-card">
-      <div className="product-card__image">
-                        {product?.imageUrl ? (
-          <img src={product.imageUrl} alt={(product?.nameSpec ?? product?.sku ?? "").toString()} />
-        ) : (
+      {hasImage ? (
+        <button
+          type="button"
+          className="product-card__image"
+          onClick={() => setImageOpen(true)}
+          aria-label="상품 이미지 확대"
+        >
+          <img src={product.imageUrl ?? undefined} alt={(product?.nameSpec ?? product?.sku ?? "").toString()} />
+        </button>
+      ) : (
+        <div className="product-card__image" aria-hidden="true">
           <div className="product-card__placeholder">이미지 없음</div>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="product-card__body">
-        <div className="product-card__sku">{product?.sku ?? "-"}</div>
-        {product?.category && <span className="product-card__category">{product.category}</span>}
-        <h3 className="product-card__name">{product?.nameSpec ?? "-"}</h3>
+        <div className="product-card__mobile-head">
+          <div className="product-card__head-text">
+            <div className="product-card__sku">{product?.sku ?? "-"}</div>
+            {product?.category && <span className="product-card__category">{product.category}</span>}
+            <h3 className="product-card__name">{product?.nameSpec ?? "-"}</h3>
+          </div>
+          {hasImage ? (
+            <button
+              type="button"
+              className="product-card__thumb"
+              onClick={() => setImageOpen(true)}
+              aria-label="상품 썸네일 확대"
+            >
+              <img src={product.imageUrl ?? undefined} alt={(product?.nameSpec ?? product?.sku ?? "").toString()} />
+            </button>
+          ) : (
+            <div className="product-card__thumb" aria-hidden="true">
+              <div className="product-card__placeholder">이미지 없음</div>
+            </div>
+          )}
+        </div>
 
         <div className="product-card__prices">
           <span>
-            출고가:{" "}
+            <PriceLabel full="출고가:" mobile="출:" />{" "}
             {product?.wholesalePrice != null ? `${product.wholesalePrice.toLocaleString()}원` : "-"}
           </span>
           <span>
-            소비자가:{" "}
+            <PriceLabel full="소비자가:" mobile="소:" />{" "}
             {product?.msrpPrice != null ? `${product.msrpPrice.toLocaleString()}원` : "-"}
           </span>
           <span>
-            실판매가:{" "}
+            <PriceLabel full="실판매가:" mobile="실:" />{" "}
             {product?.salePrice != null ? `${product.salePrice.toLocaleString()}원` : "-"}
           </span>
           <span>
-            매장:{" "}
+            <PriceLabel full="매장:" mobile="매:" />{" "}
             {product?.extraPrice != null ? `${product.extraPrice.toLocaleString()}원` : "-"}
           </span>
         </div>
@@ -166,6 +202,25 @@ export function ProductCard({
           )}
         </div>
       </div>
+
+      {imageOpen && hasImage ? (
+        <div className="product-image-modal" role="dialog" aria-modal="true" onClick={() => setImageOpen(false)}>
+          <button
+            type="button"
+            className="product-image-modal__close"
+            onClick={() => setImageOpen(false)}
+            aria-label="이미지 닫기"
+          >
+            닫기
+          </button>
+          <img
+            className="product-image-modal__img"
+            src={product.imageUrl ?? undefined}
+            alt={(product?.nameSpec ?? product?.sku ?? "").toString()}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
     </article>
   );
 }

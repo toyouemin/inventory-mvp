@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { adjustStock, adjustVariantStock } from "./actions";
+import { adjustStock, adjustVariantStock, updateVariantMemo } from "./actions";
 import type { Product, ProductVariant } from "./types";
 import { sortSizes } from "./sizeUtils";
 
@@ -32,6 +32,10 @@ export function ProductCard({
 }) {
   const [pending, setPending] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const [editingMemoVariantId, setEditingMemoVariantId] = useState<string | null>(null);
+  const [memoDraft1, setMemoDraft1] = useState("");
+  const [memoDraft2, setMemoDraft2] = useState("");
+  const [memoPending, setMemoPending] = useState(false);
   const safeVariants = Array.isArray(variants) ? variants : [];
 
   const sortedVariants = useMemo(() => {
@@ -65,6 +69,23 @@ export function ProductCard({
       await adjustVariantStock(variant.id, delta);
     } finally {
       setPending(false);
+    }
+  }
+
+  function openMemoEditor(variant: ProductVariant) {
+    setEditingMemoVariantId(variant.id);
+    setMemoDraft1((variant.memo ?? "").trim());
+    setMemoDraft2((variant.memo2 ?? "").trim());
+  }
+
+  async function handleSaveMemo(variantId: string) {
+    if (memoPending) return;
+    setMemoPending(true);
+    try {
+      await updateVariantMemo(variantId, memoDraft1, memoDraft2);
+      setEditingMemoVariantId(null);
+    } finally {
+      setMemoPending(false);
     }
   }
 
@@ -139,31 +160,78 @@ export function ProductCard({
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
                 return (
-                  <div className="product-card__option-row" role="listitem" key={variant.id ?? `${product?.id}-${variant.size}`}>
-                    <span className="product-card__option-name">{toOptionDisplay(variant)}</span>
-                    <div className="product-card__option-right">
-                      <span className="product-card__stock-label">재고</span>
-                      <div className="product-card__option-qty">
-                        <strong>{qty}</strong>
-                        {variantMemoText ? <span className="product-card__memo">({variantMemoText})</span> : null}
-                      </div>
-                      <div className="product-card__adjust">
+                  <div className="product-card__option-item" role="listitem" key={variant.id ?? `${product?.id}-${variant.size}`}>
+                    <div className="product-card__option-row">
+                      <span className="product-card__option-name">{toOptionDisplay(variant)}</span>
+                      <div className="product-card__option-right">
+                        <span className="product-card__stock-label">재고</span>
+                        <div className="product-card__option-qty">
+                          <strong>{qty}</strong>
+                          {variantMemoText ? <span className="product-card__memo">({variantMemoText})</span> : null}
+                        </div>
                         <button
                           type="button"
-                          onClick={() => handleAdjustVariant(variant, -1)}
-                          disabled={pending || qty < 1}
+                          className="product-card__memo-btn"
+                          onClick={() =>
+                            editingMemoVariantId === variant.id
+                              ? setEditingMemoVariantId(null)
+                              : openMemoEditor(variant)
+                          }
+                          disabled={memoPending}
                         >
-                          -1
+                          메모
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleAdjustVariant(variant, 1)}
-                          disabled={pending}
-                        >
-                          +1
-                        </button>
+                        <div className="product-card__adjust">
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustVariant(variant, -1)}
+                            disabled={pending || qty < 1}
+                          >
+                            -1
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleAdjustVariant(variant, 1)}
+                            disabled={pending}
+                          >
+                            +1
+                          </button>
+                        </div>
                       </div>
                     </div>
+                    {editingMemoVariantId === variant.id ? (
+                      <div className="product-card__memo-editor">
+                        <input
+                          type="text"
+                          value={memoDraft1}
+                          onChange={(e) => setMemoDraft1(e.target.value)}
+                          placeholder="비고1"
+                        />
+                        <input
+                          type="text"
+                          value={memoDraft2}
+                          onChange={(e) => setMemoDraft2(e.target.value)}
+                          placeholder="비고2"
+                        />
+                        <div className="product-card__memo-actions">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveMemo(variant.id)}
+                            disabled={memoPending}
+                          >
+                            저장
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            onClick={() => setEditingMemoVariantId(null)}
+                            disabled={memoPending}
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}

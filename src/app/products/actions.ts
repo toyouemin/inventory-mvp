@@ -1091,6 +1091,24 @@ export async function adjustVariantStock(
   revalidatePath("/status");
 }
 
+export async function updateVariantMemo(
+  variantId: string,
+  memo?: string | null,
+  memo2?: string | null
+) {
+  if (!variantId) return;
+  const { error } = await supabaseServer
+    .from("product_variants")
+    .update({
+      memo: memo?.trim() || null,
+      memo2: memo2?.trim() || null,
+    })
+    .eq("id", variantId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/products");
+  revalidatePath("/status");
+}
+
 /* -----------------------------
  * CSV Upload: 고정 10컬럼 + SKU 그룹 variant 동기화(stock 0)
  * ----------------------------- */

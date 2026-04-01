@@ -399,6 +399,12 @@ button:hover {
   background: #faf7f3;
 }
 
+.product-card__option-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .product-card__option-name {
   min-width: 0;
   font-size: 14px;
@@ -412,6 +418,47 @@ button:hover {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+.product-card__memo-btn {
+  width: auto;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  background: #e8e4de;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.product-card__memo-editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.product-card__memo-editor input {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.product-card__memo-actions {
+  display: inline-flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.product-card__memo-actions button {
+  width: auto;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 6px;
 }
 
 .product-card__option-qty {
@@ -735,8 +782,76 @@ label {
   max-width: 100%;
 }
 
+/* Edit modal: responsive variant inputs */
+.edit-variant-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.8fr) 56px minmax(72px, 0.85fr) minmax(72px, 0.85fr) 40px;
+  gap: 6px;
+  margin-top: 6px;
+  align-items: center;
+}
+
+.edit-variant-input {
+  min-height: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.edit-variant-stock {
+  font-size: 15px;
+}
+
+.edit-variant-memo {
+  font-size: 14px;
+}
+
+.edit-variant-remove {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: #c62828;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+
 /* 모바일: variant row 더 좁은 화면 대응 */
 @media (max-width: 768px) {
+  .edit-variant-row {
+    grid-template-columns: minmax(108px, 1.6fr) 52px minmax(66px, 0.8fr) minmax(66px, 0.8fr) 36px;
+    gap: 4px;
+  }
+
+  .edit-variant-input {
+    min-height: 40px;
+    height: 40px;
+    padding: 6px 8px;
+  }
+
+  .edit-variant-stock {
+    font-size: 14px;
+  }
+
+  .edit-variant-memo {
+    font-size: 13px;
+  }
+
+  .edit-variant-remove {
+    width: 36px;
+    min-width: 36px;
+    height: 40px;
+    font-size: 13px;
+  }
+
   .variant-editor-row {
     grid-template-columns: minmax(80px, 1.2fr) minmax(56px, 0.8fr) minmax(76px, 1fr) minmax(76px, 1fr) 40px;
     gap: 6px;
@@ -938,6 +1053,15 @@ label {
     min-width: 34px;
     padding: 6px;
     font-size: 12px;
+  }
+
+  .product-card__memo-editor {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .product-card__memo-actions {
+    justify-content: flex-end;
   }
 }
 

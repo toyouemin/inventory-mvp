@@ -235,20 +235,20 @@ export function AddProductModal({
             placeholder="0"
           />
 
-          <label>비고</label>
-          <input
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="(선택)"
-          />
-
-          <label>추가금액</label>
+          <label>매장가</label>
           <input
             type="number"
             inputMode="decimal"
             value={extraPrice}
             onChange={(e) => setExtraPrice(e.target.value)}
             placeholder="0"
+          />
+
+          <label>비고1</label>
+          <input
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="(선택)"
           />
 
           <label>비고2</label>

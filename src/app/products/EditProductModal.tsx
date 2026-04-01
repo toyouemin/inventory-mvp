@@ -198,28 +198,14 @@ export function EditProductModal({
             {rowsToShow.map((row) => (
               <div
                 key={row.rowId}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 80px 1fr 1fr 48px",
-                  gap: 6,
-                  marginTop: 6,
-                  alignItems: "center",
-                }}
+                className="edit-variant-row"
               >
                 <input
                   type="text"
                   placeholder="사이즈"
                   value={row.size}
                   onChange={(e) => updateVariantRow(row.rowId, "size", e.target.value)}
-                  style={{
-                    minHeight: 44,
-                    height: 44,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "8px 10px",
-                    fontSize: 16,
-                    boxSizing: "border-box",
-                  }}
+                  className="edit-variant-input"
                 />
                 <input
                   type="number"
@@ -228,63 +214,26 @@ export function EditProductModal({
                   placeholder="재고"
                   value={row.stock}
                   onChange={(e) => updateVariantRow(row.rowId, "stock", e.target.value)}
-                  style={{
-                    minHeight: 44,
-                    height: 44,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "8px 10px",
-                    fontSize: 16,
-                    boxSizing: "border-box",
-                  }}
+                  className="edit-variant-input edit-variant-stock"
                 />
                 <input
                   type="text"
-                  placeholder="비고"
+                  placeholder="비고1"
                   value={row.memo}
                   onChange={(e) => updateVariantRow(row.rowId, "memo", e.target.value)}
-                  style={{
-                    minHeight: 44,
-                    height: 44,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "8px 10px",
-                    fontSize: 16,
-                    boxSizing: "border-box",
-                  }}
+                  className="edit-variant-input edit-variant-memo"
                 />
                 <input
                   type="text"
                   placeholder="비고2"
                   value={row.memo2}
                   onChange={(e) => updateVariantRow(row.rowId, "memo2", e.target.value)}
-                  style={{
-                    minHeight: 44,
-                    height: 44,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    padding: "8px 10px",
-                    fontSize: 16,
-                    boxSizing: "border-box",
-                  }}
+                  className="edit-variant-input edit-variant-memo"
                 />
                 <button
                   type="button"
                   onClick={() => removeVariantRow(row.rowId)}
-                  style={{
-                    width: 48,
-                    minWidth: 48,
-                    height: 44,
-                    padding: 0,
-                    border: "none",
-                    borderRadius: 8,
-                    background: "#c62828",
-                    color: "#fff",
-                    fontSize: 16,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    lineHeight: 1,
-                  }}
+                  className="edit-variant-remove"
                 >
                   ✕
                 </button>
@@ -373,10 +322,7 @@ export function EditProductModal({
             placeholder="0"
           />
 
-          <label>비고</label>
-          <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
-
-          <label>추가금액</label>
+          <label>매장가</label>
           <input
             type="number"
             inputMode="decimal"
@@ -384,6 +330,9 @@ export function EditProductModal({
             onChange={(e) => setExtraPrice(e.target.value)}
             placeholder="0"
           />
+
+          <label>비고1</label>
+          <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
 
           <label>비고2</label>
           <textarea

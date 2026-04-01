@@ -5,6 +5,13 @@ import { createProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import { VariantEditor, type VariantRow } from "./VariantEditor";
 
+function parsePriceInput(value: string): number | null {
+  const cleaned = String(value ?? "").replace(/,/g, "").trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
 export function AddProductModal({
   open,
   onClose,
@@ -30,8 +37,10 @@ export function AddProductModal({
   const [wholesalePrice, setWholesalePrice] = useState("");
   const [msrpPrice, setMsrpPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
+  const [extraPrice, setExtraPrice] = useState("");
 
   const [memo, setMemo] = useState("");
+  const [memo2, setMemo2] = useState("");
 
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [variantError, setVariantError] = useState("");
@@ -50,7 +59,9 @@ export function AddProductModal({
     setWholesalePrice("");
     setMsrpPrice("");
     setSalePrice("");
+    setExtraPrice("");
     setMemo("");
+    setMemo2("");
     setVariantRows([]);
     setVariantError("");
   }, [open, initialSku, initialNameSpec, initialCategory]);
@@ -86,6 +97,8 @@ export function AddProductModal({
       const variants = rowsWithSize.map((r) => ({
         size: (r.size ?? "").trim(),
         stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
+        memo: (r.memo ?? "").trim() || null,
+        memo2: (r.memo2 ?? "").trim() || null,
       }));
 
       await createProduct({
@@ -93,10 +106,12 @@ export function AddProductModal({
         category: category.trim() || null,
         nameSpec: nameSpec.trim(),
         imageUrl: finalImageUrl,
-        wholesalePrice: wholesalePrice === "" ? null : parseInt(wholesalePrice, 10),
-        msrpPrice: msrpPrice === "" ? null : parseInt(msrpPrice, 10),
-        salePrice: salePrice === "" ? null : parseInt(salePrice, 10),
+        wholesalePrice: parsePriceInput(wholesalePrice),
+        msrpPrice: parsePriceInput(msrpPrice),
+        salePrice: parsePriceInput(salePrice),
+        extraPrice: parsePriceInput(extraPrice),
         memo: memo.trim() || null,
+        memo2: memo2.trim() || null,
         variants: variants.length > 0 ? variants : undefined,
       });
 
@@ -109,7 +124,9 @@ export function AddProductModal({
       setWholesalePrice("");
       setMsrpPrice("");
       setSalePrice("");
+      setExtraPrice("");
       setMemo("");
+      setMemo2("");
       setVariantRows([]);
       setVariantError("");
 
@@ -223,6 +240,23 @@ export function AddProductModal({
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="(선택)"
+          />
+
+          <label>추가금액</label>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={extraPrice}
+            onChange={(e) => setExtraPrice(e.target.value)}
+            placeholder="0"
+          />
+
+          <label>비고2</label>
+          <textarea
+            value={memo2}
+            onChange={(e) => setMemo2(e.target.value)}
+            placeholder="(선택)"
+            rows={3}
           />
 
           <div className="modal-actions">

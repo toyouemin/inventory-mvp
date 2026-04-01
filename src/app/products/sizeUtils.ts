@@ -5,44 +5,43 @@ export type NormalizedSizeMeta = {
   reason?: string;
 };
 
-function extractPrefix(raw: string): { prefix: "W" | "M"; corrected: boolean; recoverable: boolean; reason?: string } {
-  const direct = raw.match(/[WM]/);
-  if (direct) {
-    const prefix = direct[0] as "W" | "M";
-    const corrected = !(raw.startsWith(prefix) && raw.slice(0, 1) === prefix);
-    return { prefix, corrected, recoverable: true };
-  }
-  return { prefix: "M", corrected: true, recoverable: false, reason: "prefix_not_found_defaulted_to_M" };
-}
+function normalizeCore(rawInput: string): { normalized: string; corrected: boolean; recoverable: boolean; reason?: string } {
+  const trimmed = (rawInput ?? "").trim();
+  if (!trimmed) return { normalized: "", corrected: false, recoverable: true };
 
-function extractNumber(raw: string): { numberText: string; corrected: boolean; recoverable: boolean; reason?: string } {
-  const m = raw.match(/(\d+)/);
-  if (m) {
-    return { numberText: m[1], corrected: false, recoverable: true };
+  // Option-like values are preserved as-is.
+  // Only standard size patterns are normalized in a limited way.
+  if (/^[mMwW]\s*\d+$/.test(trimmed)) {
+    const m = /^([mMwW])\s*(\d+)$/.exec(trimmed);
+    if (!m) return { normalized: trimmed, corrected: false, recoverable: true };
+    const normalized = `${m[1].toUpperCase()}${m[2]}`;
+    return { normalized, corrected: normalized !== trimmed, recoverable: true, reason: "normalized_standard_prefixed_size" };
   }
-  return { numberText: "0", corrected: true, recoverable: false, reason: "number_not_found_defaulted_to_0" };
+
+  if (/^\d+$/.test(trimmed)) {
+    return { normalized: trimmed, corrected: false, recoverable: true };
+  }
+
+  if (/^(xs|s|m|l|xl|xxl|xxxl|free|os)$/i.test(trimmed)) {
+    const normalized = trimmed.toUpperCase();
+    return { normalized, corrected: normalized !== trimmed, recoverable: true, reason: "normalized_standard_text_size" };
+  }
+
+  return { normalized: trimmed, corrected: false, recoverable: true, reason: "option_value_preserved" };
 }
 
 export function normalizeSize(size: string): string {
-  const raw = (size ?? "").replace(/\s+/g, "").toUpperCase();
-  if (!raw) return "";
-
-  const prefixInfo = extractPrefix(raw);
-  const numberInfo = extractNumber(raw);
-  return `${prefixInfo.prefix}${numberInfo.numberText}`;
+  return normalizeCore(size).normalized;
 }
 
 export function normalizeSizeWithMeta(size: string): NormalizedSizeMeta {
-  const raw = (size ?? "").replace(/\s+/g, "").toUpperCase();
-  if (!raw) return { normalized: "", corrected: false, recoverable: true };
-
-  const prefixInfo = extractPrefix(raw);
-  const numberInfo = extractNumber(raw);
-  const normalized = `${prefixInfo.prefix}${numberInfo.numberText}`;
-  const corrected = raw !== normalized || prefixInfo.corrected || numberInfo.corrected;
-  const recoverable = prefixInfo.recoverable && numberInfo.recoverable;
-  const reason = !recoverable ? [prefixInfo.reason, numberInfo.reason].filter(Boolean).join(",") : undefined;
-  return { normalized, corrected, recoverable, reason };
+  const r = normalizeCore(size);
+  return {
+    normalized: r.normalized,
+    corrected: r.corrected,
+    recoverable: r.recoverable,
+    reason: r.reason,
+  };
 }
 
 function parseForSort(size: string): { prefixOrder: number; numberPart: number; text: string } {

@@ -5,15 +5,24 @@ import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
 
-type VariantRow = { rowId: string; size: string; stock: string; variantId?: string };
+type VariantRow = { rowId: string; size: string; stock: string; memo: string; memo2: string; variantId?: string };
 
-function makeRow(size = "", stock = "0", variantId?: string): VariantRow {
-  return { rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, size, stock, variantId };
+function parsePriceInput(value: string): number | null {
+  const cleaned = String(value ?? "").replace(/,/g, "").trim();
+  if (!cleaned) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function makeRow(size = "", stock = "0", memo = "", memo2 = "", variantId?: string): VariantRow {
+  return { rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, size, stock, memo, memo2, variantId };
 }
 
 function variantsToRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
   if (variants.length > 0) {
-    return variants.map((v) => makeRow((v.size ?? "").trim(), String(v.stock), v.id));
+    return variants.map((v) =>
+      makeRow((v.size ?? "").trim(), String(v.stock), (v.memo ?? "").trim(), (v.memo2 ?? "").trim(), v.id)
+    );
   }
   return [makeRow("", String(fallbackStock ?? 0))];
 }
@@ -41,8 +50,10 @@ export function EditProductModal({
   const [wholesalePrice, setWholesalePrice] = useState("");
   const [msrpPrice, setMsrpPrice] = useState("");
   const [salePrice, setSalePrice] = useState("");
+  const [extraPrice, setExtraPrice] = useState("");
 
   const [memo, setMemo] = useState("");
+  const [memo2, setMemo2] = useState("");
   const [variantRows, setVariantRows] = useState<VariantRow[]>(() => [makeRow()]);
   const [variantError, setVariantError] = useState("");
 
@@ -65,8 +76,10 @@ export function EditProductModal({
     setWholesalePrice(product.wholesalePrice != null ? String(product.wholesalePrice) : "");
     setMsrpPrice(product.msrpPrice != null ? String(product.msrpPrice) : "");
     setSalePrice(product.salePrice != null ? String(product.salePrice) : "");
+    setExtraPrice(product.extraPrice != null ? String(product.extraPrice) : "");
 
     setMemo(product.memo ?? "");
+    setMemo2(product.memo2 ?? "");
     const rows = variantsToRows(variants ?? [], product.stock ?? 0);
     setVariantRows(rows.length > 0 ? rows : [makeRow("", String(product.stock ?? 0))]);
     setVariantError("");
@@ -97,6 +110,8 @@ export function EditProductModal({
       id: r.variantId,
       size: (r.size ?? "").trim(),
       stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
+      memo: (r.memo ?? "").trim() || null,
+      memo2: (r.memo2 ?? "").trim() || null,
     }));
     const remainingIds = new Set(rowsWithSize.map((r) => r.variantId).filter(Boolean));
     const deleteIds = initialVariantIds.filter((id) => !remainingIds.has(id));
@@ -120,10 +135,12 @@ export function EditProductModal({
         category: category.trim() || null,
         nameSpec: nameSpec.trim(),
         imageUrl: finalImageUrl,
-        wholesalePrice: wholesalePrice === "" ? null : parseInt(wholesalePrice, 10),
-        msrpPrice: msrpPrice === "" ? null : parseInt(msrpPrice, 10),
-        salePrice: salePrice === "" ? null : parseInt(salePrice, 10),
+        wholesalePrice: parsePriceInput(wholesalePrice),
+        msrpPrice: parsePriceInput(msrpPrice),
+        salePrice: parsePriceInput(salePrice),
+        extraPrice: parsePriceInput(extraPrice),
         memo: memo.trim() || null,
+        memo2: memo2.trim() || null,
         variants: { updates, deleteIds },
         stock: stockForSingle,
       });
@@ -141,7 +158,7 @@ export function EditProductModal({
   function addVariantRow() {
     setVariantRows((prev) => [...prev, makeRow()]);
   }
-  function updateVariantRow(rowId: string, field: "size" | "stock", value: string) {
+  function updateVariantRow(rowId: string, field: "size" | "stock" | "memo" | "memo2", value: string) {
     setVariantRows((prev) =>
       prev.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
     );
@@ -183,7 +200,7 @@ export function EditProductModal({
                 key={row.rowId}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 80px 48px",
+                  gridTemplateColumns: "1fr 80px 1fr 1fr 48px",
                   gap: 6,
                   marginTop: 6,
                   alignItems: "center",
@@ -211,6 +228,36 @@ export function EditProductModal({
                   placeholder="재고"
                   value={row.stock}
                   onChange={(e) => updateVariantRow(row.rowId, "stock", e.target.value)}
+                  style={{
+                    minHeight: 44,
+                    height: 44,
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 16,
+                    boxSizing: "border-box",
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="비고"
+                  value={row.memo}
+                  onChange={(e) => updateVariantRow(row.rowId, "memo", e.target.value)}
+                  style={{
+                    minHeight: 44,
+                    height: 44,
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 16,
+                    boxSizing: "border-box",
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="비고2"
+                  value={row.memo2}
+                  onChange={(e) => updateVariantRow(row.rowId, "memo2", e.target.value)}
                   style={{
                     minHeight: 44,
                     height: 44,
@@ -328,6 +375,23 @@ export function EditProductModal({
 
           <label>비고</label>
           <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
+
+          <label>추가금액</label>
+          <input
+            type="number"
+            inputMode="decimal"
+            value={extraPrice}
+            onChange={(e) => setExtraPrice(e.target.value)}
+            placeholder="0"
+          />
+
+          <label>비고2</label>
+          <textarea
+            value={memo2}
+            onChange={(e) => setMemo2(e.target.value)}
+            placeholder="(선택)"
+            rows={3}
+          />
 
           <div className="modal-actions">
             <button type="submit" disabled={pending}>

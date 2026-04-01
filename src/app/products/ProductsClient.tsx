@@ -93,7 +93,14 @@ export function ProductsClient({
       const variants = variantsByProductId[p.id] ?? [];
       if (variants.length > 0) {
         for (const v of variants) {
-          rows.push({ ...p, variantId: v.id, size: v.size, variantStock: v.stock });
+          rows.push({
+            ...p,
+            variantId: v.id,
+            size: v.size,
+            variantStock: v.stock,
+            memo: v.memo ?? null,
+            memo2: v.memo2 ?? null,
+          });
         }
       } else {
         rows.push({
@@ -282,6 +289,9 @@ export function ProductsClient({
                   <th>출고가</th>
                   <th>판매가</th>
                   <th>실판매가</th>
+                  <th>매장</th>
+                  <th>비고1</th>
+                  <th>비고2</th>
                   <th>작업</th>
                 </tr>
               </thead>
@@ -324,6 +334,9 @@ export function ProductsClient({
                       <td>{row.wholesalePrice != null ? `${row.wholesalePrice.toLocaleString()}원` : "-"}</td>
                       <td>{row.msrpPrice != null ? `${row.msrpPrice.toLocaleString()}원` : "-"}</td>
                       <td>{row.salePrice != null ? `${row.salePrice.toLocaleString()}원` : "-"}</td>
+                      <td>{row.extraPrice != null ? `${row.extraPrice.toLocaleString()}원` : "-"}</td>
+                      <td>{row.memo?.trim() ? row.memo : "-"}</td>
+                      <td>{row.memo2?.trim() ? row.memo2 : "-"}</td>
                       <td>
                         <div className="row-actions">
                           <button

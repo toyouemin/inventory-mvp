@@ -6,8 +6,24 @@ CREATE TABLE IF NOT EXISTS product_variants (
   product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   size text NOT NULL DEFAULT '',
   stock integer NOT NULL DEFAULT 0,
+  memo text NULL,
+  color text NULL,
+  gender text NULL,
+  option_tag text NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE product_variants
+ADD COLUMN IF NOT EXISTS memo text NULL;
+
+ALTER TABLE product_variants
+ADD COLUMN IF NOT EXISTS color text NULL;
+
+ALTER TABLE product_variants
+ADD COLUMN IF NOT EXISTS gender text NULL;
+
+ALTER TABLE product_variants
+ADD COLUMN IF NOT EXISTS option_tag text NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS product_variants_product_size_key
   ON product_variants (product_id, size);

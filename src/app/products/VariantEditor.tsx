@@ -7,6 +7,8 @@ export type VariantRow = {
   rowId: string; // stable React key
   size: string;
   stock: string;
+  memo: string;
+  memo2: string;
   variantId?: string; // DB id if editing existing variant
 };
 
@@ -32,6 +34,8 @@ export function VariantEditor({
       rowId: generateRowId(),
       size: "",
       stock: "0",
+      memo: "",
+      memo2: "",
     };
     lastAddedRowIdRef.current = newRow.rowId;
     onRowsChange([...rows, newRow]);
@@ -40,15 +44,22 @@ export function VariantEditor({
   const removeRow = useCallback(
     (rowId: string) => {
       const next = rows.filter((r) => r.rowId !== rowId);
-      onRowsChange(next.length > 0 ? next : [{ rowId: generateRowId(), size: "", stock: "0", variantId: undefined }]);
+      onRowsChange(next.length > 0 ? next : [{ rowId: generateRowId(), size: "", stock: "0", memo: "", memo2: "", variantId: undefined }]);
     },
     [rows, onRowsChange]
   );
 
   const updateRow = useCallback(
-    (rowId: string, field: "size" | "stock", value: string) => {
+    (rowId: string, field: "size" | "stock" | "memo" | "memo2", value: string) => {
       if (rows.length === 0) {
-        onRowsChange([{ rowId: generateRowId(), size: field === "size" ? value : "", stock: field === "stock" ? value : "0", variantId: undefined }]);
+        onRowsChange([{
+          rowId: generateRowId(),
+          size: field === "size" ? value : "",
+          stock: field === "stock" ? value : "0",
+          memo: field === "memo" ? value : "",
+          memo2: field === "memo2" ? value : "",
+          variantId: undefined,
+        }]);
       } else {
         onRowsChange(
           rows.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
@@ -77,7 +88,7 @@ export function VariantEditor({
     });
   }, [rows.length, autoFocusLastAdded]);
 
-  const displayRows = rows.length > 0 ? rows : [{ rowId: "empty-1", size: "", stock: "0", variantId: undefined }];
+  const displayRows = rows.length > 0 ? rows : [{ rowId: "empty-1", size: "", stock: "0", memo: "", memo2: "", variantId: undefined }];
 
   return (
     <div style={{ display: "block", minHeight: 80 }}>
@@ -103,6 +114,22 @@ export function VariantEditor({
             value={row.stock}
             onChange={(e) => updateRow(row.rowId, "stock", e.target.value)}
             placeholder="재고"
+          />
+          <input
+            type="text"
+            className="variant-editor-size-input"
+            value={row.memo}
+            onChange={(e) => updateRow(row.rowId, "memo", e.target.value)}
+            placeholder="비고1(옵션별)"
+            autoComplete="off"
+          />
+          <input
+            type="text"
+            className="variant-editor-size-input"
+            value={row.memo2}
+            onChange={(e) => updateRow(row.rowId, "memo2", e.target.value)}
+            placeholder="비고2(옵션별)"
+            autoComplete="off"
           />
           <button
             type="button"

@@ -5,12 +5,14 @@ export type Product = {
   nameSpec: string;
   imageUrl?: string | null;
   memo?: string | null;
+  memo2?: string | null;
   stock?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
   wholesalePrice?: number | null;
   msrpPrice?: number | null;
   salePrice?: number | null;
+  extraPrice?: number | null;
 };
 
 export type ProductVariant = {
@@ -18,6 +20,8 @@ export type ProductVariant = {
   productId: string;
   size: string;
   stock: number;
+  memo?: string | null;
+  memo2?: string | null;
   createdAt?: string | null;
 };
 

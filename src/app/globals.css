@@ -360,6 +360,40 @@ button:hover {
   gap: 6px;
 }
 
+.product-card__option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.product-card__option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #faf7f3;
+}
+
+.product-card__option-name {
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.product-card__option-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 .product-card__stock-row {
   display: flex;
   align-items: center;
@@ -592,7 +626,7 @@ label {
 /* VariantEditor: size/stock row - 모바일 한 줄 내 수용 */
 .variant-editor-row {
   display: grid;
-  grid-template-columns: minmax(90px, 1.4fr) minmax(64px, 1fr) 44px;
+  grid-template-columns: minmax(90px, 1.2fr) minmax(64px, 0.8fr) minmax(90px, 1fr) minmax(90px, 1fr) 44px;
   gap: 6px;
   align-items: center;
   margin-top: 6px;
@@ -644,7 +678,7 @@ label {
 /* 모바일: variant row 더 좁은 화면 대응 */
 @media (max-width: 768px) {
   .variant-editor-row {
-    grid-template-columns: minmax(80px, 1.4fr) minmax(56px, 1fr) 40px;
+    grid-template-columns: minmax(80px, 1.2fr) minmax(56px, 0.8fr) minmax(76px, 1fr) minmax(76px, 1fr) 40px;
     gap: 6px;
   }
   .variant-editor-row .btn {
@@ -729,6 +763,44 @@ label {
   .products-grid,
   .table-wrap {
     padding-bottom: 90px;
+  }
+
+  .product-card__option-list {
+    max-height: 200px;
+    gap: 6px;
+  }
+
+  .product-card__option-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "name name name"
+      "label qty actions";
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .product-card__option-name {
+    grid-area: name;
+    font-size: 12px;
+  }
+
+  .product-card__option-row .product-card__stock-label {
+    grid-area: label;
+    font-size: 12px;
+  }
+
+  .product-card__option-row strong {
+    grid-area: qty;
+    font-size: 14px;
+  }
+
+  .product-card__option-qty {
+    grid-area: qty;
+  }
+
+  .product-card__option-row .product-card__adjust {
+    grid-area: actions;
+    margin-left: auto;
   }
 }
 

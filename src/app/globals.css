@@ -401,9 +401,17 @@ button:hover {
 
 .product-card__option-name {
   min-width: 0;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
   line-height: 1.35;
   word-break: break-word;
+}
+
+.product-card__option-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .product-card__option-qty {
@@ -837,15 +845,15 @@ label {
 
   .product-card__mobile-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 64px;
+    grid-template-columns: minmax(0, 1fr) 96px;
     gap: 8px;
     align-items: start;
   }
 
   .product-card__thumb {
     display: block;
-    width: 64px;
-    height: 64px;
+    width: 96px;
+    height: 96px;
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0;
@@ -886,36 +894,50 @@ label {
   }
 
   .product-card__option-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    grid-template-areas:
-      "name name name"
-      "label qty actions";
-    padding: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 6px;
     gap: 6px;
   }
 
   .product-card__option-name {
-    grid-area: name;
-    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .product-card__option-right {
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 
   .product-card__option-row .product-card__stock-label {
-    grid-area: label;
     font-size: 12px;
   }
 
-  .product-card__option-row strong {
-    grid-area: qty;
+  .product-card__option-qty strong {
     font-size: 14px;
   }
 
-  .product-card__option-qty {
-    grid-area: qty;
+  .product-card__option-qty .product-card__memo {
+    display: none;
   }
 
   .product-card__option-row .product-card__adjust {
-    grid-area: actions;
-    margin-left: auto;
+    margin-left: 2px;
+    white-space: nowrap;
+  }
+
+  .product-card__option-row .product-card__adjust button {
+    width: 34px;
+    min-width: 34px;
+    padding: 6px;
+    font-size: 12px;
   }
 }
 

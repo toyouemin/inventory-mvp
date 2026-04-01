@@ -141,26 +141,28 @@ export function ProductCard({
                 return (
                   <div className="product-card__option-row" role="listitem" key={variant.id ?? `${product?.id}-${variant.size}`}>
                     <span className="product-card__option-name">{toOptionDisplay(variant)}</span>
-                    <span className="product-card__stock-label">재고</span>
-                    <div className="product-card__option-qty">
-                      <strong>{qty}</strong>
-                      {variantMemoText ? <span className="product-card__memo">({variantMemoText})</span> : null}
-                    </div>
-                    <div className="product-card__adjust">
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustVariant(variant, -1)}
-                        disabled={pending || qty < 1}
-                      >
-                        -1
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleAdjustVariant(variant, 1)}
-                        disabled={pending}
-                      >
-                        +1
-                      </button>
+                    <div className="product-card__option-right">
+                      <span className="product-card__stock-label">재고</span>
+                      <div className="product-card__option-qty">
+                        <strong>{qty}</strong>
+                        {variantMemoText ? <span className="product-card__memo">({variantMemoText})</span> : null}
+                      </div>
+                      <div className="product-card__adjust">
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustVariant(variant, -1)}
+                          disabled={pending || qty < 1}
+                        >
+                          -1
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleAdjustVariant(variant, 1)}
+                          disabled={pending}
+                        >
+                          +1
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

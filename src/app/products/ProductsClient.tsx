@@ -64,6 +64,15 @@ export function ProductsClient({
   const orderedProducts = useMemo(() => {
     const map = orderRef.current;
     return [...products].sort((a, b) => {
+      const aCategory = (a.category ?? "").trim();
+      const bCategory = (b.category ?? "").trim();
+      if (aCategory !== bCategory) {
+        if (!aCategory) return 1;
+        if (!bCategory) return -1;
+        return aCategory.localeCompare(bCategory, "ko");
+      }
+      const skuCompare = (a.sku ?? "").localeCompare(b.sku ?? "", "ko");
+      if (skuCompare !== 0) return skuCompare;
       const ai = map.get(a.id) ?? 999999;
       const bi = map.get(b.id) ?? 999999;
       return ai - bi;

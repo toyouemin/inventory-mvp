@@ -27,6 +27,9 @@ export function ProductsClient({
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingVariants, setEditingVariants] = useState<ProductVariant[]>([]);
+  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+  const [localVariantsByProductId, setLocalVariantsByProductId] =
+    useState<Record<string, ProductVariant[]>>(variantsByProductId);
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
@@ -39,6 +42,12 @@ export function ProductsClient({
       if (!map.has(p.id)) map.set(p.id, map.size);
     }
   }, [products]);
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+  useEffect(() => {
+    setLocalVariantsByProductId(variantsByProductId);
+  }, [variantsByProductId]);
 
   // 모바일이면 기본 카드형
   useEffect(() => {
@@ -63,7 +72,7 @@ export function ProductsClient({
   // 항상 동일한 순서로 보이도록 고정 정렬된 products
   const orderedProducts = useMemo(() => {
     const map = orderRef.current;
-    return [...products].sort((a, b) => {
+    return [...localProducts].sort((a, b) => {
       const aCategory = (a.category ?? "").trim();
       const bCategory = (b.category ?? "").trim();
       if (aCategory !== bCategory) {
@@ -77,7 +86,7 @@ export function ProductsClient({
       const bi = map.get(b.id) ?? 999999;
       return ai - bi;
     });
-  }, [products]);
+  }, [localProducts]);
 
   // 검색 + 카테고리: orderedProducts 기준 필터링(순서 유지)
   const filtered = useMemo(() => {
@@ -99,7 +108,7 @@ export function ProductsClient({
   const listRows = useMemo((): ProductRow[] => {
     const rows: ProductRow[] = [];
     for (const p of filtered) {
-      const variants = variantsByProductId[p.id] ?? [];
+      const variants = localVariantsByProductId[p.id] ?? [];
       if (variants.length > 0) {
         for (const v of variants) {
           rows.push({
@@ -121,7 +130,7 @@ export function ProductsClient({
       }
     }
     return rows;
-  }, [filtered, variantsByProductId]);
+  }, [filtered, localVariantsByProductId]);
 
   async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -235,7 +244,7 @@ export function ProductsClient({
 
       <p className="products-count">
         {filtered.length}개 상품
-        {search && ` (전체 ${products.length}개 중)`}
+        {search && ` (전체 ${localProducts.length}개 중)`}
       </p>
 
       {viewMode === "card" ? (
@@ -260,10 +269,10 @@ export function ProductsClient({
               <ProductCard
                 key={p.id}
                 product={p}
-                variants={variantsByProductId[p.id] ?? []}
+                variants={localVariantsByProductId[p.id] ?? []}
                 onEditClick={() => {
                   setEditingProduct(p);
-                  setEditingVariants(variantsByProductId[p.id] ?? []);
+                  setEditingVariants(localVariantsByProductId[p.id] ?? []);
                   setEditOpen(true);
                 }}
                 onDeleteClick={async () => {
@@ -353,7 +362,7 @@ export function ProductsClient({
                             className="btn btn-secondary btn-row"
                             onClick={() => {
                               setEditingProduct(row);
-                              setEditingVariants(variantsByProductId[row.id] ?? []);
+                              setEditingVariants(localVariantsByProductId[row.id] ?? []);
                               setEditOpen(true);
                             }}
                           >
@@ -387,6 +396,15 @@ export function ProductsClient({
         open={editOpen}
         product={editingProduct}
         variants={editingVariants}
+        onSaved={({ productId, memo, memo2 }) => {
+          setLocalProducts((prev) =>
+            prev.map((p) => (p.id === productId ? { ...p, memo, memo2 } : p))
+          );
+          setEditingProduct((prev) =>
+            prev && prev.id === productId ? { ...prev, memo, memo2 } : prev
+          );
+          setLocalVariantsByProductId((prev) => ({ ...prev }));
+        }}
         onClose={() => {
           setEditOpen(false);
           setEditingProduct(null);

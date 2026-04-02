@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { adjustStock, adjustVariantStock, updateVariantMemo } from "./actions";
+import { adjustStock, adjustVariantStock, updateProductMemo, updateVariantMemo } from "./actions";
 import type { Product, ProductVariant } from "./types";
 import { sortSizes } from "./sizeUtils";
 
@@ -33,6 +33,7 @@ export function ProductCard({
   const [pending, setPending] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
   const [editingMemoVariantId, setEditingMemoVariantId] = useState<string | null>(null);
+  const [editingProductMemo, setEditingProductMemo] = useState(false);
   const [memoDraft1, setMemoDraft1] = useState("");
   const [memoDraft2, setMemoDraft2] = useState("");
   const [memoPending, setMemoPending] = useState(false);
@@ -73,9 +74,17 @@ export function ProductCard({
   }
 
   function openMemoEditor(variant: ProductVariant) {
+    setEditingProductMemo(false);
     setEditingMemoVariantId(variant.id);
     setMemoDraft1((variant.memo ?? "").trim());
     setMemoDraft2((variant.memo2 ?? "").trim());
+  }
+
+  function openProductMemoEditor() {
+    setEditingMemoVariantId(null);
+    setEditingProductMemo(true);
+    setMemoDraft1((product.memo ?? "").trim());
+    setMemoDraft2((product.memo2 ?? "").trim());
   }
 
   async function handleSaveMemo(variantId: string) {
@@ -84,6 +93,17 @@ export function ProductCard({
     try {
       await updateVariantMemo(variantId, memoDraft1, memoDraft2);
       setEditingMemoVariantId(null);
+    } finally {
+      setMemoPending(false);
+    }
+  }
+
+  async function handleSaveProductMemo() {
+    if (memoPending) return;
+    setMemoPending(true);
+    try {
+      await updateProductMemo(product.id, memoDraft1, memoDraft2);
+      setEditingProductMemo(false);
     } finally {
       setMemoPending(false);
     }
@@ -241,6 +261,19 @@ export function ProductCard({
               <span className="product-card__stock-label">옵션 없음</span>
               <span className="product-card__stock-label">재고:</span>
               <strong>{product?.stock ?? "-"}</strong>
+              {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
+                <span className="product-card__memo">
+                  ({[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")})
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="product-card__memo-btn"
+                onClick={() => (editingProductMemo ? setEditingProductMemo(false) : openProductMemoEditor())}
+                disabled={memoPending}
+              >
+                메모
+              </button>
               <div className="product-card__adjust">
                 <button type="button" onClick={() => handleAdjustProduct(-1)} disabled={pending || (product?.stock ?? 0) < 1}>
                   -1
@@ -251,6 +284,39 @@ export function ProductCard({
               </div>
             </div>
           )}
+          {!hasVariants && editingProductMemo ? (
+            <div className="product-card__memo-editor">
+              <input
+                type="text"
+                value={memoDraft1}
+                onChange={(e) => setMemoDraft1(e.target.value)}
+                placeholder="비고1"
+              />
+              <input
+                type="text"
+                value={memoDraft2}
+                onChange={(e) => setMemoDraft2(e.target.value)}
+                placeholder="비고2"
+              />
+              <div className="product-card__memo-actions">
+                <button
+                  type="button"
+                  onClick={handleSaveProductMemo}
+                  disabled={memoPending}
+                >
+                  저장
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setEditingProductMemo(false)}
+                  disabled={memoPending}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="product-card__actions">

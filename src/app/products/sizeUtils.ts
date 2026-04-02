@@ -49,12 +49,33 @@ function parseForSort(size: string): { prefixOrder: number; numberPart: number; 
   if (!normalized) {
     return { prefixOrder: 999, numberPart: Number.POSITIVE_INFINITY, text: "" };
   }
-  const m = /^([WM])(\d+)$/.exec(normalized);
-  if (!m) {
-    return { prefixOrder: 999, numberPart: Number.POSITIVE_INFINITY, text: normalized };
+  const standardTextSizeOrder: Record<string, number> = {
+    XS: 0,
+    S: 1,
+    M: 2,
+    L: 3,
+    XL: 4,
+    XXL: 5,
+    XXXL: 6,
+    "2XL": 5,
+    "3XL": 6,
+    "4XL": 7,
+    FREE: 100,
+    OS: 101,
+  };
+  const textOrder = standardTextSizeOrder[normalized];
+  if (textOrder !== undefined) {
+    return { prefixOrder: 0, numberPart: textOrder, text: normalized };
   }
-  const prefixOrder = m[1] === "W" ? 0 : 1;
-  return { prefixOrder, numberPart: Number.parseInt(m[2], 10), text: normalized };
+  const m = /^([WM])(\d+)$/.exec(normalized);
+  if (m) {
+    const prefixOrder = m[1] === "W" ? 1 : 2;
+    return { prefixOrder, numberPart: Number.parseInt(m[2], 10), text: normalized };
+  }
+  if (/^\d+$/.test(normalized)) {
+    return { prefixOrder: 3, numberPart: Number.parseInt(normalized, 10), text: normalized };
+  }
+  return { prefixOrder: 999, numberPart: Number.POSITIVE_INFINITY, text: normalized };
 }
 
 export function sortSizes(a: string, b: string): number {

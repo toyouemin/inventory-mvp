@@ -914,6 +914,12 @@ export async function updateProduct(
   if (data.extraPrice !== undefined) {
     updateData.extra_price = data.extraPrice != null && Number.isFinite(data.extraPrice) ? data.extraPrice : null;
   }
+  if (data.memo !== undefined) {
+    updateData.memo = data.memo?.trim() || null;
+  }
+  if (data.memo2 !== undefined) {
+    updateData.memo2 = data.memo2?.trim() || null;
+  }
 
   if (data.stock !== undefined)
     updateData.stock = Number.isFinite(Number(data.stock)) ? Math.max(0, Number(data.stock)) : 0;
@@ -1104,6 +1110,24 @@ export async function updateVariantMemo(
       memo2: memo2?.trim() || null,
     })
     .eq("id", variantId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/products");
+  revalidatePath("/status");
+}
+
+export async function updateProductMemo(
+  productId: string,
+  memo?: string | null,
+  memo2?: string | null
+) {
+  if (!productId) return;
+  const { error } = await supabaseServer
+    .from("products")
+    .update({
+      memo: memo?.trim() || null,
+      memo2: memo2?.trim() || null,
+    })
+    .eq("id", productId);
   if (error) throw new Error(error.message);
   revalidatePath("/products");
   revalidatePath("/status");

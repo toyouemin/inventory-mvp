@@ -32,11 +32,13 @@ export function EditProductModal({
   product,
   variants = [],
   onClose,
+  onSaved,
 }: {
   open: boolean;
   product: Product | null;
   variants?: ProductVariant[];
   onClose: () => void;
+  onSaved?: (payload: { productId: string; memo: string | null; memo2: string | null }) => void;
 }) {
   const [pending, setPending] = useState(false);
   const [sku, setSku] = useState("");
@@ -143,6 +145,11 @@ export function EditProductModal({
         memo2: memo2.trim() || null,
         variants: { updates, deleteIds },
         stock: stockForSingle,
+      });
+      onSaved?.({
+        productId: product.id,
+        memo: memo.trim() || null,
+        memo2: memo2.trim() || null,
       });
 
       onClose();

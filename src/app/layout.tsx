@@ -21,6 +21,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           >
             도매몰
           </a>
+          <a
+            href="https://login.ecount.com/Login/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            이카운트
+          </a>
         </nav>
         <hr/>
         {children}

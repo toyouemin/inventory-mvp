@@ -83,6 +83,11 @@ function parseForSort(size: string): { prefixOrder: number; numberPart: number; 
     const prefixOrder = m[1] === "W" ? 1 : 2;
     return { prefixOrder, numberPart: Number.parseInt(m[2], 10), text: normalized };
   }
+  // 공용/UNISEX 사이즈 (예: 공용90, 공용100, 공용 105)
+  const uni = /^(공용|UNISEX)\D*(\d+)(?:\D.*)?$/i.exec(normalized);
+  if (uni) {
+    return { prefixOrder: 3, numberPart: Number.parseInt(uni[2], 10), text: normalized };
+  }
   if (/^\d+$/.test(normalized)) {
     return { prefixOrder: 3, numberPart: Number.parseInt(normalized, 10), text: normalized };
   }

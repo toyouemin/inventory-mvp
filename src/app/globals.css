@@ -266,6 +266,63 @@ button:hover {
   flex: 0 0 auto;
 }
 
+/* ========== Download Dropdown ========== */
+.download-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.download-dropdown__menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  min-width: 0;
+  width: fit-content;
+  max-width: 92vw;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  z-index: 9999;
+}
+
+/* direction 클래스는 fixed positioning에서 사용하지 않음(코드에서 top 계산) */
+.download-dropdown__menu--up {
+  top: 0;
+  bottom: auto;
+}
+
+.download-dropdown__item {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 14px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.download-dropdown__item:hover {
+  background: #f0ebe5;
+}
+
+.download-dropdown__divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+@media (max-width: 768px) {
+  .download-dropdown__menu {
+    min-width: 0;
+    width: fit-content;
+    max-width: 92vw;
+  }
+}
+
 /* 숨김 파일 입력: label 대신 button으로 트리거할 때 다른 툴바 버튼과 높이·정렬 일치 */
 .products-csv-file-input {
   position: absolute;

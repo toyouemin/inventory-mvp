@@ -1196,7 +1196,10 @@ export async function updateProductMemo(
  * CSV Upload: 고정 10컬럼 + SKU 그룹 variant 동기화(stock 0)
  * ----------------------------- */
 
-// 상품 CSV 업로드 (sku 기준 upsert). 항상 CSV 기준으로 완전 동기화(없는 SKU 삭제).
+// 상품 CSV 업로드: DB 상태를 CSV 내용으로 완전 덮어쓰기.
+// 정책:
+// - 업로드 시작 시점에 기존 `product_variants`, `products`를 전부 삭제
+// - 실패하면 업로드 전 스냅샷을 기반으로 이전 상태를 복구(중간 상태 방지)
 export async function uploadProductsCsv(formData: FormData) {
   const file = formData.get("file") as File | null;
   if (!file) return;
@@ -1244,8 +1247,7 @@ export async function uploadProductsCsv(formData: FormData) {
   autofillOptionValueFromName(rows);
   validateSkuVariantRules(rows);
   validateSkuConsistency(rows);
-  const csvSkus = await applyCsvProductRowsGrouped(rows);
-  await deleteProductsNotInCsv(csvSkus);
+  await replaceAllProductsAndVariantsFromCsv(rows);
   revalidatePath("/products");
   revalidatePath("/status");
   if (LOG_MOVES) revalidatePath("/moves");
@@ -1254,6 +1256,161 @@ export async function uploadProductsCsv(formData: FormData) {
     skippedCount: skippedRows.length,
     skippedRows,
   };
+}
+
+function chunkArray<T>(arr: T[], chunkSize: number) {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += chunkSize) out.push(arr.slice(i, i + chunkSize));
+  return out;
+}
+
+async function deleteByIdChunks(table: string, ids: string[], chunkSize = 500): Promise<void> {
+  if (ids.length === 0) return;
+  for (const chunk of chunkArray(ids, chunkSize)) {
+    const { error } = await supabaseServer.from(table).delete().in("id", chunk);
+    if (error) throw new Error(error.message);
+  }
+}
+
+async function restoreProductsAndVariantsSnapshot(snapshot: {
+  products: Array<Record<string, unknown>>;
+  variants: Array<Record<string, unknown>>;
+}): Promise<void> {
+  const oldProducts = snapshot.products ?? [];
+  const oldVariants = snapshot.variants ?? [];
+
+  const oldProductIds = oldProducts.map((p) => String((p as any).id));
+  const oldVariantIds = oldVariants.map((v) => String((v as any).id));
+
+  // 현재 데이터 제거(부분 insert가 있었을 가능성 대비)
+  const { data: curProducts, error: curPErr } = await supabaseServer.from("products").select("id");
+  if (curPErr) throw new Error(curPErr.message);
+  const curProductIds = (curProducts ?? []).map((p: any) => String(p.id));
+
+  const { data: curVariants, error: curVErr } = await supabaseServer.from("product_variants").select("id");
+  if (curVErr) throw new Error(curVErr.message);
+  const curVariantIds = (curVariants ?? []).map((v: any) => String(v.id));
+
+  await deleteByIdChunks("product_variants", curVariantIds);
+  await deleteByIdChunks("products", curProductIds);
+
+  // 복구
+  for (const chunk of chunkArray(oldProducts, 200)) {
+    const { error } = await supabaseServer.from("products").insert(chunk);
+    if (error) throw new Error(error.message);
+  }
+  for (const chunk of chunkArray(oldVariants, 200)) {
+    const { error } = await supabaseServer.from("product_variants").insert(chunk);
+    if (error) throw new Error(error.message);
+  }
+
+  // 타입/사용 목적상 반환값 없이 종료
+  void oldProductIds;
+  void oldVariantIds;
+}
+
+async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<void> {
+  // 업로드 실패 시 복구를 위해 업로드 전 스냅샷을 확보
+  const { data: oldProductsRaw, error: oldProductsErr } = await supabaseServer
+    .from("products")
+    .select("id, sku, category, name_spec, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock");
+  if (oldProductsErr) throw new Error(oldProductsErr.message);
+  const oldProducts = (oldProductsRaw ?? []) as Array<Record<string, unknown>>;
+
+  const { data: oldVariantsRaw, error: oldVariantsErr } = await supabaseServer
+    .from("product_variants")
+    .select("id, product_id, size, stock, memo, memo2");
+  if (oldVariantsErr) throw new Error(oldVariantsErr.message);
+  const oldVariants = (oldVariantsRaw ?? []) as Array<Record<string, unknown>>;
+
+  const snapshot = { products: oldProducts, variants: oldVariants };
+
+  try {
+    // 1) 기존 전부 삭제
+    const oldVariantIds = oldVariants.map((v) => String((v as any).id));
+    const oldProductIds = oldProducts.map((p) => String((p as any).id));
+    await deleteByIdChunks("product_variants", oldVariantIds);
+    await deleteByIdChunks("products", oldProductIds);
+
+    // 2) CSV로 새로 insert
+    const skuOrder: string[] = [];
+    const bySku = new Map<string, ParsedCsvRow[]>();
+    for (const r of rows) {
+      if (!bySku.has(r.sku)) {
+        skuOrder.push(r.sku);
+        bySku.set(r.sku, []);
+      }
+      bySku.get(r.sku)!.push(r);
+    }
+
+    for (const sku of skuOrder) {
+      const group = bySku.get(sku)!;
+      const row0 = group[0];
+      const variantMode = row0.size !== "";
+
+      const payloadBase = {
+        sku,
+        category: row0.category,
+        name_spec: (row0.nameSpec ?? sku).trim(),
+        image_url: resolveProductImageUrl(sku, row0.imageUrl),
+        wholesale_price: row0.wholesale,
+        msrp_price: row0.msrp,
+        sale_price: row0.sale,
+        extra_price: row0.extra,
+        stock: variantMode ? 0 : row0.stockVal,
+        // variant mode에서는 memo/memo2를 variant에 넣는 정책이므로 product memo/memo2는 null로 유지
+        memo: variantMode ? null : row0.memo,
+        memo2: variantMode ? null : row0.memo2,
+      };
+
+      const { data: inserted, error: insErr } = await supabaseServer
+        .from("products")
+        .insert(payloadBase as any)
+        .select("id")
+        .single();
+      if (insErr) throw new Error(insErr.message);
+      const productId = inserted.id as string;
+
+      if (variantMode) {
+        const mergedBySize = new Map<
+          string,
+          { size: string; stockVal: number; memo: string | null; memo2: string | null }
+        >();
+
+        for (const r of group) {
+          const key = r.size;
+          const prev = mergedBySize.get(key);
+          if (!prev) {
+            mergedBySize.set(key, { size: r.size, stockVal: r.stockVal, memo: r.memo, memo2: r.memo2 });
+          } else {
+            mergedBySize.set(key, {
+              size: r.size,
+              stockVal: prev.stockVal + r.stockVal,
+              memo: prev.memo ?? r.memo,
+              memo2: prev.memo2 ?? r.memo2,
+            });
+          }
+        }
+
+        const variantsToInsert = [...mergedBySize.values()].map((v) => ({
+          product_id: productId,
+          size: v.size,
+          stock: v.stockVal,
+          memo: v.memo,
+          memo2: v.memo2,
+        }));
+
+        if (variantsToInsert.length > 0) {
+          const { error: vInsErr } = await supabaseServer.from("product_variants").insert(variantsToInsert as any);
+          if (vInsErr) throw new Error(vInsErr.message);
+        }
+      }
+    }
+  } catch (err) {
+    // 3) 복구: 기존 스냅샷으로 되돌리기
+    await restoreProductsAndVariantsSnapshot(snapshot);
+    throw err;
+  }
 }
 /* -----------------------------
  * Stock: move between locations (stub/implementation)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import type { Product, ProductVariant, ProductRow } from "./types";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
@@ -37,6 +38,68 @@ export function ProductsClient({
   // (중요) 화면에 처음 나타난 순서를 고정 저장
   const orderRef = useRef<Map<string, number>>(new Map());
   const csvFileInputRef = useRef<HTMLInputElement>(null);
+  const downloadRef = useRef<HTMLDivElement | null>(null);
+  const downloadButtonRef = useRef<HTMLButtonElement | null>(null);
+  const downloadMenuRef = useRef<HTMLDivElement | null>(null);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [downloadMenuUp, setDownloadMenuUp] = useState(false);
+  const [downloadMenuStyle, setDownloadMenuStyle] = useState<CSSProperties>({});
+
+  useEffect(() => {
+    if (!downloadOpen) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (!downloadRef.current) return;
+      const t = e.target as Node | null;
+      if (t && downloadRef.current.contains(t)) return;
+      setDownloadOpen(false);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [downloadOpen]);
+
+  useEffect(() => {
+    if (!downloadOpen) return;
+    const computeMenuPos = () => {
+      const btn = downloadButtonRef.current;
+      const menu = downloadMenuRef.current;
+      if (!btn) return;
+
+      const rect = btn.getBoundingClientRect();
+      const menuHeight = menu?.offsetHeight ?? 340;
+      const menuWidth = menu?.offsetWidth ?? 320;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      // 버튼 기준 위/아래 여유에 맞춰 배치
+      // 아래 여유가 부족하면 위로, 아니면 아래로.
+      const openUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+      setDownloadMenuUp(openUp);
+
+      const gap = 0; // 메뉴-버튼 사이 간격 최소화
+      const top = openUp ? Math.max(0, rect.top - menuHeight - gap) : rect.bottom + gap;
+
+      // 글씨 폭 기준으로 버튼의 "가운데"와 메뉴의 "가운데"를 맞춤
+      const preferredLeft = rect.left + rect.width / 2 - menuWidth / 2;
+      const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - menuWidth - 8));
+
+      setDownloadMenuStyle({
+        position: "fixed",
+        top,
+        left,
+        zIndex: 9999,
+      });
+    };
+
+    computeMenuPos();
+    // 폭/높이(layout) 반영 직후 1회 더 재계산
+    requestAnimationFrame(computeMenuPos);
+    window.addEventListener("resize", computeMenuPos);
+    window.addEventListener("scroll", computeMenuPos, true);
+    return () => {
+      window.removeEventListener("resize", computeMenuPos);
+      window.removeEventListener("scroll", computeMenuPos, true);
+    };
+  }, [downloadOpen]);
 
   useEffect(() => {
     const map = orderRef.current;
@@ -179,9 +242,65 @@ export function ProductsClient({
           카드
         </button>
       </div>
-      <a href="/products/csv/products" download="products.csv" className="btn btn-secondary btn-compact btn-strong">
-        CSV다운
-      </a>
+      <div className="download-dropdown" ref={downloadRef}>
+        <button
+          type="button"
+          className="btn btn-secondary btn-compact btn-strong"
+          ref={downloadButtonRef}
+          onClick={() => setDownloadOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={downloadOpen}
+        >
+          다운로드
+        </button>
+        {downloadOpen ? (
+          <div
+            ref={downloadMenuRef}
+            className="download-dropdown__menu"
+            role="menu"
+            aria-label="다운로드 선택"
+            style={downloadMenuStyle}
+          >
+            <a
+              role="menuitem"
+              href="/products/csv/products"
+              download="products.csv"
+              className="download-dropdown__item"
+              onClick={() => setDownloadOpen(false)}
+            >
+              상품 CSV
+            </a>
+            <a
+              role="menuitem"
+              href="/products/xlsx/products"
+              download="products.xlsx"
+              className="download-dropdown__item"
+              onClick={() => setDownloadOpen(false)}
+            >
+              상품 엑셀
+            </a>
+            <div className="download-dropdown__divider" role="separator" />
+            <a
+              role="menuitem"
+              href="/products/csv/stock"
+              download="stock.csv"
+              className="download-dropdown__item"
+              onClick={() => setDownloadOpen(false)}
+            >
+              재고 CSV
+            </a>
+            <a
+              role="menuitem"
+              href="/products/xlsx/stock"
+              download="stock.xlsx"
+              className="download-dropdown__item"
+              onClick={() => setDownloadOpen(false)}
+            >
+              재고 엑셀
+            </a>
+          </div>
+        ) : null}
+      </div>
       <button
         type="button"
         className="btn btn-secondary btn-compact btn-strong"

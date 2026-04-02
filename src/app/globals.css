@@ -38,6 +38,23 @@ body {
 }
 
 /* ========== LAYOUT ========== */
+.app-site-header {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px 16px 8px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.app-site-title {
+  margin: 0;
+  font-size: clamp(1.125rem, 2.5vw + 0.75rem, 1.75rem);
+  font-weight: 700;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+
 main {
   max-width: 960px;
   margin: 32px auto 80px;
@@ -65,7 +82,7 @@ nav a:hover {
   color: var(--accent);
 }
 
-h1 {
+h1:not(.app-site-title) {
   margin: 0 0 16px;
   font-size: 28px;
 }
@@ -167,6 +184,7 @@ button:hover {
 
 /* ========== TOOLBAR ========== */
 .products-page {
+  position: relative;
   padding: 0 8px;
 }
 
@@ -246,7 +264,23 @@ button:hover {
 } 
 .toolbar-scroll > * {
   flex: 0 0 auto;
-} 
+}
+
+/* 숨김 파일 입력: label 대신 button으로 트리거할 때 다른 툴바 버튼과 높이·정렬 일치 */
+.products-csv-file-input {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px !important;
+  height: 1px;
+  padding: 0 !important;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0 !important;
+  opacity: 0;
+}
 
 .view-toggle {
   display: inline-flex;
@@ -627,6 +661,22 @@ label {
   vertical-align: middle;
 }
 
+.products-table__thumb-btn {
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 8px;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.products-table__thumb-btn:focus-visible {
+  outline: 2px solid var(--accent, #8b7355);
+  outline-offset: 2px;
+}
+
 .thumb-small {
   width: 36px;
   height: 36px;
@@ -634,6 +684,7 @@ label {
   object-fit: cover;
   border: 1px solid var(--border);
   background: #f0ebe5;
+  display: block;
 }
 
 .thumb-empty {
@@ -878,8 +929,13 @@ label {
     padding: 0 10px;
   }
 
-  h1 {
+  h1:not(.app-site-title) {
     font-size: 18px;
+  }
+
+  .app-site-header {
+    padding: 12px 10px 6px;
+    max-width: 100%;
   }
 
   /* Compact header/toolbar: ~20% smaller */

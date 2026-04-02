@@ -6,7 +6,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
       <body>
-        <h1>재고관리 프로그램</h1>
+        <header className="app-site-header">
+          <h1 className="app-site-title">재고관리 프로그램</h1>
+        </header>
         <nav>
           <a href="/products">상품</a>
           {/*href="/moves">재고 변동</a>*/}

@@ -257,30 +257,42 @@ export function ProductCard({
               })}
             </div>
           ) : (
-            <div className="product-card__stock-row">
-              <span className="product-card__stock-label">옵션 없음</span>
-              <span className="product-card__stock-label">재고:</span>
-              <strong>{product?.stock ?? "-"}</strong>
-              {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
-                <span className="product-card__memo">
-                  ({[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")})
-                </span>
-              ) : null}
-              <button
-                type="button"
-                className="product-card__memo-btn"
-                onClick={() => (editingProductMemo ? setEditingProductMemo(false) : openProductMemoEditor())}
-                disabled={memoPending}
-              >
-                메모
-              </button>
-              <div className="product-card__adjust">
-                <button type="button" onClick={() => handleAdjustProduct(-1)} disabled={pending || (product?.stock ?? 0) < 1}>
-                  -1
-                </button>
-                <button type="button" onClick={() => handleAdjustProduct(1)} disabled={pending}>
-                  +1
-                </button>
+            <div className="product-card__option-list" role="list" aria-label="옵션 목록">
+              <div className="product-card__option-item" role="listitem">
+                <div className="product-card__option-row">
+                  <span className="product-card__option-name">옵션 없음</span>
+                  <div className="product-card__option-right">
+                    <span className="product-card__stock-label">재고</span>
+                    <div className="product-card__option-qty">
+                      <strong>{product?.stock ?? "-"}</strong>
+                      {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
+                        <span className="product-card__memo">
+                          ({[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")})
+                        </span>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="product-card__memo-btn"
+                      onClick={() => (editingProductMemo ? setEditingProductMemo(false) : openProductMemoEditor())}
+                      disabled={memoPending}
+                    >
+                      메모
+                    </button>
+                    <div className="product-card__adjust">
+                      <button
+                        type="button"
+                        onClick={() => handleAdjustProduct(-1)}
+                        disabled={pending || (product?.stock ?? 0) < 1}
+                      >
+                        -1
+                      </button>
+                      <button type="button" onClick={() => handleAdjustProduct(1)} disabled={pending}>
+                        +1
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

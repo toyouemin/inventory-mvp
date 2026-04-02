@@ -544,6 +544,7 @@ function parseCsvRows(
     const imageUrl = col.imageUrl >= 0 ? (cols[col.imageUrl] ?? "").trim() || null : null;
     const rawSize = col.size >= 0 ? (cols[col.size] ?? "").trim() || "" : "";
     let size = buildOptionValue(rawSize, nameParts.optionTag, nameParts.sizeHint);
+    size = normalizeVariantSizeBySku(sku, size);
     if (size) {
       const normalizedSize = normalizeSizeWithMeta(size);
       size = normalizedSize.normalized;
@@ -586,6 +587,40 @@ function parseCsvRows(
   }
 
   return { rows, skippedRows };
+}
+
+function inferColorCodeFromSku(sku: string): string | null {
+  const m = /([A-Z]{2,3})$/i.exec((sku ?? "").trim());
+  if (!m) return null;
+  return m[1].toUpperCase();
+}
+
+function looksLikeTerminalSizeToken(token: string): boolean {
+  const v = (token ?? "").trim().toUpperCase();
+  if (!v) return false;
+  if (/^[WM]\D*\d+/.test(v)) return true;
+  if (/^\d+$/.test(v)) return true;
+  if (/^(XS|S|M|L|XL|XXL|XXXL|2XL|3XL|4XL|FREE|OS)$/.test(v)) return true;
+  return false;
+}
+
+function normalizeVariantSizeBySku(sku: string, size: string): string {
+  const trimmed = (size ?? "").trim();
+  if (!trimmed) return "";
+  const parts = trimmed
+    .split("/")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (parts.length !== 2) return trimmed;
+
+  const first = parts[0];
+  const second = parts[1];
+  if (!/^(남|여|공용|UNISEX)$/i.test(first)) return trimmed;
+  if (!looksLikeTerminalSizeToken(second)) return trimmed;
+
+  const color = inferColorCodeFromSku(sku);
+  if (!color) return trimmed;
+  return `${first} / ${color} / ${second}`;
 }
 
 /** Within each SKU group, fill empty common fields from another row with same SKU. Do NOT fill size/stock/memo. If two non-empty values conflict, throw. Run before validateSkuConsistency. */
@@ -772,7 +807,31 @@ async function applyCsvProductRowsGrouped(rows: ParsedCsvRow[]): Promise<Set<str
 
     if (variantMode) {
       const sizesInCsv = new Set<string>();
+      const mergedBySize = new Map<
+        string,
+        { size: string; stockVal: number; memo: string | null; memo2: string | null }
+      >();
       for (const r of group) {
+        const key = r.size;
+        const prev = mergedBySize.get(key);
+        if (!prev) {
+          mergedBySize.set(key, {
+            size: r.size,
+            stockVal: r.stockVal,
+            memo: r.memo ?? null,
+            memo2: r.memo2 ?? null,
+          });
+        } else {
+          mergedBySize.set(key, {
+            size: r.size,
+            stockVal: prev.stockVal + r.stockVal,
+            memo: prev.memo ?? r.memo ?? null,
+            memo2: prev.memo2 ?? r.memo2 ?? null,
+          });
+        }
+      }
+
+      for (const r of mergedBySize.values()) {
         sizesInCsv.add(r.size);
         const { error: upsertErr } = await supabaseServer.from("product_variants").upsert(
           {

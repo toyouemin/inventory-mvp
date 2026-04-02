@@ -32,9 +32,11 @@ export function ProductsClient({
     useState<Record<string, ProductVariant[]>>(variantsByProductId);
 
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [listImagePreview, setListImagePreview] = useState<{ url: string; alt: string } | null>(null);
 
   // (중요) 화면에 처음 나타난 순서를 고정 저장
   const orderRef = useRef<Map<string, number>>(new Map());
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const map = orderRef.current;
@@ -178,20 +180,19 @@ export function ProductsClient({
         </button>
       </div>
       <a href="/products/csv/products" download="products.csv" className="btn btn-secondary btn-compact btn-strong">
-        CSV↓
+        CSV다운
       </a>
-      <label className="btn btn-secondary btn-compact btn-strong">
-        {uploading ? "동기화..." : "CSV동기화"}
-        <input
-          type="file"
-          accept=".csv"
-          onChange={(e) => handleProductsCsv(e)}
-          disabled={uploading}
-          style={{ display: "none" }}
-        />
-      </label>
+      <button
+        type="button"
+        className="btn btn-secondary btn-compact btn-strong"
+        onClick={() => csvFileInputRef.current?.click()}
+        disabled={uploading}
+        aria-label="CSV 파일 업로드"
+      >
+        {uploading ? "업로드..." : "CSV업로드"}
+      </button>
       <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
-        +추가
+        추가
       </button>
     </>
   );
@@ -229,7 +230,7 @@ export function ProductsClient({
           </select>
         </div>
 
-        {/* 데스크톱 전용: 리스트/카드/CSV/+추가 */}
+        {/* 데스크톱 전용: 리스트/카드/CSV/추가 */}
         <div className="toolbar-actions toolbar-actions-desktop">
           <div className="toolbar-scroll">
             {actionButtons}
@@ -323,7 +324,19 @@ export function ProductsClient({
                     <tr key={row.variantId ? `${row.id}-${row.size}` : row.id}>
                       <td>
                         {row.imageUrl ? (
-                          <img className="thumb-small" src={row.imageUrl} alt={(row.nameSpec ?? row.sku ?? "").toString()} />
+                          <button
+                            type="button"
+                            className="products-table__thumb-btn"
+                            onClick={() =>
+                              setListImagePreview({
+                                url: row.imageUrl!,
+                                alt: (row.nameSpec ?? row.sku ?? "").toString(),
+                              })
+                            }
+                            aria-label="상품 이미지 확대"
+                          >
+                            <img className="thumb-small" src={row.imageUrl} alt="" />
+                          </button>
                         ) : (
                           <span className="thumb-empty">-</span>
                         )}
@@ -389,6 +402,17 @@ export function ProductsClient({
         </div>
       )}
 
+      <input
+        ref={csvFileInputRef}
+        type="file"
+        accept=".csv"
+        onChange={(e) => handleProductsCsv(e)}
+        disabled={uploading}
+        className="products-csv-file-input"
+        aria-hidden
+        tabIndex={-1}
+      />
+
       <AddProductModal open={addOpen} onClose={() => setAddOpen(false)} initialSku={search.trim()} />
 
       <EditProductModal
@@ -411,6 +435,30 @@ export function ProductsClient({
           setEditingVariants([]);
         }}
       />
+
+      {listImagePreview ? (
+        <div
+          className="product-image-modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setListImagePreview(null)}
+        >
+          <button
+            type="button"
+            className="product-image-modal__close"
+            onClick={() => setListImagePreview(null)}
+            aria-label="이미지 닫기"
+          >
+            닫기
+          </button>
+          <img
+            className="product-image-modal__img"
+            src={listImagePreview.url}
+            alt={listImagePreview.alt}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

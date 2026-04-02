@@ -11,8 +11,8 @@ function normalizeCore(rawInput: string): { normalized: string; corrected: boole
 
   // Option-like values are preserved as-is.
   // Only standard size patterns are normalized in a limited way.
-  if (/^[mMwW]\s*\d+$/.test(trimmed)) {
-    const m = /^([mMwW])\s*(\d+)$/.exec(trimmed);
+  if (/^[mMwW]/.test(trimmed)) {
+    const m = /^([mMwW])\D*(\d+)(?:\D.*)?$/.exec(trimmed);
     if (!m) return { normalized: trimmed, corrected: false, recoverable: true };
     const normalized = `${m[1].toUpperCase()}${m[2]}`;
     return { normalized, corrected: normalized !== trimmed, recoverable: true, reason: "normalized_standard_prefixed_size" };
@@ -44,8 +44,19 @@ export function normalizeSizeWithMeta(size: string): NormalizedSizeMeta {
   };
 }
 
+function extractTerminalSizeToken(input: string): string {
+  const trimmed = (input ?? "").trim();
+  if (!trimmed) return "";
+  const parts = trimmed
+    .split("/")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : trimmed;
+}
+
 function parseForSort(size: string): { prefixOrder: number; numberPart: number; text: string } {
-  const normalized = normalizeSize(size);
+  const terminal = extractTerminalSizeToken(size);
+  const normalized = normalizeSize(terminal || size);
   if (!normalized) {
     return { prefixOrder: 999, numberPart: Number.POSITIVE_INFINITY, text: "" };
   }
@@ -67,7 +78,7 @@ function parseForSort(size: string): { prefixOrder: number; numberPart: number; 
   if (textOrder !== undefined) {
     return { prefixOrder: 0, numberPart: textOrder, text: normalized };
   }
-  const m = /^([WM])(\d+)$/.exec(normalized);
+  const m = /^([WM])\D*(\d+)(?:\D.*)?$/.exec(normalized);
   if (m) {
     const prefixOrder = m[1] === "W" ? 1 : 2;
     return { prefixOrder, numberPart: Number.parseInt(m[2], 10), text: normalized };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Product, ProductVariant, ProductRow } from "./types";
 import { formatVariantDisplay } from "./variantOptions";
@@ -24,6 +24,30 @@ function variantSavingKeyForProduct(adjustingKeys: Set<string>, variants: Produc
 
 function listRowAdjustKey(row: ProductRow): string {
   return row.variantId ? `v:${row.variantId}` : `p:${row.id}`;
+}
+
+/** 카테고리 select 폭 안에 들어가도록 글자 크기 조절(네이티브 select는 줄바꿈 불가). */
+function fitCategorySelectFont(selectEl: HTMLSelectElement, displayedLabel: string) {
+  const maxFs = 13;
+  const minFs = 9;
+  const padApprox = 28;
+  const w = selectEl.clientWidth;
+  if (w < 40) return;
+  const cs = getComputedStyle(selectEl);
+  const family = cs.fontFamily || "sans-serif";
+  const weight = cs.fontWeight || "600";
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  let bestFs = minFs;
+  for (let fs = maxFs; fs >= minFs; fs -= 0.5) {
+    ctx.font = `${weight} ${fs}px ${family}`;
+    if (ctx.measureText(displayedLabel).width + padApprox <= w) {
+      bestFs = fs;
+      break;
+    }
+  }
+  selectEl.style.fontSize = `${bestFs}px`;
 }
 
 export function ProductsClient({
@@ -53,6 +77,7 @@ export function ProductsClient({
 
   // (중요) 화면에 처음 나타난 순서를 고정 저장
   const orderRef = useRef<Map<string, number>>(new Map());
+  const categorySelectRef = useRef<HTMLSelectElement>(null);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   const downloadRef = useRef<HTMLDivElement | null>(null);
   const downloadButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -194,6 +219,20 @@ export function ProductsClient({
     if (!confirm("이 상품을 삭제하시겠습니까?")) return;
     await deleteProduct(productId);
   }, []);
+
+  const categorySelectDisplayedLabel = categoryFilter === "" ? "전체" : categoryFilter;
+
+  useLayoutEffect(() => {
+    const sel = categorySelectRef.current;
+    if (!sel) return;
+    const run = () => fitCategorySelectFont(sel, categorySelectDisplayedLabel);
+    run();
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(run);
+    });
+    ro.observe(sel);
+    return () => ro.disconnect();
+  }, [categorySelectDisplayedLabel]);
 
   useEffect(() => {
     if (!downloadOpen) return;
@@ -484,19 +523,23 @@ export function ProductsClient({
           <button type="button" className="btn btn-primary btn-compact" onClick={runSearch}>
             검색
           </button>
-          <select
-            className="btn btn-secondary btn-compact"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            aria-label="카테고리 필터"
-          >
-            <option value="">전체</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <div className="products-category-select-wrap">
+            <select
+              ref={categorySelectRef}
+              className="btn btn-secondary btn-compact products-category-select"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              aria-label="카테고리 필터"
+              title={categorySelectDisplayedLabel}
+            >
+              <option value="">전체</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* 데스크톱 전용: 리스트/카드/CSV/추가 */}

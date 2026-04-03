@@ -70,6 +70,18 @@ export const ProductCard = memo(function ProductCard({
     const copy = [...safeVariants];
     return copy.sort((a, b) => sortVariantRows(a, b));
   }, [safeVariants]);
+
+  /** 같은 카드에서 옵션 표시 문자열이 겹치면 메모는 점만(어느 행 메모인지 혼동 방지). */
+  const variantOptionLabelsOverlap = useMemo(() => {
+    if (sortedVariants.length <= 1) return false;
+    const counts = new Map<string, number>();
+    for (const v of sortedVariants) {
+      const label = (formatVariantDisplay(v) ?? "").trim() || v.id;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return [...counts.values()].some((c) => c > 1);
+  }, [sortedVariants]);
+
   const hasVariants = sortedVariants.length > 0;
   const hasImage = Boolean(product?.imageUrl);
 
@@ -226,11 +238,17 @@ export const ProductCard = memo(function ProductCard({
                             <span className="stock-adjust-pending" aria-label="저장 중" />
                           ) : null}
                           {variantMemoText ? (
-                            <span
-                              className="product-card__memo-has"
-                              title="메모 있음"
-                              aria-label="이 옵션에 메모가 있습니다"
-                            />
+                            variantOptionLabelsOverlap ? (
+                              <span
+                                className="product-card__memo-has"
+                                title={variantMemoText}
+                                aria-label={`메모: ${variantMemoText}`}
+                              />
+                            ) : (
+                              <span className="product-card__memo product-card__memo--filled product-card__memo--by-qty">
+                                {variantMemoText}
+                              </span>
+                            )
                           ) : null}
                         </div>
                         <button
@@ -319,11 +337,9 @@ export const ProductCard = memo(function ProductCard({
                         <span className="stock-adjust-pending" aria-label="저장 중" />
                       ) : null}
                       {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
-                        <span
-                          className="product-card__memo-has"
-                          title="메모 있음"
-                          aria-label="메모가 있습니다"
-                        />
+                        <span className="product-card__memo product-card__memo--filled product-card__memo--by-qty">
+                          {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
+                        </span>
                       ) : null}
                     </div>
                     <button

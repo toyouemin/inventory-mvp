@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
+import { decomposeVariantSize, joinVariantSizeForCsv, variantCompositeKey } from "./variantOptions";
 
 type VariantRow = { rowId: string; size: string; stock: string; memo: string; memo2: string; variantId?: string };
 
@@ -21,7 +22,13 @@ function makeRow(size = "", stock = "0", memo = "", memo2 = "", variantId?: stri
 function variantsToRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
   if (variants.length > 0) {
     return variants.map((v) =>
-      makeRow((v.size ?? "").trim(), String(v.stock), (v.memo ?? "").trim(), (v.memo2 ?? "").trim(), v.id)
+      makeRow(
+        joinVariantSizeForCsv(v.option1, v.option2, v.size).trim() || (v.size ?? "").trim(),
+        String(v.stock),
+        (v.memo ?? "").trim(),
+        (v.memo2 ?? "").trim(),
+        v.id
+      )
     );
   }
   return [makeRow("", String(fallbackStock ?? 0))];
@@ -99,9 +106,12 @@ export function EditProductModal({
       setVariantError("사이즈가 비어 있는 행이 있습니다. 사이즈를 입력하거나 해당 행을 삭제해 주세요.");
       return;
     }
-    const sizes = rowsWithNonEmptySize.map((r) => (r.size ?? "").trim());
-    if (new Set(sizes).size !== sizes.length) {
-      setVariantError("중복된 사이즈가 있습니다.");
+    const variantKeys = rowsWithNonEmptySize.map((r) => {
+      const d = decomposeVariantSize((r.size ?? "").trim());
+      return variantCompositeKey(d.option1, d.option2, d.size);
+    });
+    if (new Set(variantKeys).size !== variantKeys.length) {
+      setVariantError("중복된 옵션(길이/성별/사이즈)이 있습니다.");
       return;
     }
     setVariantError("");

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Product, ProductVariant, ProductRow } from "./types";
+import { formatVariantDisplay } from "./variantOptions";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
 import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } from "./actions";
@@ -179,7 +180,7 @@ export function ProductsClient({
           rows.push({
             ...p,
             variantId: v.id,
-            size: v.size,
+            size: formatVariantDisplay(v),
             variantStock: v.stock,
             memo: v.memo ?? null,
             memo2: v.memo2 ?? null,
@@ -440,7 +441,7 @@ export function ProductsClient({
                   const adjust = (delta: number) =>
                     isVariant ? adjustVariantStock(row.variantId, delta) : adjustStock(row.id, delta);
                   return (
-                    <tr key={row.variantId ? `${row.id}-${row.size}` : row.id}>
+                    <tr key={row.variantId ? `${row.id}-${row.variantId}` : row.id}>
                       <td>
                         {row.imageUrl ? (
                           <button
@@ -485,8 +486,20 @@ export function ProductsClient({
                       <td>{row.msrpPrice != null ? `${row.msrpPrice.toLocaleString()}원` : "-"}</td>
                       <td>{row.salePrice != null ? `${row.salePrice.toLocaleString()}원` : "-"}</td>
                       <td>{row.extraPrice != null ? `${row.extraPrice.toLocaleString()}원` : "-"}</td>
-                      <td>{row.memo?.trim() ? row.memo : "-"}</td>
-                      <td>{row.memo2?.trim() ? row.memo2 : "-"}</td>
+                      <td>
+                        {row.memo?.trim() ? (
+                          <span className="products-table__memo products-table__memo--filled">{row.memo}</span>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
+                      <td>
+                        {row.memo2?.trim() ? (
+                          <span className="products-table__memo products-table__memo--filled">{row.memo2}</span>
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                       <td>
                         <div className="row-actions">
                           <button

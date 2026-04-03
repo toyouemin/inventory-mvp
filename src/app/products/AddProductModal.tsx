@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import { VariantEditor, type VariantRow } from "./VariantEditor";
+import { decomposeVariantSize, variantCompositeKey } from "./variantOptions";
 
 function parsePriceInput(value: string): number | null {
   const cleaned = String(value ?? "").replace(/,/g, "").trim();
@@ -77,9 +78,12 @@ export function AddProductModal({
       setVariantError("사이즈가 비어 있는 행이 있습니다. 사이즈를 입력하거나 해당 행을 삭제해 주세요.");
       return;
     }
-    const sizes = rowsWithSize.map((r) => (r.size ?? "").trim());
-    if (new Set(sizes).size !== sizes.length) {
-      setVariantError("중복된 사이즈가 있습니다.");
+    const variantKeys = rowsWithSize.map((r) => {
+      const d = decomposeVariantSize((r.size ?? "").trim());
+      return variantCompositeKey(d.option1, d.option2, d.size);
+    });
+    if (new Set(variantKeys).size !== variantKeys.length) {
+      setVariantError("중복된 옵션(길이/성별/사이즈)이 있습니다.");
       return;
     }
     setVariantError("");

@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseClient";
+import { joinVariantSizeForCsv } from "@/app/products/variantOptions";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -39,19 +40,36 @@ export async function GET() {
   const list = products ?? [];
   const productIds = list.map((p: { id: string }) => p.id);
 
-  let variants: { product_id: string; size: string; stock: number; memo: string | null; memo2: string | null }[] = [];
+  let variants: {
+    product_id: string;
+    option1: string | null;
+    option2: string | null;
+    size: string;
+    stock: number;
+    memo: string | null;
+    memo2: string | null;
+  }[] = [];
   if (productIds.length > 0) {
     const { data: variantsData } = await supabaseServer
       .from("product_variants")
-      .select("product_id, size, stock, memo, memo2")
+      .select("product_id, option1, option2, size, stock, memo, memo2")
       .in("product_id", productIds);
-    variants = variantsData ?? [];
+    variants = (variantsData ?? []) as typeof variants;
   }
 
-  const variantsByProductId = new Map<string, { size: string; stock: number; memo: string | null; memo2: string | null }[]>();
+  const variantsByProductId = new Map<
+    string,
+    { size: string; stock: number; memo: string | null; memo2: string | null }[]
+  >();
   for (const v of variants) {
     const arr = variantsByProductId.get(v.product_id) ?? [];
-    arr.push({ size: v.size, stock: Number(v.stock) ?? 0, memo: v.memo ?? null, memo2: v.memo2 ?? null });
+    const sizeCol = joinVariantSizeForCsv(v.option1, v.option2, v.size);
+    arr.push({
+      size: sizeCol || v.size,
+      stock: Number(v.stock) ?? 0,
+      memo: v.memo ?? null,
+      memo2: v.memo2 ?? null,
+    });
     variantsByProductId.set(v.product_id, arr);
   }
 

@@ -3,11 +3,23 @@
 import { useState, useMemo, useEffect } from "react";
 import { adjustStock, adjustVariantStock, updateProductMemo, updateVariantMemo } from "./actions";
 import type { Product, ProductVariant } from "./types";
-import { sortSizes } from "./sizeUtils";
+import { effectiveVariantTriple, formatVariantDisplay, sortVariantRows } from "./variantOptions";
 
-function toOptionDisplay(v: ProductVariant): string {
-  const value = (v.size ?? "").trim();
-  return value || "(없음)";
+function VariantOptionChips({ variant }: { variant: ProductVariant }) {
+  const t = effectiveVariantTriple(variant);
+  const chips = [t.option1, t.option2, t.size].filter(Boolean);
+  if (chips.length === 0) {
+    return <>{formatVariantDisplay(variant)}</>;
+  }
+  return (
+    <span className="product-card__opt-chips">
+      {chips.map((c, i) => (
+        <span key={`${i}-${c}`} className="product-card__opt-chip">
+          {c}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 function PriceLabel({ full, mobile }: { full: string; mobile: string }) {
@@ -41,7 +53,7 @@ export function ProductCard({
 
   const sortedVariants = useMemo(() => {
     const copy = [...safeVariants];
-    return copy.sort((a, b) => sortSizes(a.size ?? "", b.size ?? ""));
+    return copy.sort((a, b) => sortVariantRows(a, b));
   }, [safeVariants]);
   const hasVariants = sortedVariants.length > 0;
   const hasImage = Boolean(product?.imageUrl);
@@ -59,8 +71,8 @@ export function ProductCard({
     if (pending) return;
     if (!variant?.id) {
       console.warn(
-        `[variant-match-fail] sku=${product?.sku ?? ""} selectedOption=${variant?.size ?? ""} variants=${JSON.stringify(
-          sortedVariants.map((v) => ({ id: v?.id ?? "", size: v?.size ?? "" }))
+        `[variant-match-fail] sku=${product?.sku ?? ""} selectedOption=${formatVariantDisplay(variant ?? {})} variants=${JSON.stringify(
+          sortedVariants.map((v) => ({ id: v?.id ?? "", opt: formatVariantDisplay(v) }))
         )}`
       );
       return;
@@ -180,18 +192,22 @@ export function ProductCard({
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
                 return (
-                  <div className="product-card__option-item" role="listitem" key={variant.id ?? `${product?.id}-${variant.size}`}>
+                  <div className="product-card__option-item" role="listitem" key={variant.id ?? `${product?.id}-${variant.option1}-${variant.option2}-${variant.size}`}>
                     <div className="product-card__option-row">
-                      <span className="product-card__option-name">{toOptionDisplay(variant)}</span>
+                      <span className="product-card__option-name product-card__option-name--chips">
+                        <VariantOptionChips variant={variant} />
+                      </span>
                       <div className="product-card__option-right">
                         <span className="product-card__stock-label">재고</span>
                         <div className="product-card__option-qty">
                           <strong>{qty}</strong>
-                          {variantMemoText ? <span className="product-card__memo">({variantMemoText})</span> : null}
+                          {variantMemoText ? (
+                            <span className="product-card__memo product-card__memo--filled">{variantMemoText}</span>
+                          ) : null}
                         </div>
                         <button
                           type="button"
-                          className="product-card__memo-btn"
+                          className={`product-card__memo-btn${variantMemoText ? " product-card__memo-btn--filled" : ""}`}
                           onClick={() =>
                             editingMemoVariantId === variant.id
                               ? setEditingMemoVariantId(null)
@@ -266,14 +282,18 @@ export function ProductCard({
                     <div className="product-card__option-qty">
                       <strong>{product?.stock ?? "-"}</strong>
                       {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
-                        <span className="product-card__memo">
-                          ({[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")})
+                        <span className="product-card__memo product-card__memo--filled">
+                          {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
                         </span>
                       ) : null}
                     </div>
                     <button
                       type="button"
-                      className="product-card__memo-btn"
+                      className={`product-card__memo-btn${
+                        (product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()
+                          ? " product-card__memo-btn--filled"
+                          : ""
+                      }`}
                       onClick={() => (editingProductMemo ? setEditingProductMemo(false) : openProductMemoEditor())}
                       disabled={memoPending}
                     >

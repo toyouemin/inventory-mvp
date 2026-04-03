@@ -33,6 +33,8 @@ function mapVariant(row: Record<string, unknown>): ProductVariant {
   return {
     id: String(row.id),
     productId: String(row.product_id),
+    option1: String(row.option1 ?? ""),
+    option2: String(row.option2 ?? ""),
     size: String(row.size ?? ""),
     stock: Number(row.stock ?? 0),
     memo: (row.memo as string) ?? null,
@@ -73,12 +75,12 @@ export default async function ProductsPage() {
     try {
       const { data: variantsData, error: variantsError } = await supabaseServer
         .from("product_variants")
-        .select("id, product_id, size, stock, memo, memo2, created_at")
+        .select("id, product_id, option1, option2, size, stock, memo, memo2, created_at")
         .in("product_id", productIds);
       if (variantsError) {
         const { data: fallbackData } = await supabaseServer
           .from("product_variants")
-          .select("id, product_id, size, stock, memo, memo2, created_at")
+          .select("id, product_id, option1, option2, size, stock, memo, memo2, created_at")
           .in("product_id", productIds);
         const variants = (fallbackData ?? []).map((r: Record<string, unknown>) => mapVariant(r));
         variants.forEach((v) => {

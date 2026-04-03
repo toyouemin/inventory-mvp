@@ -18,6 +18,11 @@ export type Product = {
 export type ProductVariant = {
   id: string;
   productId: string;
+  /** 길이 (예: 3부, 4부) */
+  option1: string;
+  /** 성별 (예: 남, 여) */
+  option2: string;
+  /** 순수 사이즈 (예: W28) */
   size: string;
   stock: number;
   memo?: string | null;

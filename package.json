@@ -10,7 +10,8 @@
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "prisma db seed"
+    "prisma:seed": "prisma db seed",
+    "verify:thp": "npx tsx scripts/verify-thp-sku.mts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

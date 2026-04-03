@@ -506,7 +506,7 @@ button:hover {
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   gap: 8px;
   align-items: center;
-  padding: 8px;
+  padding: 3px 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #faf7f3;
@@ -520,7 +520,7 @@ button:hover {
 
 .product-card__option-name {
   min-width: 0;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   line-height: 1.35;
   word-break: break-word;
@@ -539,10 +539,11 @@ button:hover {
 
 .product-card__opt-chip {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 1px 8px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1.25;
   background: #ebe6df;
   border: 1px solid #d4cdc3;
   color: #3d3a36;
@@ -810,6 +811,34 @@ label {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.stock-cell__qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stock-adjust-pending {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: stock-adjust-pulse 0.85s ease-in-out infinite;
+}
+
+@keyframes stock-adjust-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .stock-buttons {
@@ -1181,8 +1210,7 @@ label {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 6px;
-    gap: 6px;
+    padding: 2px 6px;
   }
 
   .product-card__option-name {
@@ -1191,7 +1219,7 @@ label {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 700;
   }
 

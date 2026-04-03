@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Product, ProductVariant, ProductRow } from "./types";
 import { formatVariantDisplay } from "./variantOptions";
@@ -10,6 +10,21 @@ import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } fro
 import { EditProductModal } from "./EditProductModal";
 
 type ViewMode = "card" | "list";
+
+function variantSavingKeyForProduct(adjustingKeys: Set<string>, variants: ProductVariant[]): string {
+  if (!variants.length) return "";
+  const ids = new Set(variants.map((v) => v.id));
+  return [...adjustingKeys]
+    .filter((k) => k.startsWith("v:"))
+    .map((k) => k.slice(2))
+    .filter((vid) => ids.has(vid))
+    .sort()
+    .join(",");
+}
+
+function listRowAdjustKey(row: ProductRow): string {
+  return row.variantId ? `v:${row.variantId}` : `p:${row.id}`;
+}
 
 export function ProductsClient({
   products,
@@ -45,6 +60,140 @@ export function ProductsClient({
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [downloadMenuUp, setDownloadMenuUp] = useState(false);
   const [downloadMenuStyle, setDownloadMenuStyle] = useState<CSSProperties>({});
+  const [adjustingStockKeys, setAdjustingStockKeys] = useState(() => new Set<string>());
+  const adjustLocksRef = useRef<Set<string>>(new Set());
+  const localProductsRef = useRef<Product[]>(products);
+  const localVariantsRef = useRef<Record<string, ProductVariant[]>>(variantsByProductId);
+  localProductsRef.current = localProducts;
+  localVariantsRef.current = localVariantsByProductId;
+
+  const patchAdjusting = useCallback((updater: (s: Set<string>) => Set<string>) => {
+    setAdjustingStockKeys((prev) => updater(new Set(prev)));
+  }, []);
+
+  const onProductStockDelta = useCallback(
+    async (productId: string, delta: number) => {
+      const key = `p:${productId}`;
+      if (adjustLocksRef.current.has(key)) return;
+      adjustLocksRef.current.add(key);
+
+      const rollback = { current: null as number | null };
+      let applied = false;
+      setLocalProducts((prev) => {
+        const p = prev.find((x) => x.id === productId);
+        if (!p) return prev;
+        const old = p.stock ?? 0;
+        if (delta < 0 && old < 1) return prev;
+        rollback.current = old;
+        applied = true;
+        const next = Math.max(0, old + delta);
+        return prev.map((x) => (x.id === productId ? { ...x, stock: next } : x));
+      });
+
+      if (!applied) {
+        adjustLocksRef.current.delete(key);
+        return;
+      }
+
+      patchAdjusting((s) => new Set(s).add(key));
+      try {
+        await adjustStock(productId, delta);
+      } catch (err) {
+        const old = rollback.current;
+        if (old !== null) {
+          setLocalProducts((prev) =>
+            prev.map((x) => (x.id === productId ? { ...x, stock: old } : x))
+          );
+        }
+        alert(err instanceof Error ? err.message : String(err));
+      } finally {
+        adjustLocksRef.current.delete(key);
+        patchAdjusting((s) => {
+          const n = new Set(s);
+          n.delete(key);
+          return n;
+        });
+      }
+    },
+    [patchAdjusting]
+  );
+
+  const onVariantStockDelta = useCallback(
+    async (productId: string, variantId: string, delta: number) => {
+      const key = `v:${variantId}`;
+      if (adjustLocksRef.current.has(key)) return;
+      adjustLocksRef.current.add(key);
+
+      const rollback = { current: null as number | null };
+      let applied = false;
+      setLocalVariantsByProductId((prev) => {
+        const list = prev[productId];
+        if (!list) return prev;
+        const idx = list.findIndex((v) => v.id === variantId);
+        if (idx < 0) return prev;
+        const old = list[idx].stock ?? 0;
+        if (delta < 0 && old < 1) return prev;
+        rollback.current = old;
+        applied = true;
+        const next = Math.max(0, old + delta);
+        const nl = [...list];
+        nl[idx] = { ...list[idx], stock: next };
+        return { ...prev, [productId]: nl };
+      });
+
+      if (!applied) {
+        adjustLocksRef.current.delete(key);
+        return;
+      }
+
+      patchAdjusting((s) => new Set(s).add(key));
+      try {
+        await adjustVariantStock(variantId, delta);
+      } catch (err) {
+        const old = rollback.current;
+        if (old !== null) {
+          setLocalVariantsByProductId((prev) => {
+            const list = prev[productId];
+            if (!list) return prev;
+            return {
+              ...prev,
+              [productId]: list.map((v) => (v.id === variantId ? { ...v, stock: old } : v)),
+            };
+          });
+        }
+        alert(err instanceof Error ? err.message : String(err));
+      } finally {
+        adjustLocksRef.current.delete(key);
+        patchAdjusting((s) => {
+          const n = new Set(s);
+          n.delete(key);
+          return n;
+        });
+      }
+    },
+    [patchAdjusting]
+  );
+
+  const onListRowStockDelta = useCallback(
+    async (row: ProductRow, delta: number) => {
+      if (row.variantId) await onVariantStockDelta(row.id, row.variantId, delta);
+      else await onProductStockDelta(row.id, delta);
+    },
+    [onProductStockDelta, onVariantStockDelta]
+  );
+
+  const openEditById = useCallback((id: string) => {
+    const p = localProductsRef.current.find((x) => x.id === id);
+    if (!p) return;
+    setEditingProduct(p);
+    setEditingVariants(localVariantsRef.current[id] ?? []);
+    setEditOpen(true);
+  }, []);
+
+  const requestDeleteProduct = useCallback(async (productId: string) => {
+    if (!confirm("이 상품을 삭제하시겠습니까?")) return;
+    await deleteProduct(productId);
+  }, []);
 
   useEffect(() => {
     if (!downloadOpen) return;
@@ -386,22 +535,22 @@ export function ProductsClient({
               )}
             </div>
           ) : (
-            filtered.map((p) => (
-              <ProductCard
-                key={p.id}
-                product={p}
-                variants={localVariantsByProductId[p.id] ?? []}
-                onEditClick={() => {
-                  setEditingProduct(p);
-                  setEditingVariants(localVariantsByProductId[p.id] ?? []);
-                  setEditOpen(true);
-                }}
-                onDeleteClick={async () => {
-                  if (!confirm("이 상품을 삭제하시겠습니까?")) return;
-                  await deleteProduct(p.id);
-                }}
-              />
-            ))
+            filtered.map((p) => {
+              const vars = localVariantsByProductId[p.id] ?? [];
+              return (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  variants={vars}
+                  onEditClick={openEditById}
+                  onDeleteClick={requestDeleteProduct}
+                  onProductStockDelta={onProductStockDelta}
+                  onVariantStockDelta={onVariantStockDelta}
+                  productStockSaving={adjustingStockKeys.has(`p:${p.id}`)}
+                  savingVariantIdsKey={variantSavingKeyForProduct(adjustingStockKeys, vars)}
+                />
+              );
+            })
           )}
         </div>
       ) : (
@@ -437,9 +586,8 @@ export function ProductsClient({
               <tbody>
                 {listRows.map((row) => {
                   const qty = row.variantStock;
-                  const isVariant = Boolean(row.variantId);
-                  const adjust = (delta: number) =>
-                    isVariant ? adjustVariantStock(row.variantId, delta) : adjustStock(row.id, delta);
+                  const rowKey = listRowAdjustKey(row);
+                  const rowSaving = adjustingStockKeys.has(rowKey);
                   return (
                     <tr key={row.variantId ? `${row.id}-${row.variantId}` : row.id}>
                       <td>
@@ -455,7 +603,13 @@ export function ProductsClient({
                             }
                             aria-label="상품 이미지 확대"
                           >
-                            <img className="thumb-small" src={row.imageUrl} alt="" />
+                            <img
+                              className="thumb-small"
+                              src={row.imageUrl}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                            />
                           </button>
                         ) : (
                           <span className="thumb-empty">-</span>
@@ -466,17 +620,31 @@ export function ProductsClient({
                       <td>{row.size || "-"}</td>
                       <td>
                         <div className="stock-cell">
-                          <strong>{qty}</strong>
+                          <span className="stock-cell__qty">
+                            <strong>{qty}</strong>
+                            {rowSaving ? (
+                              <span className="stock-adjust-pending" aria-label="저장 중" />
+                            ) : null}
+                          </span>
                           <div className="stock-buttons">
                             <button
                               type="button"
                               className="btn-mini"
-                              disabled={qty < 1}
-                              onClick={async () => adjust(-1)}
+                              disabled={qty < 1 || rowSaving}
+                              onClick={() => {
+                                void onListRowStockDelta(row, -1);
+                              }}
                             >
                               -1
                             </button>
-                            <button type="button" className="btn-mini" onClick={async () => adjust(1)}>
+                            <button
+                              type="button"
+                              className="btn-mini"
+                              disabled={rowSaving}
+                              onClick={() => {
+                                void onListRowStockDelta(row, 1);
+                              }}
+                            >
                               +1
                             </button>
                           </div>
@@ -505,21 +673,14 @@ export function ProductsClient({
                           <button
                             type="button"
                             className="btn btn-secondary btn-row"
-                            onClick={() => {
-                              setEditingProduct(row);
-                              setEditingVariants(localVariantsByProductId[row.id] ?? []);
-                              setEditOpen(true);
-                            }}
+                            onClick={() => openEditById(row.id)}
                           >
                             수정
                           </button>
                           <button
                             type="button"
                             className="btn btn-danger btn-row"
-                            onClick={async () => {
-                              if (!confirm("이 상품을 삭제하시겠습니까?")) return;
-                              await deleteProduct(row.id);
-                            }}
+                            onClick={() => void requestDeleteProduct(row.id)}
                           >
                             삭제
                           </button>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
-import { adjustStock, adjustVariantStock, updateProductMemo, updateVariantMemo } from "./actions";
+import { memo, useMemo, useState } from "react";
+import { updateProductMemo, updateVariantMemo } from "./actions";
 import type { Product, ProductVariant } from "./types";
 import { effectiveVariantTriple, formatVariantDisplay, sortVariantRows } from "./variantOptions";
 
@@ -31,18 +31,28 @@ function PriceLabel({ full, mobile }: { full: string; mobile: string }) {
   );
 }
 
-export function ProductCard({
+export type ProductCardProps = {
+  product: Product;
+  variants?: ProductVariant[];
+  onEditClick?: (productId: string) => void;
+  onDeleteClick?: (productId: string) => void | Promise<void>;
+  onProductStockDelta?: (productId: string, delta: number) => void | Promise<void>;
+  onVariantStockDelta?: (productId: string, variantId: string, delta: number) => void | Promise<void>;
+  productStockSaving?: boolean;
+  /** 쉼표로 구분된 variant id (정렬된 문자열). memo 비교용 */
+  savingVariantIdsKey?: string;
+};
+
+export const ProductCard = memo(function ProductCard({
   product,
   variants = [],
   onEditClick,
   onDeleteClick,
-}: {
-  product: Product;
-  variants?: ProductVariant[];
-  onEditClick?: () => void;
-  onDeleteClick?: () => void;
-}) {
-  const [pending, setPending] = useState(false);
+  onProductStockDelta,
+  onVariantStockDelta,
+  productStockSaving = false,
+  savingVariantIdsKey = "",
+}: ProductCardProps) {
   const [imageOpen, setImageOpen] = useState(false);
   const [editingMemoVariantId, setEditingMemoVariantId] = useState<string | null>(null);
   const [editingProductMemo, setEditingProductMemo] = useState(false);
@@ -51,24 +61,23 @@ export function ProductCard({
   const [memoPending, setMemoPending] = useState(false);
   const safeVariants = Array.isArray(variants) ? variants : [];
 
+  const savingVariantSet = useMemo(
+    () => new Set(savingVariantIdsKey.split(",").filter(Boolean)),
+    [savingVariantIdsKey]
+  );
+
   const sortedVariants = useMemo(() => {
     const copy = [...safeVariants];
     return copy.sort((a, b) => sortVariantRows(a, b));
   }, [safeVariants]);
   const hasVariants = sortedVariants.length > 0;
   const hasImage = Boolean(product?.imageUrl);
-  async function handleAdjustProduct(delta: number) {
-    if (pending) return;
-    setPending(true);
-    try {
-      await adjustStock(product.id, delta);
-    } finally {
-      setPending(false);
-    }
+
+  function handleAdjustProduct(delta: number) {
+    void onProductStockDelta?.(product.id, delta);
   }
 
-  async function handleAdjustVariant(variant: ProductVariant, delta: number) {
-    if (pending) return;
+  function handleAdjustVariant(variant: ProductVariant, delta: number) {
     if (!variant?.id) {
       console.warn(
         `[variant-match-fail] sku=${product?.sku ?? ""} selectedOption=${formatVariantDisplay(variant ?? {})} variants=${JSON.stringify(
@@ -77,12 +86,7 @@ export function ProductCard({
       );
       return;
     }
-    setPending(true);
-    try {
-      await adjustVariantStock(variant.id, delta);
-    } finally {
-      setPending(false);
-    }
+    void onVariantStockDelta?.(product.id, variant.id, delta);
   }
 
   function openMemoEditor(variant: ProductVariant) {
@@ -130,7 +134,12 @@ export function ProductCard({
           onClick={() => setImageOpen(true)}
           aria-label="상품 이미지 확대"
         >
-          <img src={product.imageUrl ?? undefined} alt={(product?.nameSpec ?? product?.sku ?? "").toString()} />
+          <img
+            src={product.imageUrl ?? undefined}
+            alt={(product?.nameSpec ?? product?.sku ?? "").toString()}
+            loading="lazy"
+            decoding="async"
+          />
         </button>
       ) : (
         <div className="product-card__image" aria-hidden="true">
@@ -152,7 +161,12 @@ export function ProductCard({
               onClick={() => setImageOpen(true)}
               aria-label="상품 썸네일 확대"
             >
-              <img src={product.imageUrl ?? undefined} alt={(product?.nameSpec ?? product?.sku ?? "").toString()} />
+              <img
+                src={product.imageUrl ?? undefined}
+                alt={(product?.nameSpec ?? product?.sku ?? "").toString()}
+                loading="lazy"
+                decoding="async"
+              />
             </button>
           ) : (
             <div className="product-card__thumb" aria-hidden="true">
@@ -185,6 +199,7 @@ export function ProductCard({
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               {sortedVariants.map((variant) => {
                 const qty = variant?.stock ?? 0;
+                const variantSaving = savingVariantSet.has(variant.id);
                 const variantMemo = (variant?.memo ?? "").trim();
                 const variantMemo2 = (variant?.memo2 ?? "").trim();
                 const variantMemoText =
@@ -201,6 +216,9 @@ export function ProductCard({
                         <span className="product-card__stock-label">재고</span>
                         <div className="product-card__option-qty">
                           <strong>{qty}</strong>
+                          {variantSaving ? (
+                            <span className="stock-adjust-pending" aria-label="저장 중" />
+                          ) : null}
                           {variantMemoText ? (
                             <span className="product-card__memo product-card__memo--filled">{variantMemoText}</span>
                           ) : null}
@@ -221,14 +239,14 @@ export function ProductCard({
                           <button
                             type="button"
                             onClick={() => handleAdjustVariant(variant, -1)}
-                            disabled={pending || qty < 1}
+                            disabled={variantSaving || qty < 1}
                           >
                             -1
                           </button>
                           <button
                             type="button"
                             onClick={() => handleAdjustVariant(variant, 1)}
-                            disabled={pending}
+                            disabled={variantSaving}
                           >
                             +1
                           </button>
@@ -281,6 +299,9 @@ export function ProductCard({
                     <span className="product-card__stock-label">재고</span>
                     <div className="product-card__option-qty">
                       <strong>{product?.stock ?? "-"}</strong>
+                      {productStockSaving ? (
+                        <span className="stock-adjust-pending" aria-label="저장 중" />
+                      ) : null}
                       {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
                         <span className="product-card__memo product-card__memo--filled">
                           {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
@@ -303,11 +324,11 @@ export function ProductCard({
                       <button
                         type="button"
                         onClick={() => handleAdjustProduct(-1)}
-                        disabled={pending || (product?.stock ?? 0) < 1}
+                        disabled={productStockSaving || (product?.stock ?? 0) < 1}
                       >
                         -1
                       </button>
-                      <button type="button" onClick={() => handleAdjustProduct(1)} disabled={pending}>
+                      <button type="button" onClick={() => handleAdjustProduct(1)} disabled={productStockSaving}>
                         +1
                       </button>
                     </div>
@@ -355,7 +376,7 @@ export function ProductCard({
           <button
             type="button"
             className="product-card__edit-btn"
-            onClick={() => onEditClick?.()}
+            onClick={() => onEditClick?.(product.id)}
           >
             수정
           </button>
@@ -363,7 +384,7 @@ export function ProductCard({
             <button
               type="button"
               className="btn btn-danger product-card__delete-btn"
-              onClick={onDeleteClick}
+              onClick={() => void onDeleteClick(product.id)}
             >
               삭제
             </button>
@@ -385,10 +406,11 @@ export function ProductCard({
             className="product-image-modal__img"
             src={product.imageUrl ?? undefined}
             alt={(product?.nameSpec ?? product?.sku ?? "").toString()}
+            decoding="async"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
       ) : null}
     </article>
   );
-}
+});

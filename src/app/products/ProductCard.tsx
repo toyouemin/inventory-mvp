@@ -209,9 +209,15 @@ export const ProductCard = memo(function ProductCard({
                 return (
                   <div className="product-card__option-item" role="listitem" key={variant.id ?? `${product?.id}-${variant.option1}-${variant.option2}-${variant.size}`}>
                     <div className="product-card__option-row">
-                      <span className="product-card__option-name product-card__option-name--chips">
-                        <VariantOptionChips variant={variant} />
-                      </span>
+                      <div
+                        className="product-card__option-chips-scroll"
+                        role="region"
+                        aria-label="옵션 — 옆으로 밀어 전체 보기"
+                      >
+                        <span className="product-card__option-name product-card__option-name--chips">
+                          <VariantOptionChips variant={variant} />
+                        </span>
+                      </div>
                       <div className="product-card__option-right">
                         <span className="product-card__stock-label">재고</span>
                         <div className="product-card__option-qty">
@@ -220,7 +226,11 @@ export const ProductCard = memo(function ProductCard({
                             <span className="stock-adjust-pending" aria-label="저장 중" />
                           ) : null}
                           {variantMemoText ? (
-                            <span className="product-card__memo product-card__memo--filled">{variantMemoText}</span>
+                            <span
+                              className="product-card__memo-has"
+                              title="메모 있음"
+                              aria-label="이 옵션에 메모가 있습니다"
+                            />
                           ) : null}
                         </div>
                         <button
@@ -294,7 +304,13 @@ export const ProductCard = memo(function ProductCard({
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               <div className="product-card__option-item" role="listitem">
                 <div className="product-card__option-row">
-                  <span className="product-card__option-name">옵션 없음</span>
+                  <div
+                    className="product-card__option-chips-scroll"
+                    role="region"
+                    aria-label="옵션 — 옆으로 밀어 전체 보기"
+                  >
+                    <span className="product-card__option-name">옵션 없음</span>
+                  </div>
                   <div className="product-card__option-right">
                     <span className="product-card__stock-label">재고</span>
                     <div className="product-card__option-qty">
@@ -303,9 +319,11 @@ export const ProductCard = memo(function ProductCard({
                         <span className="stock-adjust-pending" aria-label="저장 중" />
                       ) : null}
                       {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
-                        <span className="product-card__memo product-card__memo--filled">
-                          {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
-                        </span>
+                        <span
+                          className="product-card__memo-has"
+                          title="메모 있음"
+                          aria-label="메모가 있습니다"
+                        />
                       ) : null}
                     </div>
                     <button

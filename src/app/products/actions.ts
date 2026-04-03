@@ -2,10 +2,12 @@
 
 import { supabaseServer } from "@/lib/supabaseClient";
 import { revalidatePath } from "next/cache";
-import { runProductCsvPipeline, type ParsedCsvRow } from "./csvProductPipeline";
+import { csvGroupUsesVariantStock, runProductCsvPipeline, type ParsedCsvRow } from "./csvProductPipeline";
 import { decomposeVariantSize, variantCompositeKey } from "./variantOptions";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
+/** CSV 업로드 행별 재고 디버그: .env에 LOG_CSV_STOCK=1 */
+const LOG_CSV_STOCK = process.env.LOG_CSV_STOCK === "1";
 
 function resolveProductImageUrl(sku: string, imageUrl: string | null | undefined): string | null {
   const explicit = (imageUrl ?? "").trim();
@@ -65,7 +67,7 @@ async function applyCsvProductRowsGrouped(rows: ParsedCsvRow[]): Promise<Set<str
     const group = bySku.get(sku)!;
     csvSkus.add(sku);
     const row0 = group[0];
-    const variantMode = row0.size !== "";
+    const variantMode = csvGroupUsesVariantStock(group);
 
     const payload = {
       category: row0.category,
@@ -646,7 +648,7 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
     for (const sku of skuOrder) {
       const group = bySku.get(sku)!;
       const row0 = group[0];
-      const variantMode = row0.size !== "";
+      const variantMode = csvGroupUsesVariantStock(group);
 
       const payloadBase = {
         sku,
@@ -671,8 +673,20 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
       if (insErr) throw new Error(insErr.message);
       const productId = inserted.id as string;
 
+      let mergedBySize: Map<
+        string,
+        {
+          option1: string;
+          option2: string;
+          sizePure: string;
+          stockVal: number;
+          memo: string | null;
+          memo2: string | null;
+        }
+      > | null = null;
+
       if (variantMode) {
-        const mergedBySize = new Map<
+        mergedBySize = new Map<
           string,
           {
             option1: string;
@@ -721,6 +735,28 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
         if (variantsToInsert.length > 0) {
           const { error: vInsErr } = await supabaseServer.from("product_variants").insert(variantsToInsert as any);
           if (vInsErr) throw new Error(vInsErr.message);
+        }
+      }
+
+      if (LOG_CSV_STOCK) {
+        const savedProductStock = variantMode ? 0 : row0.stockVal;
+        const savedSku = sku;
+        for (const r of group) {
+          const key = variantCompositeKey(r.variantOption1, r.variantOption2, r.variantSizePure);
+          const merged = mergedBySize?.get(key);
+          console.info(
+            "[CSV-STOCK-DEBUG]",
+            JSON.stringify({
+              rawSkuFromCsv: r.rawSkuFromCsv,
+              savedSku,
+              rawStockFromCsv: r.rawStockFromCsv,
+              parsedStockVal: r.stockVal,
+              savedProductStock,
+              savedVariantStock: variantMode ? merged?.stockVal ?? null : null,
+              variantMode,
+              dataRowIndex: r.dataRowIndex,
+            })
+          );
         }
       }
     }

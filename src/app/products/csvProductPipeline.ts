@@ -11,10 +11,20 @@ function detectDelimiter(line: string) {
   return ",";
 }
 
-function parseCsvLine(line: string, delimiter: string): string[] {
+/**
+ * @param preserveCellTrimIndices 셀 인덱스가 여기 포함되면 앞뒤 공백을 제거하지 않음(SKU·STOCK 원문 보존용).
+ */
+function parseCsvLine(line: string, delimiter: string, preserveCellTrimIndices?: Set<number>): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
+
+  const pushCell = () => {
+    const idx = result.length;
+    const raw = current;
+    result.push(preserveCellTrimIndices?.has(idx) ? raw : raw.trim());
+    current = "";
+  };
 
   for (let i = 0; i < line.length; i++) {
     const c = line[i];
@@ -31,21 +41,29 @@ function parseCsvLine(line: string, delimiter: string): string[] {
     }
 
     if (c === delimiter && !inQuotes) {
-      result.push(current.trim());
-      current = "";
+      pushCell();
       continue;
     }
 
     current += c;
   }
 
-  result.push(current.trim());
+  pushCell();
   return result;
 }
 
 function toIntOrNaN(v: string | undefined) {
   if (v == null) return NaN;
   const s = String(v).trim().replace(/,/g, "");
+  if (!s) return NaN;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/** 재고: 천단위 쉼표·앞뒤 공백만 파싱용으로 처리, 그 외 값은 바꾸지 않음(Math.max 등 없음). */
+function parseStockIntPreservingValue(v: string | undefined): number {
+  if (v == null) return NaN;
+  const s = String(v).replace(/,/g, "").trim();
   if (!s) return NaN;
   const n = parseInt(s, 10);
   return Number.isFinite(n) ? n : NaN;
@@ -357,8 +375,25 @@ type CsvColMap = {
   memo2: number;
 };
 
+/**
+ * CSV 재고를 어디에 둘지(변형 vs 단일 상품).
+ * - true: `products.stock`은 0, 재고는 `product_variants` 행에만.
+ * - false: `products.stock`에 반영, 변형 행은 없음(업로드 시 삽입 안 함).
+ *
+ * 규칙: 동일 SKU가 **2행 이상**이거나, **size 컬럼(rawSize)** 이 비어 있지 않으면 변형 모드.
+ * 단일 행 + size 컬럼 공백이면 단일 상품 재고 — 상품명/SKU에서만 채워진 파생 `size`(예: BL)는 변형으로 보지 않음.
+ */
+export function csvGroupUsesVariantStock(group: ParsedCsvRow[]): boolean {
+  if (group.length === 0) return false;
+  if (group.length > 1) return true;
+  return (group[0].rawSize ?? "").trim() !== "";
+}
+
 export type ParsedCsvRow = {
+  /** DB·그룹 키 — CSV sku 셀 원문(해당 셀만 trim 생략) */
   sku: string;
+  rawSkuFromCsv: string;
+  rawStockFromCsv: string;
   category: string | null;
   rawNameSpec: string;
   nameSpec: string;
@@ -369,6 +404,7 @@ export type ParsedCsvRow = {
   imageUrl: string | null;
   rawSize: string;
   size: string;
+  /** stock 컬럼 숫자 파싱 결과(실패 시 0) */
   stockVal: number;
   wholesale: number | null;
   msrp: number | null;
@@ -514,16 +550,21 @@ function parseCsvRows(
 
   let dataRowIndex = 0; // 유효 SKU가 있는 데이터 행 기준(에러 메시지용)
 
+  const preserveSkuStockTrim = new Set<number>();
+  if (col.sku >= 0) preserveSkuStockTrim.add(col.sku);
+  if (col.stock >= 0) preserveSkuStockTrim.add(col.stock);
+
   for (let i = headerLineIndex + 1; i < lines.length; i++) {
     if (!lines[i] || lines[i].trim() === "") continue;
 
-    const cols = parseCsvLine(lines[i], delimiter);
-    const sku = (cols[col.sku] ?? "").trim();
-    if (!sku) {
+    const cols = parseCsvLine(lines[i], delimiter, preserveSkuStockTrim);
+    const rawSkuFromCsv = cols[col.sku] ?? "";
+    if (rawSkuFromCsv === "") {
       // Excel/CSV에서 사용자가 보는 "파일 라인 번호(헤더 포함)" 기준으로 반환
       skippedRows.push(i + 1);
       continue;
     }
+    const sku = rawSkuFromCsv;
 
     dataRowIndex += 1;
 
@@ -544,8 +585,9 @@ function parseCsvRows(
         );
       }
     }
-    const stockRaw = col.stock >= 0 ? toIntOrNaN(cols[col.stock]) : NaN;
-    const stockVal = Number.isFinite(stockRaw) ? Math.max(0, stockRaw) : 0;
+    const rawStockFromCsv = col.stock >= 0 ? String(cols[col.stock] ?? "") : "";
+    const stockRaw = col.stock >= 0 ? parseStockIntPreservingValue(cols[col.stock]) : NaN;
+    const stockVal = Number.isFinite(stockRaw) ? stockRaw : 0;
     const wholesale = col.wholesale >= 0 ? toIntOrNaN(cols[col.wholesale]) : null;
     const msrp = col.msrp >= 0 ? toIntOrNaN(cols[col.msrp]) : null;
     const sale = col.sale >= 0 ? toIntOrNaN(cols[col.sale]) : null;
@@ -555,6 +597,8 @@ function parseCsvRows(
 
     rows.push({
       sku,
+      rawSkuFromCsv,
+      rawStockFromCsv,
       category,
       rawNameSpec,
       nameSpec,

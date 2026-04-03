@@ -60,13 +60,47 @@ function toIntOrNaN(v: string | undefined) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-/** 재고: 천단위 쉼표·앞뒤 공백만 파싱용으로 처리, 그 외 값은 바꾸지 않음(Math.max 등 없음). */
-function parseStockIntPreservingValue(v: string | undefined): number {
-  if (v == null) return NaN;
-  const s = String(v).replace(/,/g, "").trim();
+/** 엑셀/CSV에서 흔한 보이지 않는 문자·NBSP·CR 정리(값 의미는 유지). */
+function normalizeTextCell(v: string | undefined): string {
+  return String(v ?? "")
+    .replace(/\uFEFF/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\u200B/g, "")
+    .trim();
+}
+
+function normalizeStockCellForParse(v: string | undefined): string {
+  return String(v ?? "")
+    .replace(/\uFEFF/g, "")
+    .replace(/\u00A0/g, " ")
+    .replace(/\u200B/g, "")
+    .replace(/\r/g, "")
+    .replace(/\n/g, "")
+    .replace(/,/g, "")
+    .trim();
+}
+
+/**
+ * 재고 컬럼: 숫자만 해석(Number). 소수·쉼표·BOM 등은 정리 후 반올림 정수로 저장(DB 정수 재고와 맞춤).
+ * 파싱 불가 시 NaN.
+ */
+function parseCsvStockNumber(v: string | undefined): number {
+  const s = normalizeStockCellForParse(v);
   if (!s) return NaN;
-  const n = parseInt(s, 10);
-  return Number.isFinite(n) ? n : NaN;
+  const n = Number(s);
+  if (!Number.isFinite(n)) return NaN;
+  return Math.round(n);
+}
+
+/** size 컬럼이 "옵션 있음"으로 볼 만한 값인지(공백·플레이스홀더는 비어 있음과 동일). */
+function isMeaningfulVariantSizeRaw(raw: string | null | undefined): boolean {
+  const s = normalizeTextCell(raw ?? "");
+  if (!s) return false;
+  const lower = s.toLowerCase();
+  if (s === "-" || s === "—" || lower === "n/a" || lower === "na" || lower === "none" || lower === "null") {
+    return false;
+  }
+  return true;
 }
 
 const KNOWN_COLOR_CODES = new Set([
@@ -380,13 +414,13 @@ type CsvColMap = {
  * - true: `products.stock`은 0, 재고는 `product_variants` 행에만.
  * - false: `products.stock`에 반영, 변형 행은 없음(업로드 시 삽입 안 함).
  *
- * 규칙: 동일 SKU가 **2행 이상**이거나, **size 컬럼(rawSize)** 이 비어 있지 않으면 변형 모드.
- * 단일 행 + size 컬럼 공백이면 단일 상품 재고 — 상품명/SKU에서만 채워진 파생 `size`(예: BL)는 변형으로 보지 않음.
+ * 규칙: 동일 SKU가 **2행 이상**이거나, **size 컬럼(rawSize)** 에 의미 있는 값이 있으면 변형 모드.
+ * 단일 행 + size 컬럼이 비어 있거나 플레이스홀더(-, N/A 등)만이면 단일 상품 재고.
  */
 export function csvGroupUsesVariantStock(group: ParsedCsvRow[]): boolean {
   if (group.length === 0) return false;
   if (group.length > 1) return true;
-  return (group[0].rawSize ?? "").trim() !== "";
+  return isMeaningfulVariantSizeRaw(group[0].rawSize);
 }
 
 export type ParsedCsvRow = {
@@ -573,7 +607,7 @@ function parseCsvRows(
     const nameParts = mergeKnownColorFromSku(sku, splitNameSpecParts(rawNameSpec));
     const nameSpec = nameParts.baseName || rawNameSpec;
     const imageUrl = col.imageUrl >= 0 ? (cols[col.imageUrl] ?? "").trim() || null : null;
-    const rawSize = col.size >= 0 ? (cols[col.size] ?? "").trim() || "" : "";
+    const rawSize = col.size >= 0 ? normalizeTextCell(cols[col.size]) : "";
     let size = buildOptionValue(rawSize, nameParts.optionTag, nameParts.sizeHint);
     size = normalizeVariantSizeBySku(sku, size);
     if (size) {
@@ -586,7 +620,7 @@ function parseCsvRows(
       }
     }
     const rawStockFromCsv = col.stock >= 0 ? String(cols[col.stock] ?? "") : "";
-    const stockRaw = col.stock >= 0 ? parseStockIntPreservingValue(cols[col.stock]) : NaN;
+    const stockRaw = col.stock >= 0 ? parseCsvStockNumber(cols[col.stock]) : NaN;
     const stockVal = Number.isFinite(stockRaw) ? stockRaw : 0;
     const wholesale = col.wholesale >= 0 ? toIntOrNaN(cols[col.wholesale]) : null;
     const msrp = col.msrp >= 0 ? toIntOrNaN(cols[col.msrp]) : null;

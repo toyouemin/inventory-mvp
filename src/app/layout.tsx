@@ -2,9 +2,12 @@ import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { AdaptiveHomepageLink } from "./AdaptiveHomepageLink";
+import { withAssetVersion } from "@/lib/assetVersion";
+
+const icon192 = withAssetVersion("/icons/icon-192.png");
+const icon512 = withAssetVersion("/icons/icon-512.png");
 
 export const metadata: Metadata = {
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     title: "재고관리",
@@ -13,10 +16,10 @@ export const metadata: Metadata = {
   themeColor: "#ffffff",
   icons: {
     icon: [
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: icon192, sizes: "192x192", type: "image/png" },
+      { url: icon512, sizes: "512x512", type: "image/png" },
     ],
-    apple: "/icons/icon-192.png",
+    apple: icon192,
   },
 };
 

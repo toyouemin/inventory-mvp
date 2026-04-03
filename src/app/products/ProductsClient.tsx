@@ -304,10 +304,19 @@ export function ProductsClient({
   }, [variantsByProductId]);
 
   // 모바일이면 기본 카드형
+  const debugInit =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debugInit") === "1";
   useEffect(() => {
     if (typeof window === "undefined") return;
     const m = window.matchMedia("(max-width: 768px)");
     if (m.matches) setViewMode("card");
+    if (debugInit) {
+      console.log("[ProductsClient][debugInit] matchMedia", {
+        innerWidth: window.innerWidth,
+        mMatches: m.matches,
+      });
+    }
   }, []);
 
   // 저장된 보기 방식 불러오기
@@ -315,12 +324,18 @@ export function ProductsClient({
     const saved =
       typeof window !== "undefined" ? window.localStorage.getItem("products:viewMode") : null;
     if (saved === "card" || saved === "list") setViewMode(saved);
+    if (debugInit) {
+      console.log("[ProductsClient][debugInit] localStorage viewMode", { saved });
+    }
   }, []);
 
   // 보기 방식 저장
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem("products:viewMode", viewMode);
+    if (debugInit) {
+      console.log("[ProductsClient][debugInit] viewMode set", { viewMode });
+    }
   }, [viewMode]);
 
   // 항상 동일한 순서로 보이도록 고정 정렬된 products

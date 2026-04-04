@@ -38,6 +38,8 @@ function fmtPrice(n: number | null | undefined) {
 
 export type ProductCardProps = {
   product: Product;
+  /** public/images 스캔 맵(빈 객체면 SKU 기반 .jpg 추측 URL 비활성화) */
+  localImageHrefBySkuLower: Record<string, string>;
   variants?: ProductVariant[];
   onEditClick?: (productId: string) => void;
   onDeleteClick?: (productId: string) => void | Promise<void>;
@@ -49,6 +51,7 @@ export type ProductCardProps = {
 
 export const ProductCard = memo(function ProductCard({
   product,
+  localImageHrefBySkuLower,
   variants = [],
   onEditClick,
   onDeleteClick,
@@ -67,7 +70,8 @@ export const ProductCard = memo(function ProductCard({
 
   const { src: imgSrc, onError: onImgError, dead: imgDead } = useProductImageSrc(
     product.sku,
-    product.imageUrl
+    product.imageUrl,
+    localImageHrefBySkuLower
   );
 
   useEffect(() => {
@@ -189,8 +193,34 @@ export const ProductCard = memo(function ProductCard({
         <div className="product-card__mobile-head">
           <div className="product-card__head-text">
             <div className="product-card__sku">{product?.sku ?? "-"}</div>
-            {product?.category && <span className="product-card__category">{product.category}</span>}
+            <div className="product-card__head-category-line">
+              {product?.category?.trim() ? (
+                <span className="product-card__category product-card__category--head">{product.category}</span>
+              ) : (
+                <span className="product-card__category product-card__category--head product-card__category--placeholder">
+                  —
+                </span>
+              )}
+            </div>
             <h3 className="product-card__name">{displayName}</h3>
+            <div className="product-card__head-actions">
+              <button
+                type="button"
+                className="btn btn-secondary btn-compact btn-strong product-card__head-action-edit"
+                onClick={() => onEditClick?.(product.id)}
+              >
+                수정
+              </button>
+              {onDeleteClick ? (
+                <button
+                  type="button"
+                  className="btn btn-danger btn-compact product-card__head-action-delete"
+                  onClick={() => void onDeleteClick(product.id)}
+                >
+                  삭제
+                </button>
+              ) : null}
+            </div>
           </div>
           {!imgDead && imgSrc ? (
             <button
@@ -419,21 +449,6 @@ export const ProductCard = memo(function ProductCard({
               </div>
             </div>
           ) : null}
-        </div>
-
-        <div className="product-card__actions">
-          <button type="button" className="product-card__edit-btn" onClick={() => onEditClick?.(product.id)}>
-            수정
-          </button>
-          {onDeleteClick && (
-            <button
-              type="button"
-              className="btn btn-danger product-card__delete-btn"
-              onClick={() => void onDeleteClick(product.id)}
-            >
-              삭제
-            </button>
-          )}
         </div>
       </div>
 

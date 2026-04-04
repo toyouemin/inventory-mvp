@@ -1,13 +1,17 @@
 import { supabaseServer } from "@/lib/supabaseClient";
+import { fetchCategoryOrderMap } from "@/app/products/categorySortOrder.server";
+import { compareProductsByCategoryOrder, sortCategoryFilterLabels } from "@/app/products/categorySortOrder.utils";
 import { StatusClient } from "./StatusClient";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export default async function StatusPage() {
+  const categoryOrder = await fetchCategoryOrderMap();
+
   const { data, error } = await supabaseServer
     .from("products")
-    .select("id, sku, category, name, stock, wholesale_price, msrp_price, sale_price")
+    .select("id, sku, category, name, stock, wholesale_price, msrp_price, sale_price, created_at")
     .order("sku", { ascending: true });
 
   if (error) {
@@ -28,7 +32,15 @@ export default async function StatusPage() {
     wholesale_price: number | null;
     msrp_price: number | null;
     sale_price: number | null;
+    created_at: string | null;
   }>;
+  products.sort((a, b) =>
+    compareProductsByCategoryOrder(
+      { category: a.category, sku: a.sku, createdAt: a.created_at },
+      { category: b.category, sku: b.sku, createdAt: b.created_at },
+      categoryOrder
+    )
+  );
   const productIds = products.map((p) => p.id);
 
   let variantsByProductId = new Map<string, number>();
@@ -67,11 +79,10 @@ export default async function StatusPage() {
       salePrice: r.sale_price ?? null,
     };
   });
-  const categories = Array.from(
-    new Set(
-      products.map((p) => p.category).filter((c): c is string => Boolean(c?.trim()))
-    )
-  ).sort((a, b) => a.localeCompare(b, "ko"));
+  const categoriesRaw = Array.from(
+    new Set(products.map((p) => p.category).filter((c): c is string => Boolean(c?.trim())))
+  );
+  const categories = sortCategoryFilterLabels(categoriesRaw, categoryOrder);
 
   return <StatusClient rows={rows} categories={categories} />;
 }

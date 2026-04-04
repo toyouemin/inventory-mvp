@@ -1,5 +1,5 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AdaptiveHomepageLink } from "./AdaptiveHomepageLink";
 import { withAssetVersion } from "@/lib/assetVersion";
@@ -7,13 +7,16 @@ import { withAssetVersion } from "@/lib/assetVersion";
 const icon192 = withAssetVersion("/icons/icon-192.png");
 const icon512 = withAssetVersion("/icons/icon-512.png");
 
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+};
+
 export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "재고관리",
     statusBarStyle: "default",
   },
-  themeColor: "#ffffff",
   icons: {
     icon: [
       { url: icon192, sizes: "192x192", type: "image/png" },

@@ -1,4 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseClient";
+import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
+import { compareProductsByCategoryOrder } from "../../categorySortOrder.utils";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,7 @@ type ProductRow = {
   memo: string | null;
   memo2: string | null;
   stock: number | null;
+  created_at: string | null;
 };
 
 type VariantRow = {
@@ -44,10 +47,12 @@ type VariantRow = {
 };
 
 export async function GET() {
+  const categoryOrder = await fetchCategoryOrderMap();
+
   const { data: products, error: productsErr } = await supabaseServer
     .from("products")
     .select(
-      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock"
+      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at"
     )
     .order("sku", { ascending: true });
 
@@ -56,6 +61,13 @@ export async function GET() {
   }
 
   const list = (products ?? []) as ProductRow[];
+  list.sort((a, b) =>
+    compareProductsByCategoryOrder(
+      { category: a.category, sku: a.sku, createdAt: a.created_at },
+      { category: b.category, sku: b.sku, createdAt: b.created_at },
+      categoryOrder
+    )
+  );
   const productIds = list.map((p) => p.id);
 
   let variants: VariantRow[] = [];

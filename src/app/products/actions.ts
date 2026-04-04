@@ -8,6 +8,7 @@ import {
   PRODUCT_VARIANTS_ON_CONFLICT,
   variantCompositeKey,
 } from "./variantOptions";
+import { ensureCategorySortOrderRow, syncCategorySortOrderAfterCsv } from "./categorySortOrder.server";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
 /** CSV 업로드 행별 재고 디버그: .env에 LOG_CSV_STOCK=1 */
@@ -65,6 +66,8 @@ export async function createProduct(data: {
 
   if (error) throw new Error(error.message);
   const productId = inserted.id;
+
+  await ensureCategorySortOrderRow(data.category);
 
   if (hasVariants && data.variants) {
     const deduped = aggregateDuplicateVariantsByCompositeKey(data.variants);
@@ -153,6 +156,10 @@ export async function updateProduct(
 
   const { error } = await supabaseServer.from("products").update(updateData).eq("id", productId);
   if (error) throw new Error(error.message);
+
+  if (data.category !== undefined) {
+    await ensureCategorySortOrderRow(data.category?.trim() || null);
+  }
 
   const { data: prodRow } = await supabaseServer.from("products").select("sku").eq("id", productId).maybeSingle();
   const productSku = String((prodRow?.sku as string | undefined) ?? "").trim();
@@ -435,6 +442,7 @@ export async function uploadProductsCsv(formData: FormData) {
   } else {
     await mergeProductsAndVariantsFromCsv(rows);
   }
+  await syncCategorySortOrderAfterCsv(rows, mode);
   revalidatePath("/products");
   revalidatePath("/status");
   if (LOG_MOVES) revalidatePath("/moves");

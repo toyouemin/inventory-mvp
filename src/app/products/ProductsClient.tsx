@@ -9,6 +9,7 @@ import { useProductImageSrc } from "./useProductImageSrc";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
 import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } from "./actions";
+import { compareProductsByCategoryOrder } from "./categorySortOrder.utils";
 import { EditProductModal } from "./EditProductModal";
 
 type ViewMode = "card" | "list";
@@ -97,25 +98,30 @@ function ProductsTableThumbCell({
   imageUrl,
   alt,
   onOpenPreview,
+  localImageHrefBySkuLower,
 }: {
   sku: string;
   imageUrl: string | null | undefined;
   alt: string;
   onOpenPreview: (url: string, altText: string) => void;
+  localImageHrefBySkuLower: Record<string, string>;
 }) {
-  const { src, onError, dead } = useProductImageSrc(sku, imageUrl);
-  if (dead || !src) {
-    return <span className="thumb-empty">-</span>;
-  }
+  const { src, onError, dead } = useProductImageSrc(sku, imageUrl, localImageHrefBySkuLower);
   return (
-    <button
-      type="button"
-      className="products-table__thumb-btn"
-      onClick={() => onOpenPreview(src, alt)}
-      aria-label="상품 이미지 확대"
-    >
-      <img className="thumb-small" src={src} alt="" loading="lazy" decoding="async" onError={onError} />
-    </button>
+    <div className="products-table__thumb-root">
+      {dead || !src ? (
+        <span className="thumb-empty">-</span>
+      ) : (
+        <button
+          type="button"
+          className="products-table__thumb-btn"
+          onClick={() => onOpenPreview(src, alt)}
+          aria-label="상품 이미지 확대"
+        >
+          <img className="thumb-small" src={src} alt="" loading="lazy" decoding="async" onError={onError} />
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -161,10 +167,15 @@ function fitCategorySelectFont(selectEl: HTMLSelectElement, displayedLabel: stri
 export function ProductsClient({
   products,
   categories = [],
+  categoryOrder = {},
+  localImageHrefBySkuLower,
   variantsByProductId = {},
 }: {
   products: Product[];
   categories?: string[];
+  categoryOrder?: Record<string, number>;
+  /** public/images 스캔 결과(항상 전달; 빈 객체면 로컬 SKU .jpg 추측 URL 비활성화) */
+  localImageHrefBySkuLower: Record<string, string>;
   variantsByProductId?: Record<string, ProductVariant[]>;
 }) {
   const [searchInput, setSearchInput] = useState("");
@@ -183,8 +194,6 @@ export function ProductsClient({
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [listImagePreview, setListImagePreview] = useState<{ url: string; alt: string } | null>(null);
 
-  // (중요) 화면에 처음 나타난 순서를 고정 저장
-  const orderRef = useRef<Map<string, number>>(new Map());
   const categorySelectRef = useRef<HTMLSelectElement>(null);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   /** 액션 바가 데스크톱/모바일에 중복이라 ref를 나눔. 숨겨진 쪽은 getBoundingClientRect가 0이라 메뉴가 (0,0) 근처로 감 */
@@ -459,12 +468,6 @@ export function ProductsClient({
   }, [uploadOpen, updateUploadMenuPosition]);
 
   useEffect(() => {
-    const map = orderRef.current;
-    for (const p of products) {
-      if (!map.has(p.id)) map.set(p.id, map.size);
-    }
-  }, [products]);
-  useEffect(() => {
     setLocalProducts(products);
   }, [products]);
   useEffect(() => {
@@ -506,24 +509,10 @@ export function ProductsClient({
     }
   }, [viewMode]);
 
-  // 항상 동일한 순서로 보이도록 고정 정렬된 products
+  // categoryOrder(CSV 카테고리 등장 순) → SKU → created_at
   const orderedProducts = useMemo(() => {
-    const map = orderRef.current;
-    return [...localProducts].sort((a, b) => {
-      const aCategory = (a.category ?? "").trim();
-      const bCategory = (b.category ?? "").trim();
-      if (aCategory !== bCategory) {
-        if (!aCategory) return 1;
-        if (!bCategory) return -1;
-        return aCategory.localeCompare(bCategory, "ko");
-      }
-      const skuCompare = (a.sku ?? "").localeCompare(b.sku ?? "", "ko");
-      if (skuCompare !== 0) return skuCompare;
-      const ai = map.get(a.id) ?? 999999;
-      const bi = map.get(b.id) ?? 999999;
-      return ai - bi;
-    });
-  }, [localProducts]);
+    return [...localProducts].sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
+  }, [localProducts, categoryOrder]);
 
   // 검색 + 카테고리: orderedProducts 기준 필터링(순서 유지)
   const filtered = useMemo(() => {
@@ -533,13 +522,21 @@ export function ProductsClient({
     }
     if (!search.trim()) return list;
     const q = search.trim().toLowerCase();
-    return list.filter(
-      (p) =>
+    const textHas = (s: string | null | undefined) => (s ?? "").toLowerCase().includes(q);
+    return list.filter((p) => {
+      if (
         p.sku.toLowerCase().includes(q) ||
-        (p.name && p.name.toLowerCase().includes(q)) ||
-        (p.category && p.category.toLowerCase().includes(q))
-    );
-  }, [orderedProducts, search, categoryFilter]);
+        textHas(p.name) ||
+        textHas(p.category) ||
+        textHas(p.memo) ||
+        textHas(p.memo2)
+      ) {
+        return true;
+      }
+      const vars = localVariantsByProductId[p.id] ?? [];
+      return vars.some((v) => textHas(v.memo) || textHas(v.memo2));
+    });
+  }, [orderedProducts, search, categoryFilter, localVariantsByProductId]);
 
   /** List view: one row per (product, size). No total stock. */
   const listRows = useMemo((): ProductRow[] => {
@@ -729,7 +726,8 @@ export function ProductsClient({
         <div className="toolbar-row toolbar-row--search">
           <input
             type="search"
-            placeholder="품목코드·품명·카테고리"
+            placeholder="품목·품명·카테고리·메모"
+            title="SKU·상품명·카테고리·비고1·비고2(옵션 포함) 검색"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
@@ -859,6 +857,7 @@ export function ProductsClient({
                 <ProductCard
                   key={p.id}
                   product={p}
+                  localImageHrefBySkuLower={localImageHrefBySkuLower}
                   variants={vars}
                   onEditClick={openEditById}
                   onDeleteClick={requestDeleteProduct}
@@ -914,6 +913,7 @@ export function ProductsClient({
                           imageUrl={row.imageUrl}
                           alt={(row.name ?? row.sku ?? "").toString()}
                           onOpenPreview={(url, altText) => setListImagePreview({ url, alt: altText })}
+                          localImageHrefBySkuLower={localImageHrefBySkuLower}
                         />
                       </td>
                       <td>{row.name}</td>
@@ -922,6 +922,9 @@ export function ProductsClient({
                       <td>
                         <div className="stock-cell">
                           <span className="stock-cell__qty">
+                            <span className="stock-cell__qty-label-mobile" aria-hidden="true">
+                              재고
+                            </span>
                             <strong>{qty}</strong>
                             {rowSaving ? (
                               <span className="stock-adjust-pending" aria-label="저장 중" />

@@ -2,24 +2,41 @@ import { filterFailedProductImageCandidates } from "./imageLoadFailureCache";
 
 /**
  * 상품 표시용 이미지 URL 후보 (순서대로 시도).
- * 1) image_url이 비어 있지 않으면 그 값만
- * 2) SKU가 있으면 /images/{SKU}.jpg (public 정적 파일)
+ * 1) image_url이 비어 있지 않으면 그 값
+ * 2) localImageHrefBySkuLower 가 전달된 경우(빈 {} 포함): public/images 실제 파일과 매칭된 URL만 (추측 .jpg 없음 → 404 폭주 방지)
+ * 3) 인자 생략(undefined): 호환용 `/images/{encodeURIComponent(SKU)}.jpg`
  */
-export function buildProductImageCandidates(sku: string, imageUrl: string | null | undefined): string[] {
+export function buildProductImageCandidates(
+  sku: string,
+  imageUrl: string | null | undefined,
+  localImageHrefBySkuLower?: Record<string, string>
+): string[] {
   const out: string[] = [];
   const u = (imageUrl ?? "").trim();
   if (u) out.push(u);
   const s = (sku ?? "").trim();
-  if (s) {
-    const path = `/images/${encodeURIComponent(s)}.jpg`;
-    if (!out.includes(path)) out.push(path);
+  if (!s) return out;
+
+  if (localImageHrefBySkuLower !== undefined) {
+    const href = localImageHrefBySkuLower[s.toLowerCase()];
+    if (href && !out.includes(href)) out.push(href);
+    return out;
   }
+
+  const path = `/images/${encodeURIComponent(s)}.jpg`;
+  if (!out.includes(path)) out.push(path);
   return out;
 }
 
 /** 첫 번째 후보만 필요할 때(비권장: UI는 useProductImageSrc 사용) */
-export function productDisplayImageSrc(sku: string, imageUrl: string | null | undefined): string {
-  const c = filterFailedProductImageCandidates(buildProductImageCandidates(sku, imageUrl));
+export function productDisplayImageSrc(
+  sku: string,
+  imageUrl: string | null | undefined,
+  localImageHrefBySkuLower?: Record<string, string>
+): string {
+  const c = filterFailedProductImageCandidates(
+    buildProductImageCandidates(sku, imageUrl, localImageHrefBySkuLower)
+  );
   return c[0] ?? "";
 }
 

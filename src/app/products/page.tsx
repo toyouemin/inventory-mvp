@@ -1,4 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseClient";
+import { getLocalImageHrefBySkuLower } from "./localProductImages.server";
+import { fetchCategoryOrderMap } from "./categorySortOrder.server";
+import { compareProductsByCategoryOrder, sortCategoryFilterLabels } from "./categorySortOrder.utils";
 import { ProductsClient } from "./ProductsClient";
 import type { Product, ProductVariant } from "./types";
 
@@ -76,7 +79,10 @@ export default async function ProductsPage() {
     );
   }
 
+  const categoryOrder = await fetchCategoryOrderMap();
+  const localImageHrefBySkuLower = getLocalImageHrefBySkuLower();
   const products: Product[] = (data ?? []).map((row: Record<string, unknown>) => mapProduct(row));
+  products.sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
   const productIds = products.map((p) => p.id);
 
   let variantsByProductId: Record<string, ProductVariant[]> = {};
@@ -94,16 +100,19 @@ export default async function ProductsPage() {
     }
   }
 
-  const categories = Array.from(
+  const categoriesRaw = Array.from(
     new Set(
       (data ?? []).map((r: { category?: string | null }) => r.category).filter((c): c is string => Boolean(c?.trim()))
     )
-  ).sort();
+  );
+  const categories = sortCategoryFilterLabels(categoriesRaw, categoryOrder);
 
   return (
     <ProductsClient
       products={products}
       categories={categories}
+      categoryOrder={categoryOrder}
+      localImageHrefBySkuLower={localImageHrefBySkuLower}
       variantsByProductId={variantsByProductId}
     />
   );

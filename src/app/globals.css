@@ -188,6 +188,27 @@ button:hover {
   padding: 0 8px;
 }
 
+/* CSV 업로드 버튼: 성공(녹)·실패(적) 6초 하이라이트 */
+.products-csv-upload-btn--success {
+  background: #2d6a4f !important;
+  color: #fff !important;
+  border: 1px solid #1b4332 !important;
+}
+
+.products-csv-upload-btn--success:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.products-csv-upload-btn--error {
+  background: #c0392b !important;
+  color: #fff !important;
+  border: 1px solid #922b21 !important;
+}
+
+.products-csv-upload-btn--error:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
 .products-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -440,9 +461,9 @@ button.download-dropdown__item {
   gap: 8px;
 }
 
-/* 헤더(수정·삭제) 바로 아래 가격 행 간격만 살짝 좁힘 */
+/* 수정·삭제 아래 margin과 맞물리도록 가격 행만 살짝 당김 */
 .product-card__body > .product-card__prices {
-  margin-top: -4px;
+  margin-top: -2px;
 }
 
 .product-card__mobile-head {
@@ -472,8 +493,9 @@ button.download-dropdown__item {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 2px;
-  margin-bottom: 0;
+  /* 버튼 높이를 줄인 만큼 위·아래 여백으로 복원 → 메뉴 주변이 더 넓어 보이게 */
+  margin-top: 5px;
+  margin-bottom: 3px;
 }
 
 .product-card__head-action-edit {
@@ -489,9 +511,9 @@ button.download-dropdown__item {
   padding-right: 12px;
 }
 
-/* 카드 헤더 버튼 높이 = 검색줄 검색창(44px), 삭제는 검색창과 같은 가로 패딩 */
+/* 높이는 검색창보다 살짝 낮춤(44→38), 절약분은 margin으로 위임 */
 .product-card__head-actions .btn-compact {
-  height: 44px;
+  height: 38px;
   box-sizing: border-box;
   font-size: 14px;
 }
@@ -508,16 +530,16 @@ button.download-dropdown__item {
 
 .product-card__name {
   margin: 0;
-  font-size: 16px;
+  font-size: calc(16px + 2pt);
   font-weight: 700;
   line-height: 1.3;
   min-height: 2.6em;
 }
 
-/* 헤더 블록: 제목~수정·삭제 사이 여백 축소 */
+/* 헤더 블록: 제품명 ↔ 수정·삭제 사이 여유 */
 .product-card__head-text .product-card__name {
   margin-top: 2px;
-  margin-bottom: 0;
+  margin-bottom: 4px;
   min-height: 0;
 }
 
@@ -889,6 +911,105 @@ label {
   vertical-align: middle;
 }
 
+/* 리스트: 컬러·사이즈 폭 최소화 → 품명과 재고 열이 시각적으로 가깝게 */
+.products-table__th-name,
+.products-table__td-name {
+  min-width: 0;
+  padding-right: 6px;
+}
+
+.products-table__th-tight,
+.products-table__td-tight {
+  width: 1%;
+  max-width: 5.25rem;
+  white-space: nowrap;
+  padding-left: 6px;
+  padding-right: 6px;
+  vertical-align: middle;
+}
+
+.products-table__th-stock,
+.products-table__td-stock {
+  width: 1%;
+  padding-left: 6px;
+  vertical-align: middle;
+}
+
+/* /status 재고 현황 */
+.status-stock-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 모바일: 뷰포트에 맞게 꽉 참 */
+.table.status-stock-table {
+  width: 100%;
+  max-width: 100%;
+  table-layout: auto;
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.status-stock-table th,
+.status-stock-table td {
+  text-align: left;
+  vertical-align: top;
+}
+
+.status-stock-table thead th {
+  font-weight: 700;
+}
+
+.status-stock-table__name {
+  min-width: 0;
+  padding-right: 6px;
+  word-break: break-word;
+}
+
+.status-stock-table__stock {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  padding-left: 4px;
+  vertical-align: top;
+  box-sizing: border-box;
+}
+
+.status-stock-table thead .status-stock-table__stock {
+  text-align: right;
+}
+
+.status-stock-table__empty {
+  text-align: center;
+  color: var(--muted);
+}
+
+/*
+ * 태블릿·데스크톱: 100% 폭으로 재고만 오른쪽 끝으로 밀리지 않게
+ * - 테이블 폭 = 내용 기반(max-content)이되 상한 = 품명열(최대 48ch) + 재고열 여유
+ * - 래퍼는 왼쪽 정렬(가운데 정렬 없음)
+ */
+@media (min-width: 769px) {
+  .table.status-stock-table {
+    width: max-content;
+    max-width: min(100%, calc(48ch + 8.5rem));
+  }
+
+  .status-stock-table__name {
+    max-width: 48ch;
+  }
+
+  .status-stock-table__stock {
+    min-width: 4.75rem;
+    padding-right: 10px;
+  }
+
+  .status-stock-table__empty {
+    max-width: none;
+  }
+}
+
 .products-table__memo--filled {
   display: inline-block;
   max-width: 100%;
@@ -1105,48 +1226,144 @@ label {
   color: var(--text);
 }
 
-/* VariantEditor: size/stock row - 모바일 한 줄 내 수용 */
+/* 상품 추가 모달: 헤더 취소 + 여백 축소 (가로만 좁게) */
+.modal.add-product-modal {
+  max-width: 380px;
+  padding: 14px 16px;
+}
+
+.modal-header-add-product {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.modal-header-add-product h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.modal-header-add-product .modal-header-cancel {
+  flex: 0 0 72px;
+  width: 72px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  background: #e8e4de;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.add-product-modal-form {
+  gap: 6px !important;
+}
+
+.add-product-modal-form .variant-editor-section {
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.add-product-modal-form .modal-actions {
+  margin-top: 10px;
+}
+
+.add-product-modal-form .variant-editor-product-memo-label {
+  margin-top: 6px;
+}
+
+/* 이미지 URL ~ 메모2: 세로 여백 축소 */
+.add-product-modal-form .add-product-modal-url-memos {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.add-product-modal-form .add-product-modal-url-memos .variant-editor-product-memo-label {
+  margin-top: 0;
+}
+
+.add-product-modal-form .add-product-modal-url-memos .variant-editor-product-memo-input {
+  margin-top: 0;
+}
+
+.add-product-modal-preview {
+  margin-bottom: 4px;
+}
+
+.modal-overlay.add-product-modal-overlay {
+  padding: 12px 14px;
+}
+
+/* VariantEditor: 줄바꿈·넘침 방지, 입력 폭 약간 축소 */
+.variant-editor {
+  font-size: calc(1rem - 1pt);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.variant-editor-main-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: calc(14px - 1pt);
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
 .variant-editor-row {
   display: grid;
-  grid-template-columns: minmax(90px, 1.2fr) minmax(64px, 0.8fr) minmax(90px, 1fr) minmax(90px, 1fr) 44px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
-  align-items: center;
-  margin-top: 6px;
+  align-items: stretch;
+  margin-top: 0;
+  padding: 6px 0;
   min-width: 0;
+  max-width: 100%;
 }
 
-.variant-editor-size-input {
-  min-width: 0;
-  width: 100% !important;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 16px;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
+@media (max-width: 640px) {
+  .variant-editor-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
+@media (max-width: 360px) {
+  .variant-editor-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.variant-editor-size-input,
 .variant-editor-stock-input {
+  box-sizing: border-box;
   min-width: 0;
-  width: 100% !important;
-  min-height: 44px;
-  padding: 8px 10px;
+  min-height: 42px;
+  padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 16px;
+  font-size: calc(16px - 1pt);
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.variant-editor-row .btn {
-  flex: none;
-  width: 44px;
-  min-width: 44px;
-  height: 44px;
-  padding: 0;
-  font-size: 12px;
-  line-height: 1;
+.variant-editor-row .variant-editor-size-input,
+.variant-editor-row .variant-editor-stock-input {
+  width: 100%;
+  max-width: none;
 }
 
 .variant-editor-section {
@@ -1155,6 +1372,84 @@ label {
   border-top: 1px solid var(--border);
   min-width: 0;
   max-width: 100%;
+}
+
+.variant-editor-error {
+  color: crimson;
+  font-size: calc(13px - 1pt);
+  margin-top: 8px;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.variant-editor-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-top: 8px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.variant-editor-add-btn {
+  align-self: flex-start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.3;
+  padding: 8px 12px;
+  font-size: calc(14px - 1pt);
+}
+
+.variant-editor-delete-between {
+  display: flex;
+  justify-content: stretch;
+  padding: 4px 0 2px;
+  min-width: 0;
+}
+
+.variant-editor-delete-between-btn {
+  width: 100%;
+  margin: 0;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #c62828;
+  color: #fff;
+  font-size: calc(13px - 1pt);
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.variant-editor-delete-between-btn:hover {
+  background: #b71c1c;
+}
+
+.variant-editor-delete-between-btn:focus-visible {
+  outline: 2px solid #c62828;
+  outline-offset: 2px;
+}
+
+/* 모달 내 상품 메모: 옵션 행 메모 입력과 동일한 칩 스타일·전체 폭 */
+.modal-form .variant-editor-product-memo-label {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 0;
+  font-size: calc(14px - 1pt);
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+
+.modal-form .variant-editor-product-memo-input {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: none !important;
+  margin-top: 6px;
 }
 
 /* Edit modal: responsive variant inputs */
@@ -1227,21 +1522,20 @@ label {
     font-size: 13px;
   }
 
-  .variant-editor-row {
-    grid-template-columns: minmax(80px, 1.2fr) minmax(56px, 0.8fr) minmax(76px, 1fr) minmax(76px, 1fr) 40px;
-    gap: 6px;
-  }
-  .variant-editor-row .btn {
-    width: 40px;
-    min-width: 40px;
-    height: 40px;
-    font-size: 11px;
-  }
   .variant-editor-size-input,
   .variant-editor-stock-input {
-    min-height: 40px;
+    min-height: 38px;
+    padding: 5px 7px;
+    font-size: calc(15px - 1pt);
+  }
+
+  .variant-editor-add-btn {
+    font-size: calc(13px - 1pt);
+  }
+
+  .variant-editor-delete-between-btn {
+    font-size: calc(12px - 1pt);
     padding: 6px 8px;
-    font-size: 15px;
   }
 }
 
@@ -1381,7 +1675,7 @@ label {
   }
 
   .product-card__name {
-    font-size: 14px;
+    font-size: calc(14px + 2pt);
     min-height: auto;
   }
 
@@ -1405,17 +1699,16 @@ label {
 
   .product-card__head-actions {
     gap: 6px;
-    margin-top: 2px;
-    margin-bottom: 0;
+    margin-top: 4px;
+    margin-bottom: 4px;
   }
 
   .product-card__body > .product-card__prices {
-    margin-top: -3px;
+    margin-top: -2px;
   }
 
-  /* 검색줄 모바일 검색창(35px·10px 패딩·14px 글자)과 동일 */
   .product-card__head-actions .btn-compact {
-    height: 35px;
+    height: 32px;
     padding: 0 10px;
     font-size: 14px;
   }

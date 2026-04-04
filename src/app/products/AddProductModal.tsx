@@ -69,7 +69,7 @@ export function AddProductModal({
         (r.size ?? "").trim() !== ""
     );
     if (variantRows.length > 0 && rowsWithAny.length === 0) {
-      setVariantError("옵션 행이 있으면 color, gender, size 중 하나 이상 입력해 주세요.");
+      setVariantError("옵션 행이 있으면 색상, 성별, 사이즈 중 하나 이상 입력해 주세요.");
       return;
     }
 
@@ -77,7 +77,7 @@ export function AddProductModal({
       variantCompositeKey(r.color, r.gender, r.size)
     );
     if (new Set(variantKeys).size !== variantKeys.length) {
-      setVariantError("중복된 변형입니다. DB 기준으로 동일 SKU에서 color·gender·size 조합은 하나만 허용됩니다.");
+      setVariantError("중복된 변형입니다. 동일 SKU에서 색상·성별·사이즈 조합은 하나만 허용됩니다.");
       return;
     }
     setVariantError("");
@@ -138,11 +138,16 @@ export function AddProductModal({
   if (!open) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>상품 추가</h3>
+    <div className="modal-overlay add-product-modal-overlay" onClick={onClose}>
+      <div className="modal add-product-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header-add-product">
+          <h3>상품 추가</h3>
+          <button type="button" className="modal-header-cancel" onClick={onClose}>
+            취소
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form onSubmit={handleSubmit} className="modal-form add-product-modal-form">
           <label>품목코드 (SKU) *</label>
           <input
             value={sku}
@@ -177,7 +182,7 @@ export function AddProductModal({
 
           <label>이미지</label>
           {(imagePreview || imageUrl) && (
-            <div style={{ marginBottom: 8 }}>
+            <div className="add-product-modal-preview">
               <img
                 src={imagePreview || imageUrl}
                 alt="미리보기"
@@ -200,33 +205,40 @@ export function AddProductModal({
               }
             }}
           />
-          <input
-            type="text"
-            value={imageUrl}
-            onChange={(e) => {
-              setImageUrl(e.target.value);
-              if (e.target.value) {
-                setImageFile(null);
-                setImagePreview(null);
-              }
-            }}
-            placeholder="또는 이미지 URL 입력"
-          />
+          <div className="add-product-modal-url-memos">
+            <input
+              type="text"
+              value={imageUrl}
+              onChange={(e) => {
+                setImageUrl(e.target.value);
+                if (e.target.value) {
+                  setImageFile(null);
+                  setImagePreview(null);
+                }
+              }}
+              placeholder="또는 이미지 URL 입력"
+            />
 
-          <label>비고1 (상품)</label>
-          <input
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="(선택)"
-          />
+            <label className="variant-editor-product-memo-label">메모1 (상품)</label>
+            <input
+              type="text"
+              className="variant-editor-size-input variant-editor-product-memo-input"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="메모1"
+              autoComplete="off"
+            />
 
-          <label>비고2 (상품)</label>
-          <textarea
-            value={memo2}
-            onChange={(e) => setMemo2(e.target.value)}
-            placeholder="(선택)"
-            rows={3}
-          />
+            <label className="variant-editor-product-memo-label">메모2 (상품)</label>
+            <input
+              type="text"
+              className="variant-editor-size-input variant-editor-product-memo-input"
+              value={memo2}
+              onChange={(e) => setMemo2(e.target.value)}
+              placeholder="메모2"
+              autoComplete="off"
+            />
+          </div>
 
           <div className="modal-actions">
             <button type="submit" disabled={pending}>

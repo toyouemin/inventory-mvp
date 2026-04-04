@@ -8,9 +8,6 @@ type StatusRow = {
   category: string | null;
   name: string;
   stock: number;
-  wholesalePrice: number | null;
-  msrpPrice: number | null;
-  salePrice: number | null;
 };
 
 export function StatusClient({
@@ -51,7 +48,7 @@ export function StatusClient({
         <div className="toolbar-row toolbar-row--search">
           <input
             type="search"
-            placeholder="품목코드·품명·카테고리"
+            placeholder="품목·품명·카테고리"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onKeyDown={(e) => {
@@ -89,41 +86,27 @@ export function StatusClient({
         <Stat label="재고 0" value={`${zeroStock.toLocaleString()}개`} />
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className="table-wrap status-stock-table-wrap">
+        <table className="table status-stock-table">
           <thead>
             <tr>
-              <th style={th}>SKU</th>
-              <th style={th}>품명</th>
-              <th style={th}>재고</th>
-              <th style={th}>출고가</th>
-              <th style={th}>소비자가</th>
-              <th style={th}>실판매가</th>
+              <th className="status-stock-table__name">품명</th>
+              <th className="status-stock-table__stock">재고</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td style={td} colSpan={6}>
+                <td className="status-stock-table__empty" colSpan={2}>
                   검색 결과가 없습니다.
                 </td>
               </tr>
             ) : (
               filtered.map((r) => (
                 <tr key={r.id}>
-                  <td style={td}>{r.sku}</td>
-                  <td style={td}>{r.name}</td>
-                  <td style={td}>
+                  <td className="status-stock-table__name">{r.name}</td>
+                  <td className="status-stock-table__stock">
                     <strong>{Number(r.stock).toLocaleString()}</strong>
-                  </td>
-                  <td style={td}>
-                    {r.wholesalePrice != null ? `${Number(r.wholesalePrice).toLocaleString()}원` : "-"}
-                  </td>
-                  <td style={td}>
-                    {r.msrpPrice != null ? `${Number(r.msrpPrice).toLocaleString()}원` : "-"}
-                  </td>
-                  <td style={td}>
-                    {r.salePrice != null ? `${Number(r.salePrice).toLocaleString()}원` : "-"}
                   </td>
                 </tr>
               ))
@@ -151,16 +134,3 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-const th: React.CSSProperties = {
-  textAlign: "left",
-  borderBottom: "1px solid #ddd",
-  padding: "10px 8px",
-  fontWeight: 700,
-  whiteSpace: "nowrap",
-};
-
-const td: React.CSSProperties = {
-  borderBottom: "1px solid #eee",
-  padding: "10px 8px",
-  verticalAlign: "top",
-};

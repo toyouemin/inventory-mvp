@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import type { Product, ProductVariant, ProductRow } from "./types";
 import { formatGenderSizeDisplay } from "./variantOptions";
 import { useProductImageSrc } from "./useProductImageSrc";
@@ -17,6 +18,8 @@ type ViewMode = "card" | "list";
 type DownloadMenuDirection = "up" | "down";
 
 type CsvUploadMode = "merge" | "reset";
+
+const CSV_UPLOAD_HIGHLIGHT_MS = 6000;
 
 function measureFixedMenuPosition(
   menu: HTMLDivElement | null,
@@ -182,7 +185,11 @@ export function ProductsClient({
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
 
+  const router = useRouter();
   const [uploading, setUploading] = useState(false);
+  /** CSV 업로드 버튼 색상 피드백(성공 녹색 / 실패 빨간색, 6초) */
+  const [csvUploadHighlight, setCsvUploadHighlight] = useState<"success" | "error" | null>(null);
+  const csvUploadHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -215,6 +222,21 @@ export function ProductsClient({
   const [uploadMenuDirection, setUploadMenuDirection] = useState<DownloadMenuDirection>("down");
   const [uploadMenuStyle, setUploadMenuStyle] = useState<CSSProperties>({});
   const [adjustingStockKeys, setAdjustingStockKeys] = useState(() => new Set<string>());
+
+  useEffect(() => {
+    return () => {
+      if (csvUploadHighlightTimerRef.current) clearTimeout(csvUploadHighlightTimerRef.current);
+    };
+  }, []);
+
+  function showUploadHighlight(kind: "success" | "error") {
+    if (csvUploadHighlightTimerRef.current) clearTimeout(csvUploadHighlightTimerRef.current);
+    setCsvUploadHighlight(kind);
+    csvUploadHighlightTimerRef.current = setTimeout(() => {
+      setCsvUploadHighlight(null);
+      csvUploadHighlightTimerRef.current = null;
+    }, CSV_UPLOAD_HIGHLIGHT_MS);
+  }
 
   const updateDownloadMenuPosition = useCallback(() => {
     const pos = measureFixedMenuPosition(
@@ -579,21 +601,39 @@ export function ProductsClient({
   async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setCsvUploadHighlight(null);
+    if (csvUploadHighlightTimerRef.current) {
+      clearTimeout(csvUploadHighlightTimerRef.current);
+      csvUploadHighlightTimerRef.current = null;
+    }
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append("file", file);
       fd.append("mode", csvPendingModeRef.current);
       const result = await uploadProductsCsv(fd);
-      if (result?.skippedCount && result.skippedCount > 0) {
-        alert(
-          `${result.skippedCount}개 행의 SKU가 비어 있어 스킵했습니다.\n` +
-            `스킵된 데이터 행 번호: ${result.skippedRows.join(", ")}`
+      if (result == null) {
+        showUploadHighlight("error");
+        return;
+      }
+      if (result.skippedCount > 0) {
+        console.warn(
+          "[uploadProductsCsv] SKU 비어 스킵:",
+          result.skippedCount,
+          "행",
+          result.skippedRows
         );
       }
+      showUploadHighlight("success");
+      /* refresh는 다음 페인트 이후에 — 토스트가 먼저 보이도록(즉시 refresh 시 상태가 덮일 수 있음) */
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          router.refresh();
+        });
+      });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      alert(msg);
+      console.error("[uploadProductsCsv]", err);
+      showUploadHighlight("error");
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -646,7 +686,16 @@ export function ProductsClient({
         <div className="download-dropdown" ref={uploadWrapRef}>
           <button
             type="button"
-            className="btn btn-secondary btn-compact btn-strong"
+            className={[
+              "btn btn-compact btn-strong",
+              uploading
+                ? "btn-secondary"
+                : csvUploadHighlight === "success"
+                  ? "products-csv-upload-btn--success"
+                  : csvUploadHighlight === "error"
+                    ? "products-csv-upload-btn--error"
+                    : "btn-secondary",
+            ].join(" ")}
             ref={uploadBtnRef}
             onClick={() => {
               setDownloadOpen(false);
@@ -657,7 +706,13 @@ export function ProductsClient({
             disabled={uploading}
             aria-label="CSV 업로드 방식 선택"
           >
-            {uploading ? "업로드..." : "CSV 업로드"}
+            {uploading
+              ? "업로드..."
+              : csvUploadHighlight === "success"
+                ? "완료"
+                : csvUploadHighlight === "error"
+                  ? "실패"
+                  : "CSV 업로드"}
           </button>
         </div>
         <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
@@ -887,10 +942,10 @@ export function ProductsClient({
               <thead>
                 <tr>
                   <th>이미지</th>
-                  <th>품명</th>
-                  <th>컬러</th>
-                  <th>사이즈</th>
-                  <th>재고</th>
+                  <th className="products-table__th-name">품명</th>
+                  <th className="products-table__th-tight">컬러</th>
+                  <th className="products-table__th-tight">사이즈</th>
+                  <th className="products-table__th-stock">재고</th>
                   <th>출고가</th>
                   <th>판매가</th>
                   <th>실판매가</th>
@@ -916,10 +971,10 @@ export function ProductsClient({
                           localImageHrefBySkuLower={localImageHrefBySkuLower}
                         />
                       </td>
-                      <td>{row.name}</td>
-                      <td>{row.color?.trim() ? row.color : ""}</td>
-                      <td>{row.size?.trim() ? row.size : ""}</td>
-                      <td>
+                      <td className="products-table__td-name">{row.name}</td>
+                      <td className="products-table__td-tight">{row.color?.trim() ? row.color : ""}</td>
+                      <td className="products-table__td-tight">{row.size?.trim() ? row.size : ""}</td>
+                      <td className="products-table__td-stock">
                         <div className="stock-cell">
                           <span className="stock-cell__qty">
                             <span className="stock-cell__qty-label-mobile" aria-hidden="true">

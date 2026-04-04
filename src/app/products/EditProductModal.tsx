@@ -115,13 +115,13 @@ export function EditProductModal({
     );
 
     if (variantRows.length > 0 && rowsWithAny.length === 0 && variantRows.some((r) => variantRows.length > 1)) {
-      setVariantError("옵션 행이 있으면 color, gender, size 중 하나 이상 입력해 주세요.");
+      setVariantError("옵션 행이 있으면 색상, 성별, 사이즈 중 하나 이상 입력해 주세요.");
       return;
     }
 
     const variantKeys = rowsWithAny.map((r) => variantCompositeKey(r.color, r.gender, r.size));
     if (new Set(variantKeys).size !== variantKeys.length) {
-      setVariantError("중복된 변형입니다. DB 기준으로 동일 SKU에서 color·gender·size 조합은 하나만 허용됩니다.");
+      setVariantError("중복된 변형입니다. 동일 SKU에서 색상·성별·사이즈 조합은 하나만 허용됩니다.");
       return;
     }
     setVariantError("");
@@ -249,15 +249,24 @@ export function EditProductModal({
             placeholder="또는 이미지 URL 입력"
           />
 
-          <label>비고1 (상품)</label>
-          <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
+          <label className="variant-editor-product-memo-label">메모1 (상품)</label>
+          <input
+            type="text"
+            className="variant-editor-size-input variant-editor-product-memo-input"
+            value={memo}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="메모1"
+            autoComplete="off"
+          />
 
-          <label>비고2 (상품)</label>
-          <textarea
+          <label className="variant-editor-product-memo-label">메모2 (상품)</label>
+          <input
+            type="text"
+            className="variant-editor-size-input variant-editor-product-memo-input"
             value={memo2}
             onChange={(e) => setMemo2(e.target.value)}
-            placeholder="(선택)"
-            rows={3}
+            placeholder="메모2"
+            autoComplete="off"
           />
 
           <div className="modal-actions">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { Fragment, useCallback, useEffect, useRef } from "react";
 
 export type VariantRow = {
   rowId: string;
@@ -95,101 +95,107 @@ export function VariantEditor({
   const displayRows = rows.length > 0 ? rows : [{ ...emptyRow(), rowId: "empty-1" }];
 
   return (
-    <div style={{ display: "block", minHeight: 80 }}>
-      <label>옵션 행 (color / gender / size)</label>
-      {displayRows.map((row) => (
-        <div key={row.rowId} className="variant-editor-row" style={{ flexWrap: "wrap", gap: 6 }}>
-          <input
-            type="text"
-            data-variant-focus={row.rowId}
-            className="variant-editor-size-input"
-            value={row.color}
-            onChange={(e) => updateRow(row.rowId, "color", e.target.value)}
-            placeholder="color"
-            autoComplete="off"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.gender}
-            onChange={(e) => updateRow(row.rowId, "gender", e.target.value)}
-            placeholder="gender"
-            autoComplete="off"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.size}
-            onChange={(e) => updateRow(row.rowId, "size", e.target.value)}
-            placeholder="size"
-            autoComplete="off"
-          />
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            className="variant-editor-stock-input"
-            value={row.stock}
-            onChange={(e) => updateRow(row.rowId, "stock", e.target.value)}
-            placeholder="재고"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.wholesalePrice}
-            onChange={(e) => updateRow(row.rowId, "wholesalePrice", e.target.value)}
-            placeholder="출고가"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.msrpPrice}
-            onChange={(e) => updateRow(row.rowId, "msrpPrice", e.target.value)}
-            placeholder="소비자가"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.salePrice}
-            onChange={(e) => updateRow(row.rowId, "salePrice", e.target.value)}
-            placeholder="실판매가"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.extraPrice}
-            onChange={(e) => updateRow(row.rowId, "extraPrice", e.target.value)}
-            placeholder="매장가"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.memo}
-            onChange={(e) => updateRow(row.rowId, "memo", e.target.value)}
-            placeholder="비고1"
-            autoComplete="off"
-          />
-          <input
-            type="text"
-            className="variant-editor-size-input"
-            value={row.memo2}
-            onChange={(e) => updateRow(row.rowId, "memo2", e.target.value)}
-            placeholder="비고2"
-            autoComplete="off"
-          />
-          <button type="button" onClick={() => removeRow(row.rowId)} className="btn btn-secondary">
-            삭제
-          </button>
-        </div>
+    <div className="variant-editor">
+      <label className="variant-editor-main-label">옵션 (색상 · 성별 · 사이즈)</label>
+      {displayRows.map((row, idx) => (
+        <Fragment key={row.rowId}>
+          <div className="variant-editor-row">
+            <input
+              type="text"
+              data-variant-focus={row.rowId}
+              className="variant-editor-size-input"
+              value={row.color}
+              onChange={(e) => updateRow(row.rowId, "color", e.target.value)}
+              placeholder="색상"
+              autoComplete="off"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.gender}
+              onChange={(e) => updateRow(row.rowId, "gender", e.target.value)}
+              placeholder="성별"
+              autoComplete="off"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.size}
+              onChange={(e) => updateRow(row.rowId, "size", e.target.value)}
+              placeholder="사이즈"
+              autoComplete="off"
+            />
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              className="variant-editor-stock-input"
+              value={row.stock}
+              onChange={(e) => updateRow(row.rowId, "stock", e.target.value)}
+              placeholder="재고"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.wholesalePrice}
+              onChange={(e) => updateRow(row.rowId, "wholesalePrice", e.target.value)}
+              placeholder="출고가"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.msrpPrice}
+              onChange={(e) => updateRow(row.rowId, "msrpPrice", e.target.value)}
+              placeholder="소비자가"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.salePrice}
+              onChange={(e) => updateRow(row.rowId, "salePrice", e.target.value)}
+              placeholder="실판매가"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.extraPrice}
+              onChange={(e) => updateRow(row.rowId, "extraPrice", e.target.value)}
+              placeholder="매장가"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.memo}
+              onChange={(e) => updateRow(row.rowId, "memo", e.target.value)}
+              placeholder="메모1"
+              autoComplete="off"
+            />
+            <input
+              type="text"
+              className="variant-editor-size-input"
+              value={row.memo2}
+              onChange={(e) => updateRow(row.rowId, "memo2", e.target.value)}
+              placeholder="메모2"
+              autoComplete="off"
+            />
+          </div>
+          <div className="variant-editor-delete-between">
+            <button
+              type="button"
+              onClick={() => removeRow(row.rowId)}
+              className="variant-editor-delete-between-btn"
+            >
+              {idx + 1}행 삭제
+            </button>
+          </div>
+        </Fragment>
       ))}
-      {error && (
-        <div style={{ color: "crimson", fontSize: 13, marginTop: 6 }}>
-          {error}
-        </div>
-      )}
-      <button type="button" onClick={addRow} className="btn btn-secondary" style={{ marginTop: 8 }}>
-        + 옵션 행 추가
-      </button>
+      {error && <div className="variant-editor-error">{error}</div>}
+      <div className="variant-editor-footer">
+        <button type="button" onClick={addRow} className="btn btn-secondary variant-editor-add-btn">
+          + 옵션 행 추가
+        </button>
+      </div>
     </div>
   );
 }

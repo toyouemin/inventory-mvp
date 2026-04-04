@@ -11,7 +11,7 @@ export default async function StatusPage() {
 
   const { data, error } = await supabaseServer
     .from("products")
-    .select("id, sku, category, name, stock, wholesale_price, msrp_price, sale_price, created_at")
+    .select("id, sku, category, name, stock, created_at")
     .order("sku", { ascending: true });
 
   if (error) {
@@ -29,9 +29,6 @@ export default async function StatusPage() {
     category: string | null;
     name: string | null;
     stock: number | null;
-    wholesale_price: number | null;
-    msrp_price: number | null;
-    sale_price: number | null;
     created_at: string | null;
   }>;
   products.sort((a, b) =>
@@ -74,9 +71,6 @@ export default async function StatusPage() {
       category: r.category ?? null,
       name: displayName,
       stock,
-      wholesalePrice: r.wholesale_price ?? null,
-      msrpPrice: r.msrp_price ?? null,
-      salePrice: r.sale_price ?? null,
     };
   });
   const categoriesRaw = Array.from(

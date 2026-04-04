@@ -2,11 +2,12 @@ import { supabaseServer } from "@/lib/supabaseClient";
 import { StatusClient } from "./StatusClient";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default async function StatusPage() {
   const { data, error } = await supabaseServer
     .from("products")
-    .select("id, sku, category, name_spec, stock, wholesale_price, msrp_price, sale_price")
+    .select("id, sku, category, name, stock, wholesale_price, msrp_price, sale_price")
     .order("sku", { ascending: true });
 
   if (error) {
@@ -22,7 +23,7 @@ export default async function StatusPage() {
     id: string;
     sku: string;
     category: string | null;
-    name_spec: string | null;
+    name: string | null;
     stock: number | null;
     wholesale_price: number | null;
     msrp_price: number | null;
@@ -54,11 +55,12 @@ export default async function StatusPage() {
   const rows = products.map((r) => {
     const hasVariants = variantsByProductId.has(r.id);
     const stock = hasVariants ? variantsByProductId.get(r.id) ?? 0 : r.stock ?? 0;
+    const displayName = (r.name ?? r.sku).trim() || r.sku;
     return {
       id: r.id,
       sku: r.sku,
       category: r.category ?? null,
-      name: r.name_spec ?? r.sku,
+      name: displayName,
       stock,
       wholesalePrice: r.wholesale_price ?? null,
       msrpPrice: r.msrp_price ?? null,

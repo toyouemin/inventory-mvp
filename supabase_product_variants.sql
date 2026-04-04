@@ -1,3 +1,4 @@
+-- (레거시) product_id+size 유니크 예시. 신규는 supabase_product_variants_unique_sku_color_gender_size.sql 참고.
 -- Run this in Supabase SQL Editor to add size-based inventory support.
 -- Creates product_variants table (and optionally create product-images bucket in Storage for image uploads).
 

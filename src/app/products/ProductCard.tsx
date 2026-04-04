@@ -1,16 +1,16 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { updateProductMemo, updateVariantMemo } from "./actions";
+import { useProductImageSrc } from "./useProductImageSrc";
 import type { Product, ProductVariant } from "./types";
-import { effectiveVariantTriple, formatVariantDisplay, sortVariantRows } from "./variantOptions";
+import { formatGenderSizeDisplay, sortVariantRows, variantCompositeKey } from "./variantOptions";
 
 function VariantOptionChips({ variant }: { variant: ProductVariant }) {
-  const t = effectiveVariantTriple(variant);
-  const chips = [t.option1, t.option2, t.size].filter(Boolean);
-  if (chips.length === 0) {
-    return <>{formatVariantDisplay(variant)}</>;
-  }
+  const color = (variant.color ?? "").trim();
+  const gs = formatGenderSizeDisplay(variant.gender, variant.size);
+  const chips = [color, gs].filter(Boolean);
+  if (chips.length === 0) return null;
   return (
     <span className="product-card__opt-chips">
       {chips.map((c, i) => (
@@ -31,6 +31,11 @@ function PriceLabel({ full, mobile }: { full: string; mobile: string }) {
   );
 }
 
+function fmtPrice(n: number | null | undefined) {
+  if (n == null || !Number.isFinite(Number(n))) return "-";
+  return `${Number(n).toLocaleString()}원`;
+}
+
 export type ProductCardProps = {
   product: Product;
   variants?: ProductVariant[];
@@ -39,7 +44,6 @@ export type ProductCardProps = {
   onProductStockDelta?: (productId: string, delta: number) => void | Promise<void>;
   onVariantStockDelta?: (productId: string, variantId: string, delta: number) => void | Promise<void>;
   productStockSaving?: boolean;
-  /** 쉼표로 구분된 variant id (정렬된 문자열). memo 비교용 */
   savingVariantIdsKey?: string;
 };
 
@@ -61,6 +65,15 @@ export const ProductCard = memo(function ProductCard({
   const [memoPending, setMemoPending] = useState(false);
   const safeVariants = Array.isArray(variants) ? variants : [];
 
+  const { src: imgSrc, onError: onImgError, dead: imgDead } = useProductImageSrc(
+    product.sku,
+    product.imageUrl
+  );
+
+  useEffect(() => {
+    if (imgDead) setImageOpen(false);
+  }, [imgDead]);
+
   const savingVariantSet = useMemo(
     () => new Set(savingVariantIdsKey.split(",").filter(Boolean)),
     [savingVariantIdsKey]
@@ -71,19 +84,28 @@ export const ProductCard = memo(function ProductCard({
     return copy.sort((a, b) => sortVariantRows(a, b));
   }, [safeVariants]);
 
-  /** 같은 카드에서 옵션 표시 문자열이 겹치면 메모는 점만(어느 행 메모인지 혼동 방지). */
   const variantOptionLabelsOverlap = useMemo(() => {
     if (sortedVariants.length <= 1) return false;
     const counts = new Map<string, number>();
     for (const v of sortedVariants) {
-      const label = (formatVariantDisplay(v) ?? "").trim() || v.id;
+      const label = variantCompositeKey(v.color, v.gender, v.size) || v.id;
       counts.set(label, (counts.get(label) ?? 0) + 1);
     }
     return [...counts.values()].some((c) => c > 1);
   }, [sortedVariants]);
 
   const hasVariants = sortedVariants.length > 0;
-  const hasImage = Boolean(product?.imageUrl);
+
+  /** CSV·현재 스키마는 가격이 variants에만 있고 products 가격은 비는 경우가 많음 → 상단은 상품값 우선, 없으면 정렬된 첫 variant */
+  const headerPrices = useMemo(() => {
+    const rep = sortedVariants[0];
+    return {
+      wholesalePrice: product.wholesalePrice ?? rep?.wholesalePrice ?? null,
+      msrpPrice: product.msrpPrice ?? rep?.msrpPrice ?? null,
+      salePrice: product.salePrice ?? rep?.salePrice ?? null,
+      extraPrice: product.extraPrice ?? rep?.extraPrice ?? null,
+    };
+  }, [product, sortedVariants]);
 
   function handleAdjustProduct(delta: number) {
     void onProductStockDelta?.(product.id, delta);
@@ -92,9 +114,10 @@ export const ProductCard = memo(function ProductCard({
   function handleAdjustVariant(variant: ProductVariant, delta: number) {
     if (!variant?.id) {
       console.warn(
-        `[variant-match-fail] sku=${product?.sku ?? ""} selectedOption=${formatVariantDisplay(variant ?? {})} variants=${JSON.stringify(
-          sortedVariants.map((v) => ({ id: v?.id ?? "", opt: formatVariantDisplay(v) }))
-        )}`
+        `[variant-match-fail] sku=${product?.sku ?? ""} variant=${JSON.stringify({
+          id: variant?.id,
+          key: variantCompositeKey(variant?.color, variant?.gender, variant?.size),
+        })}`
       );
       return;
     }
@@ -137,9 +160,11 @@ export const ProductCard = memo(function ProductCard({
     }
   }
 
+  const displayName = (product?.name ?? "").trim() || product?.sku || "-";
+
   return (
     <article className="product-card">
-      {hasImage ? (
+      {!imgDead && imgSrc ? (
         <button
           type="button"
           className="product-card__image"
@@ -147,10 +172,11 @@ export const ProductCard = memo(function ProductCard({
           aria-label="상품 이미지 확대"
         >
           <img
-            src={product.imageUrl ?? undefined}
-            alt={(product?.nameSpec ?? product?.sku ?? "").toString()}
+            src={imgSrc}
+            alt={displayName}
             loading="lazy"
             decoding="async"
+            onError={onImgError}
           />
         </button>
       ) : (
@@ -164,9 +190,9 @@ export const ProductCard = memo(function ProductCard({
           <div className="product-card__head-text">
             <div className="product-card__sku">{product?.sku ?? "-"}</div>
             {product?.category && <span className="product-card__category">{product.category}</span>}
-            <h3 className="product-card__name">{product?.nameSpec ?? "-"}</h3>
+            <h3 className="product-card__name">{displayName}</h3>
           </div>
-          {hasImage ? (
+          {!imgDead && imgSrc ? (
             <button
               type="button"
               className="product-card__thumb"
@@ -174,10 +200,11 @@ export const ProductCard = memo(function ProductCard({
               aria-label="상품 썸네일 확대"
             >
               <img
-                src={product.imageUrl ?? undefined}
-                alt={(product?.nameSpec ?? product?.sku ?? "").toString()}
+                src={imgSrc}
+                alt={displayName}
                 loading="lazy"
                 decoding="async"
+                onError={onImgError}
               />
             </button>
           ) : (
@@ -189,20 +216,16 @@ export const ProductCard = memo(function ProductCard({
 
         <div className="product-card__prices">
           <span>
-            <PriceLabel full="출고가:" mobile="출:" />{" "}
-            {product?.wholesalePrice != null ? `${product.wholesalePrice.toLocaleString()}원` : "-"}
+            <PriceLabel full="출고가:" mobile="출:" /> {fmtPrice(headerPrices.wholesalePrice)}
           </span>
           <span>
-            <PriceLabel full="소비자가:" mobile="소:" />{" "}
-            {product?.msrpPrice != null ? `${product.msrpPrice.toLocaleString()}원` : "-"}
+            <PriceLabel full="소비자가:" mobile="소:" /> {fmtPrice(headerPrices.msrpPrice)}
           </span>
           <span>
-            <PriceLabel full="실판매가:" mobile="실:" />{" "}
-            {product?.salePrice != null ? `${product.salePrice.toLocaleString()}원` : "-"}
+            <PriceLabel full="실판매가:" mobile="실:" /> {fmtPrice(headerPrices.salePrice)}
           </span>
           <span>
-            <PriceLabel full="매장:" mobile="매:" />{" "}
-            {product?.extraPrice != null ? `${product.extraPrice.toLocaleString()}원` : "-"}
+            <PriceLabel full="매장:" mobile="매:" /> {fmtPrice(headerPrices.extraPrice)}
           </span>
         </div>
 
@@ -219,7 +242,7 @@ export const ProductCard = memo(function ProductCard({
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
                 return (
-                  <div className="product-card__option-item" role="listitem" key={variant.id ?? `${product?.id}-${variant.option1}-${variant.option2}-${variant.size}`}>
+                  <div className="product-card__option-item" role="listitem" key={variant.id}>
                     <div className="product-card__option-row">
                       <div
                         className="product-card__option-chips-scroll"
@@ -296,11 +319,7 @@ export const ProductCard = memo(function ProductCard({
                           placeholder="비고2"
                         />
                         <div className="product-card__memo-actions">
-                          <button
-                            type="button"
-                            onClick={() => handleSaveMemo(variant.id)}
-                            disabled={memoPending}
-                          >
+                          <button type="button" onClick={() => handleSaveMemo(variant.id)} disabled={memoPending}>
                             저장
                           </button>
                           <button
@@ -327,7 +346,7 @@ export const ProductCard = memo(function ProductCard({
                     role="region"
                     aria-label="옵션 — 옆으로 밀어 전체 보기"
                   >
-                    <span className="product-card__option-name">옵션 없음</span>
+                    <span className="product-card__option-name" aria-hidden="true" />
                   </div>
                   <div className="product-card__option-right">
                     <span className="product-card__stock-label">재고</span>
@@ -336,7 +355,7 @@ export const ProductCard = memo(function ProductCard({
                       {productStockSaving ? (
                         <span className="stock-adjust-pending" aria-label="저장 중" />
                       ) : null}
-                      {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) ? (
+                      {(product?.memo ?? "").trim() || (product?.memo2 ?? "").trim() ? (
                         <span className="product-card__memo product-card__memo--filled product-card__memo--by-qty">
                           {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
                         </span>
@@ -386,11 +405,7 @@ export const ProductCard = memo(function ProductCard({
                 placeholder="비고2"
               />
               <div className="product-card__memo-actions">
-                <button
-                  type="button"
-                  onClick={handleSaveProductMemo}
-                  disabled={memoPending}
-                >
+                <button type="button" onClick={handleSaveProductMemo} disabled={memoPending}>
                   저장
                 </button>
                 <button
@@ -407,11 +422,7 @@ export const ProductCard = memo(function ProductCard({
         </div>
 
         <div className="product-card__actions">
-          <button
-            type="button"
-            className="product-card__edit-btn"
-            onClick={() => onEditClick?.(product.id)}
-          >
+          <button type="button" className="product-card__edit-btn" onClick={() => onEditClick?.(product.id)}>
             수정
           </button>
           {onDeleteClick && (
@@ -426,7 +437,7 @@ export const ProductCard = memo(function ProductCard({
         </div>
       </div>
 
-      {imageOpen && hasImage ? (
+      {imageOpen && imgSrc && !imgDead ? (
         <div className="product-image-modal" role="dialog" aria-modal="true" onClick={() => setImageOpen(false)}>
           <button
             type="button"
@@ -438,10 +449,11 @@ export const ProductCard = memo(function ProductCard({
           </button>
           <img
             className="product-image-modal__img"
-            src={product.imageUrl ?? undefined}
-            alt={(product?.nameSpec ?? product?.sku ?? "").toString()}
+            src={imgSrc}
+            alt={displayName}
             decoding="async"
             onClick={(e) => e.stopPropagation()}
+            onError={onImgError}
           />
         </div>
       ) : null}

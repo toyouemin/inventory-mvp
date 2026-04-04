@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: Request) {
   const { password } = await req.json().catch(() => ({ password: "" }));
 
@@ -14,7 +16,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, reason: "wrong password" }, { status: 401 });
   }
 
-  const res = NextResponse.json({ ok: true });
+  const res = NextResponse.json(
+    { ok: true },
+    {
+      headers: {
+        "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
+        Pragma: "no-cache",
+      },
+    }
+  );
   res.cookies.set(cookieName, "1", {
     httpOnly: true,
     sameSite: "lax",

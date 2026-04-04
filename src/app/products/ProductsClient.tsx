@@ -1,15 +1,123 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, Ref } from "react";
+import { createPortal } from "react-dom";
 import type { Product, ProductVariant, ProductRow } from "./types";
-import { formatVariantDisplay } from "./variantOptions";
+import { formatGenderSizeDisplay } from "./variantOptions";
+import { useProductImageSrc } from "./useProductImageSrc";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
 import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } from "./actions";
 import { EditProductModal } from "./EditProductModal";
 
 type ViewMode = "card" | "list";
+
+type DownloadMenuDirection = "up" | "down";
+
+type CsvUploadMode = "merge" | "reset";
+
+function measureFixedMenuPosition(
+  menu: HTMLDivElement | null,
+  buttonDesktop: HTMLButtonElement | null,
+  buttonMobile: HTMLButtonElement | null
+): { direction: DownloadMenuDirection; style: CSSProperties } | null {
+  const candidates = [buttonDesktop, buttonMobile];
+  const trigger = candidates.find((el) => {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+  if (!trigger) return null;
+
+  const rect = trigger.getBoundingClientRect();
+  if (rect.width < 1 || rect.height < 1) return null;
+
+  const gap = 8;
+  const margin = 8;
+  const innerH = window.innerHeight;
+  const innerW = window.innerWidth;
+
+  const spaceBelow = innerH - rect.bottom;
+  const spaceAbove = rect.top;
+
+  let menuHeight = 0;
+  if (menu) {
+    menuHeight = menu.offsetHeight;
+    if (menuHeight < 1) menuHeight = menu.getBoundingClientRect().height;
+    if (menuHeight < 1) menuHeight = menu.scrollHeight;
+  }
+  if (menuHeight < 1) return null;
+
+  let menuWidth = 0;
+  if (menu) {
+    menuWidth = menu.offsetWidth;
+    if (menuWidth < 1) menuWidth = menu.getBoundingClientRect().width;
+    if (menuWidth < 1) menuWidth = menu.scrollWidth;
+  }
+  if (menuWidth < 1) menuWidth = 1;
+
+  let direction: DownloadMenuDirection;
+  if (spaceBelow >= menuHeight + gap) {
+    direction = "down";
+  } else if (spaceAbove >= menuHeight + gap) {
+    direction = "up";
+  } else {
+    direction = spaceAbove > spaceBelow ? "up" : "down";
+  }
+
+  let top: number;
+  if (direction === "down") {
+    top = rect.bottom + gap;
+    top = Math.min(top, innerH - menuHeight - margin);
+    top = Math.max(margin, top);
+  } else {
+    top = rect.top - gap - menuHeight;
+    top = Math.max(margin, top);
+    top = Math.min(top, innerH - menuHeight - margin);
+  }
+
+  const triggerCenterX = rect.left + rect.width / 2;
+  let left = triggerCenterX - menuWidth / 2;
+  left = Math.max(margin, Math.min(left, innerW - menuWidth - margin));
+
+  return {
+    direction,
+    style: {
+      position: "fixed",
+      top,
+      left,
+      zIndex: 9999,
+    },
+  };
+}
+
+function ProductsTableThumbCell({
+  sku,
+  imageUrl,
+  alt,
+  onOpenPreview,
+}: {
+  sku: string;
+  imageUrl: string | null | undefined;
+  alt: string;
+  onOpenPreview: (url: string, altText: string) => void;
+}) {
+  const { src, onError, dead } = useProductImageSrc(sku, imageUrl);
+  if (dead || !src) {
+    return <span className="thumb-empty">-</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="products-table__thumb-btn"
+      onClick={() => onOpenPreview(src, alt)}
+      aria-label="상품 이미지 확대"
+    >
+      <img className="thumb-small" src={src} alt="" loading="lazy" decoding="async" onError={onError} />
+    </button>
+  );
+}
 
 function variantSavingKeyForProduct(adjustingKeys: Set<string>, variants: ProductVariant[]): string {
   if (!variants.length) return "";
@@ -79,13 +187,47 @@ export function ProductsClient({
   const orderRef = useRef<Map<string, number>>(new Map());
   const categorySelectRef = useRef<HTMLSelectElement>(null);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
-  const downloadRef = useRef<HTMLDivElement | null>(null);
-  const downloadButtonRef = useRef<HTMLButtonElement | null>(null);
+  /** 액션 바가 데스크톱/모바일에 중복이라 ref를 나눔. 숨겨진 쪽은 getBoundingClientRect가 0이라 메뉴가 (0,0) 근처로 감 */
+  const downloadWrapDesktopRef = useRef<HTMLDivElement | null>(null);
+  const downloadWrapMobileRef = useRef<HTMLDivElement | null>(null);
+  const downloadButtonDesktopRef = useRef<HTMLButtonElement | null>(null);
+  const downloadButtonMobileRef = useRef<HTMLButtonElement | null>(null);
   const downloadMenuRef = useRef<HTMLDivElement | null>(null);
   const [downloadOpen, setDownloadOpen] = useState(false);
-  const [downloadMenuUp, setDownloadMenuUp] = useState(false);
+  const [downloadMenuDirection, setDownloadMenuDirection] = useState<DownloadMenuDirection>("down");
   const [downloadMenuStyle, setDownloadMenuStyle] = useState<CSSProperties>({});
+  const csvPendingModeRef = useRef<CsvUploadMode>("merge");
+  const uploadWrapDesktopRef = useRef<HTMLDivElement | null>(null);
+  const uploadWrapMobileRef = useRef<HTMLDivElement | null>(null);
+  const uploadButtonDesktopRef = useRef<HTMLButtonElement | null>(null);
+  const uploadButtonMobileRef = useRef<HTMLButtonElement | null>(null);
+  const uploadMenuRef = useRef<HTMLDivElement | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadMenuDirection, setUploadMenuDirection] = useState<DownloadMenuDirection>("down");
+  const [uploadMenuStyle, setUploadMenuStyle] = useState<CSSProperties>({});
   const [adjustingStockKeys, setAdjustingStockKeys] = useState(() => new Set<string>());
+
+  const updateDownloadMenuPosition = useCallback(() => {
+    const pos = measureFixedMenuPosition(
+      downloadMenuRef.current,
+      downloadButtonDesktopRef.current,
+      downloadButtonMobileRef.current
+    );
+    if (!pos) return;
+    setDownloadMenuDirection(pos.direction);
+    setDownloadMenuStyle(pos.style);
+  }, []);
+
+  const updateUploadMenuPosition = useCallback(() => {
+    const pos = measureFixedMenuPosition(
+      uploadMenuRef.current,
+      uploadButtonDesktopRef.current,
+      uploadButtonMobileRef.current
+    );
+    if (!pos) return;
+    setUploadMenuDirection(pos.direction);
+    setUploadMenuStyle(pos.style);
+  }, []);
   const adjustLocksRef = useRef<Set<string>>(new Set());
   const localProductsRef = useRef<Product[]>(products);
   const localVariantsRef = useRef<Record<string, ProductVariant[]>>(variantsByProductId);
@@ -237,9 +379,11 @@ export function ProductsClient({
   useEffect(() => {
     if (!downloadOpen) return;
     const onDocMouseDown = (e: MouseEvent) => {
-      if (!downloadRef.current) return;
       const t = e.target as Node | null;
-      if (t && downloadRef.current.contains(t)) return;
+      if (!t) return;
+      if (downloadWrapDesktopRef.current?.contains(t)) return;
+      if (downloadWrapMobileRef.current?.contains(t)) return;
+      if (downloadMenuRef.current?.contains(t)) return;
       setDownloadOpen(false);
     };
     document.addEventListener("mousedown", onDocMouseDown);
@@ -247,48 +391,72 @@ export function ProductsClient({
   }, [downloadOpen]);
 
   useEffect(() => {
+    if (!uploadOpen) return;
+    const onDocMouseDown = (e: MouseEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      if (uploadWrapDesktopRef.current?.contains(t)) return;
+      if (uploadWrapMobileRef.current?.contains(t)) return;
+      if (uploadMenuRef.current?.contains(t)) return;
+      setUploadOpen(false);
+    };
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [uploadOpen]);
+
+  useLayoutEffect(() => {
     if (!downloadOpen) return;
-    const computeMenuPos = () => {
-      const btn = downloadButtonRef.current;
-      const menu = downloadMenuRef.current;
-      if (!btn) return;
 
-      const rect = btn.getBoundingClientRect();
-      const menuHeight = menu?.offsetHeight ?? 340;
-      const menuWidth = menu?.offsetWidth ?? 320;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
+    updateDownloadMenuPosition();
+    const rafId = requestAnimationFrame(() => {
+      updateDownloadMenuPosition();
+    });
 
-      // 버튼 기준 위/아래 여유에 맞춰 배치
-      // 아래 여유가 부족하면 위로, 아니면 아래로.
-      const openUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
-      setDownloadMenuUp(openUp);
+    const menuEl = downloadMenuRef.current;
+    const ro =
+      menuEl && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            requestAnimationFrame(updateDownloadMenuPosition);
+          })
+        : null;
+    if (menuEl && ro) ro.observe(menuEl);
 
-      const gap = 0; // 메뉴-버튼 사이 간격 최소화
-      const top = openUp ? Math.max(0, rect.top - menuHeight - gap) : rect.bottom + gap;
-
-      // 글씨 폭 기준으로 버튼의 "가운데"와 메뉴의 "가운데"를 맞춤
-      const preferredLeft = rect.left + rect.width / 2 - menuWidth / 2;
-      const left = Math.max(8, Math.min(preferredLeft, window.innerWidth - menuWidth - 8));
-
-      setDownloadMenuStyle({
-        position: "fixed",
-        top,
-        left,
-        zIndex: 9999,
-      });
-    };
-
-    computeMenuPos();
-    // 폭/높이(layout) 반영 직후 1회 더 재계산
-    requestAnimationFrame(computeMenuPos);
-    window.addEventListener("resize", computeMenuPos);
-    window.addEventListener("scroll", computeMenuPos, true);
+    window.addEventListener("resize", updateDownloadMenuPosition);
+    window.addEventListener("scroll", updateDownloadMenuPosition, true);
     return () => {
-      window.removeEventListener("resize", computeMenuPos);
-      window.removeEventListener("scroll", computeMenuPos, true);
+      cancelAnimationFrame(rafId);
+      ro?.disconnect();
+      window.removeEventListener("resize", updateDownloadMenuPosition);
+      window.removeEventListener("scroll", updateDownloadMenuPosition, true);
     };
-  }, [downloadOpen]);
+  }, [downloadOpen, updateDownloadMenuPosition]);
+
+  useLayoutEffect(() => {
+    if (!uploadOpen) return;
+
+    updateUploadMenuPosition();
+    const rafId = requestAnimationFrame(() => {
+      updateUploadMenuPosition();
+    });
+
+    const menuEl = uploadMenuRef.current;
+    const ro =
+      menuEl && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            requestAnimationFrame(updateUploadMenuPosition);
+          })
+        : null;
+    if (menuEl && ro) ro.observe(menuEl);
+
+    window.addEventListener("resize", updateUploadMenuPosition);
+    window.addEventListener("scroll", updateUploadMenuPosition, true);
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro?.disconnect();
+      window.removeEventListener("resize", updateUploadMenuPosition);
+      window.removeEventListener("scroll", updateUploadMenuPosition, true);
+    };
+  }, [uploadOpen, updateUploadMenuPosition]);
 
   useEffect(() => {
     const map = orderRef.current;
@@ -368,7 +536,7 @@ export function ProductsClient({
     return list.filter(
       (p) =>
         p.sku.toLowerCase().includes(q) ||
-        (p.nameSpec && p.nameSpec.toLowerCase().includes(q)) ||
+        (p.name && p.name.toLowerCase().includes(q)) ||
         (p.category && p.category.toLowerCase().includes(q))
     );
   }, [orderedProducts, search, categoryFilter]);
@@ -383,18 +551,28 @@ export function ProductsClient({
           rows.push({
             ...p,
             variantId: v.id,
-            size: formatVariantDisplay(v),
+            color: (v.color ?? "").trim(),
+            size: formatGenderSizeDisplay(v.gender, v.size),
             variantStock: v.stock,
             memo: v.memo ?? null,
             memo2: v.memo2 ?? null,
+            variantWholesalePrice: v.wholesalePrice ?? null,
+            variantMsrpPrice: v.msrpPrice ?? null,
+            variantSalePrice: v.salePrice ?? null,
+            variantExtraPrice: v.extraPrice ?? null,
           });
         }
       } else {
         rows.push({
           ...p,
           variantId: "",
+          color: "",
           size: "",
           variantStock: p.stock ?? 0,
+          variantWholesalePrice: null,
+          variantMsrpPrice: null,
+          variantSalePrice: null,
+          variantExtraPrice: null,
         });
       }
     }
@@ -408,6 +586,7 @@ export function ProductsClient({
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("mode", csvPendingModeRef.current);
       const result = await uploadProductsCsv(fd);
       if (result?.skippedCount && result.skippedCount > 0) {
         alert(
@@ -428,97 +607,120 @@ export function ProductsClient({
     setSearch(searchInput);
   }
 
-  const actionButtons = (
-    <>
-      <div className="view-toggle" role="group" aria-label="보기 방식 전환">
-        <button
-          type="button"
-          className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setViewMode("list")}
-        >
-          리스트
-        </button>
-        <button
-          type="button"
-          className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
-          onClick={() => setViewMode("card")}
-        >
-          카드
-        </button>
-      </div>
-      <div className="download-dropdown" ref={downloadRef}>
-        <button
-          type="button"
-          className="btn btn-secondary btn-compact btn-strong"
-          ref={downloadButtonRef}
-          onClick={() => setDownloadOpen((v) => !v)}
-          aria-haspopup="menu"
-          aria-expanded={downloadOpen}
-        >
-          다운로드
-        </button>
-        {downloadOpen ? (
-          <div
-            ref={downloadMenuRef}
-            className="download-dropdown__menu"
-            role="menu"
-            aria-label="다운로드 선택"
-            style={downloadMenuStyle}
+  function renderToolbarActions(
+    downloadWrapRef: Ref<HTMLDivElement>,
+    downloadBtnRef: Ref<HTMLButtonElement>,
+    uploadWrapRef: Ref<HTMLDivElement>,
+    uploadBtnRef: Ref<HTMLButtonElement>
+  ) {
+    return (
+      <>
+        <div className="view-toggle" role="group" aria-label="보기 방식 전환">
+          <button
+            type="button"
+            className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setViewMode("list")}
           >
-            <a
-              role="menuitem"
-              href="/products/csv/products"
-              download="products.csv"
-              className="download-dropdown__item"
-              onClick={() => setDownloadOpen(false)}
-            >
-              상품 CSV
-            </a>
-            <a
-              role="menuitem"
-              href="/products/xlsx/products"
-              download="products.xlsx"
-              className="download-dropdown__item"
-              onClick={() => setDownloadOpen(false)}
-            >
-              상품 엑셀
-            </a>
-            <div className="download-dropdown__divider" role="separator" />
-            <a
-              role="menuitem"
-              href="/products/csv/stock"
-              download="stock.csv"
-              className="download-dropdown__item"
-              onClick={() => setDownloadOpen(false)}
-            >
-              재고 CSV
-            </a>
-            <a
-              role="menuitem"
-              href="/products/xlsx/stock"
-              download="stock.xlsx"
-              className="download-dropdown__item"
-              onClick={() => setDownloadOpen(false)}
-            >
-              재고 엑셀
-            </a>
-          </div>
-        ) : null}
-      </div>
-      <button
-        type="button"
-        className="btn btn-secondary btn-compact btn-strong"
-        onClick={() => csvFileInputRef.current?.click()}
-        disabled={uploading}
-        aria-label="CSV 파일 업로드"
+            리스트
+          </button>
+          <button
+            type="button"
+            className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setViewMode("card")}
+          >
+            카드
+          </button>
+        </div>
+        <div className="download-dropdown" ref={downloadWrapRef}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact btn-strong"
+            ref={downloadBtnRef}
+            onClick={() => {
+              setUploadOpen(false);
+              setDownloadOpen((v) => !v);
+            }}
+            aria-haspopup="menu"
+            aria-expanded={downloadOpen}
+          >
+            다운로드
+          </button>
+        </div>
+        <div className="download-dropdown" ref={uploadWrapRef}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact btn-strong"
+            ref={uploadBtnRef}
+            onClick={() => {
+              setDownloadOpen(false);
+              setUploadOpen((v) => !v);
+            }}
+            aria-haspopup="menu"
+            aria-expanded={uploadOpen}
+            disabled={uploading}
+            aria-label="CSV 업로드 방식 선택"
+          >
+            {uploading ? "업로드..." : "CSV 업로드"}
+          </button>
+        </div>
+        <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
+          추가
+        </button>
+      </>
+    );
+  }
+
+  const downloadMenuPortal = downloadOpen
+    ? createPortal(
+      <div
+        ref={downloadMenuRef}
+        className="download-dropdown__menu"
+        role="menu"
+        aria-label="다운로드 선택"
+        data-placement={downloadMenuDirection}
+        style={downloadMenuStyle}
       >
-        {uploading ? "업로드..." : "CSV업로드"}
-      </button>
-      <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
-        추가
-      </button>
-    </>
-  );
+        <a
+          role="menuitem"
+          href="/products/csv/products"
+          download="products.csv"
+          className="download-dropdown__item"
+          onClick={() => setDownloadOpen(false)}
+        >
+          상품 CSV
+        </a>
+        <a
+          role="menuitem"
+          href="/products/xlsx/products"
+          download="products.xlsx"
+          className="download-dropdown__item"
+          onClick={() => setDownloadOpen(false)}
+        >
+          상품 엑셀
+        </a>
+        <div className="download-dropdown__divider" role="separator" />
+        <a
+          role="menuitem"
+          href="/products/csv/stock"
+          download="stock.csv"
+          className="download-dropdown__item"
+          onClick={() => setDownloadOpen(false)}
+        >
+          재고 CSV
+        </a>
+        <a
+          role="menuitem"
+          href="/products/xlsx/stock"
+          download="stock.xlsx"
+          className="download-dropdown__item"
+          onClick={() => setDownloadOpen(false)}
+        >
+          재고 엑셀
+        </a>
+      </div>,
+      document.body
+    )
+    : null;
 
   return (
     <div className="products-page">
@@ -560,15 +762,73 @@ export function ProductsClient({
         {/* 데스크톱 전용: 리스트/카드/CSV/추가 */}
         <div className="toolbar-actions toolbar-actions-desktop">
           <div className="toolbar-scroll">
-            {actionButtons}
+            {renderToolbarActions(
+              downloadWrapDesktopRef,
+              downloadButtonDesktopRef,
+              uploadWrapDesktopRef,
+              uploadButtonDesktopRef
+            )}
           </div>
         </div>
       </div>
 
       {/* 모바일 전용: 하단 고정 액션 바 */}
       <div className="toolbar-bottom-bar" aria-hidden="true">
-        {actionButtons}
+        {renderToolbarActions(
+          downloadWrapMobileRef,
+          downloadButtonMobileRef,
+          uploadWrapMobileRef,
+          uploadButtonMobileRef
+        )}
       </div>
+
+      {downloadMenuPortal}
+
+      {uploadOpen
+        ? createPortal(
+            <div
+              ref={uploadMenuRef}
+              className="download-dropdown__menu"
+              role="menu"
+              aria-label="CSV 업로드 방식"
+              data-placement={uploadMenuDirection}
+              style={uploadMenuStyle}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className="download-dropdown__item"
+                onClick={() => {
+                  csvPendingModeRef.current = "merge";
+                  setUploadOpen(false);
+                  requestAnimationFrame(() => csvFileInputRef.current?.click());
+                }}
+              >
+                덮어쓰기
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="download-dropdown__item"
+                onClick={() => {
+                  if (
+                    !confirm(
+                      "초기화: products·product_variants를 모두 삭제한 뒤 CSV만 남깁니다. 계속할까요?"
+                    )
+                  ) {
+                    return;
+                  }
+                  csvPendingModeRef.current = "reset";
+                  setUploadOpen(false);
+                  requestAnimationFrame(() => csvFileInputRef.current?.click());
+                }}
+              >
+                초기화
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
 
       <p className="products-count">
         {filtered.length}개 상품
@@ -628,8 +888,8 @@ export function ProductsClient({
               <thead>
                 <tr>
                   <th>이미지</th>
-                  <th>SKU</th>
                   <th>품명</th>
+                  <th>컬러</th>
                   <th>사이즈</th>
                   <th>재고</th>
                   <th>출고가</th>
@@ -649,33 +909,16 @@ export function ProductsClient({
                   return (
                     <tr key={row.variantId ? `${row.id}-${row.variantId}` : row.id}>
                       <td>
-                        {row.imageUrl ? (
-                          <button
-                            type="button"
-                            className="products-table__thumb-btn"
-                            onClick={() =>
-                              setListImagePreview({
-                                url: row.imageUrl!,
-                                alt: (row.nameSpec ?? row.sku ?? "").toString(),
-                              })
-                            }
-                            aria-label="상품 이미지 확대"
-                          >
-                            <img
-                              className="thumb-small"
-                              src={row.imageUrl}
-                              alt=""
-                              loading="lazy"
-                              decoding="async"
-                            />
-                          </button>
-                        ) : (
-                          <span className="thumb-empty">-</span>
-                        )}
+                        <ProductsTableThumbCell
+                          sku={row.sku}
+                          imageUrl={row.imageUrl}
+                          alt={(row.name ?? row.sku ?? "").toString()}
+                          onOpenPreview={(url, altText) => setListImagePreview({ url, alt: altText })}
+                        />
                       </td>
-                      <td>{row.sku}</td>
-                      <td>{row.nameSpec}</td>
-                      <td>{row.size || "-"}</td>
+                      <td>{row.name}</td>
+                      <td>{row.color?.trim() ? row.color : ""}</td>
+                      <td>{row.size?.trim() ? row.size : ""}</td>
                       <td>
                         <div className="stock-cell">
                           <span className="stock-cell__qty">
@@ -708,10 +951,26 @@ export function ProductsClient({
                           </div>
                         </div>
                       </td>
-                      <td>{row.wholesalePrice != null ? `${row.wholesalePrice.toLocaleString()}원` : "-"}</td>
-                      <td>{row.msrpPrice != null ? `${row.msrpPrice.toLocaleString()}원` : "-"}</td>
-                      <td>{row.salePrice != null ? `${row.salePrice.toLocaleString()}원` : "-"}</td>
-                      <td>{row.extraPrice != null ? `${row.extraPrice.toLocaleString()}원` : "-"}</td>
+                      <td>
+                        {(row.variantId ? row.variantWholesalePrice : row.wholesalePrice) != null
+                          ? `${Number(row.variantId ? row.variantWholesalePrice : row.wholesalePrice).toLocaleString()}원`
+                          : "-"}
+                      </td>
+                      <td>
+                        {(row.variantId ? row.variantMsrpPrice : row.msrpPrice) != null
+                          ? `${Number(row.variantId ? row.variantMsrpPrice : row.msrpPrice).toLocaleString()}원`
+                          : "-"}
+                      </td>
+                      <td>
+                        {(row.variantId ? row.variantSalePrice : row.salePrice) != null
+                          ? `${Number(row.variantId ? row.variantSalePrice : row.salePrice).toLocaleString()}원`
+                          : "-"}
+                      </td>
+                      <td>
+                        {(row.variantId ? row.variantExtraPrice : row.extraPrice) != null
+                          ? `${Number(row.variantId ? row.variantExtraPrice : row.extraPrice).toLocaleString()}원`
+                          : "-"}
+                      </td>
                       <td>
                         {row.memo?.trim() ? (
                           <span className="products-table__memo products-table__memo--filled">{row.memo}</span>
@@ -807,6 +1066,7 @@ export function ProductsClient({
             src={listImagePreview.url}
             alt={listImagePreview.alt}
             onClick={(e) => e.stopPropagation()}
+            onError={() => setListImagePreview(null)}
           />
         </div>
       ) : null}

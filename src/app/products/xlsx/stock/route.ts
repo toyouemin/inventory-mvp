@@ -1,10 +1,8 @@
 import { supabaseServer } from "@/lib/supabaseClient";
-import { joinVariantSizeForCsv } from "@/app/products/variantOptions";
 import * as XLSX from "xlsx";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 function excelCell(v: unknown): string | number {
   if (v === null || v === undefined) return "";
@@ -15,84 +13,105 @@ function excelCell(v: unknown): string | number {
   return s;
 }
 
+const HEADER = [
+  "SKU",
+  "카테고리",
+  "상품명",
+  "이미지url",
+  "color",
+  "gender",
+  "size",
+  "stock",
+  "wholesalePrice",
+  "msrpPrice",
+  "salePrice",
+  "extraPrice",
+  "memo",
+  "memo2",
+];
+
+type ProductRow = {
+  id: string;
+  sku: string;
+  category: string | null;
+  name: string | null;
+  image_url: string | null;
+  wholesale_price: number | null;
+  msrp_price: number | null;
+  sale_price: number | null;
+  extra_price: number | null;
+  memo: string | null;
+  memo2: string | null;
+  stock: number | null;
+};
+
+type VariantRow = {
+  product_id: string;
+  color: string | null;
+  gender: string | null;
+  size: string | null;
+  stock: number;
+  wholesale_price: number | null;
+  msrp_price: number | null;
+  sale_price: number | null;
+  extra_price: number | null;
+  memo: string | null;
+  memo2: string | null;
+};
+
 export async function GET() {
   const { data: products, error: productsErr } = await supabaseServer
     .from("products")
-    .select("id, sku, category, name_spec, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock")
+    .select(
+      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock"
+    )
     .order("sku", { ascending: true });
 
   if (productsErr) {
     return new Response(`XLSX export failed: ${productsErr.message}`, { status: 500 });
   }
 
-  const list = products ?? [];
-  const productIds = list.map((p: any) => p.id);
+  const list = (products ?? []) as ProductRow[];
+  const productIds = list.map((p) => p.id);
 
-  let variants: {
-    product_id: string;
-    option1: string | null;
-    option2: string | null;
-    size: string;
-    stock: number;
-    memo: string | null;
-    memo2: string | null;
-  }[] = [];
+  let variants: VariantRow[] = [];
   if (productIds.length > 0) {
     const { data: variantsData } = await supabaseServer
       .from("product_variants")
-      .select("product_id, option1, option2, size, stock, memo, memo2")
+      .select(
+        "product_id, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2"
+      )
       .in("product_id", productIds);
-    variants = (variantsData ?? []) as typeof variants;
+    variants = (variantsData ?? []) as VariantRow[];
   }
 
-  const variantsByProductId = new Map<
-    string,
-    { size: string; stock: number; memo: string | null; memo2: string | null }[]
-  >();
+  const variantsByProductId = new Map<string, VariantRow[]>();
   for (const v of variants) {
     const arr = variantsByProductId.get(v.product_id) ?? [];
-    const sizeCol = joinVariantSizeForCsv(v.option1, v.option2, v.size);
-    arr.push({
-      size: sizeCol || v.size,
-      stock: Number(v.stock) ?? 0,
-      memo: v.memo ?? null,
-      memo2: v.memo2 ?? null,
-    });
+    arr.push(v);
     variantsByProductId.set(v.product_id, arr);
   }
 
-  const header = [
-    "sku",
-    "category",
-    "name",
-    "imageUrl",
-    "size",
-    "stock",
-    "wholesalePrice",
-    "msrpPrice",
-    "salePrice",
-    "extraPrice",
-    "memo",
-    "memo2",
-  ];
-
-  const aoa: (string | number)[][] = [header];
+  const aoa: (string | number)[][] = [HEADER];
 
   for (const p of list) {
     const productVariants = variantsByProductId.get(p.id) ?? [];
+    const name = (p.name ?? "").trim() || p.sku;
     if (productVariants.length > 0) {
       for (const v of productVariants) {
         aoa.push([
           excelCell(p.sku),
-          excelCell(p.category),
-          excelCell(p.name_spec ?? p.sku),
-          excelCell(p.image_url),
-          excelCell(v.size),
-          excelCell(v.stock),
-          excelCell(p.wholesale_price ?? ""),
-          excelCell(p.msrp_price ?? ""),
-          excelCell(p.sale_price ?? ""),
-          excelCell(p.extra_price ?? ""),
+          excelCell(p.category ?? ""),
+          excelCell(name),
+          excelCell(p.image_url ?? ""),
+          excelCell(v.color ?? ""),
+          excelCell(v.gender ?? ""),
+          excelCell(v.size ?? ""),
+          excelCell(Number(v.stock) || 0),
+          excelCell(v.wholesale_price ?? ""),
+          excelCell(v.msrp_price ?? ""),
+          excelCell(v.sale_price ?? ""),
+          excelCell(v.extra_price ?? ""),
           excelCell(v.memo ?? ""),
           excelCell(v.memo2 ?? ""),
         ]);
@@ -100,11 +119,13 @@ export async function GET() {
     } else {
       aoa.push([
         excelCell(p.sku),
-        excelCell(p.category),
-        excelCell(p.name_spec ?? p.sku),
-        excelCell(p.image_url),
+        excelCell(p.category ?? ""),
+        excelCell(name),
+        excelCell(p.image_url ?? ""),
         "",
-        excelCell(p.stock ?? 0),
+        "",
+        "",
+        excelCell(Number(p.stock) || 0),
         excelCell(p.wholesale_price ?? ""),
         excelCell(p.msrp_price ?? ""),
         excelCell(p.sale_price ?? ""),
@@ -125,8 +146,8 @@ export async function GET() {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": 'attachment; filename="stock.xlsx"',
-      "Cache-Control": "no-store",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
     },
   });
 }
-

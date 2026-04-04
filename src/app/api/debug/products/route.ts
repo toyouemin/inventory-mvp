@@ -14,7 +14,7 @@ function mapProduct(row: DebugProductRow) {
     id: String(row.id),
     sku,
     category: (row.category as string) ?? null,
-    nameSpec: String(row.name_spec ?? sku ?? ""),
+    name: String((row.name as string) ?? sku ?? ""),
     imageUrl,
     wholesalePrice: row.wholesale_price != null ? Number(row.wholesale_price) : null,
     msrpPrice: row.msrp_price != null ? Number(row.msrp_price) : null,
@@ -32,10 +32,15 @@ function mapVariant(row: DebugProductRow) {
   return {
     id: String(row.id),
     productId: String(row.product_id),
-    option1: String(row.option1 ?? ""),
-    option2: String(row.option2 ?? ""),
+    sku: String(row.sku ?? ""),
+    color: String(row.color ?? ""),
+    gender: String(row.gender ?? ""),
     size: String(row.size ?? ""),
     stock: Number(row.stock ?? 0),
+    wholesalePrice: row.wholesale_price != null ? Number(row.wholesale_price) : null,
+    msrpPrice: row.msrp_price != null ? Number(row.msrp_price) : null,
+    salePrice: row.sale_price != null ? Number(row.sale_price) : null,
+    extraPrice: row.extra_price != null ? Number(row.extra_price) : null,
     memo: (row.memo as string) ?? null,
     memo2: (row.memo2 as string) ?? null,
     createdAt: (row.created_at as string) ?? null,
@@ -76,7 +81,7 @@ export async function GET(req: Request) {
     const { data: productsData, error: productsError } = await supabaseServer
       .from("products")
       .select(
-        "id, sku, category, name_spec, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at"
+        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at"
       )
       .eq("sku", sku)
       .order("created_at", { ascending: false });
@@ -96,7 +101,9 @@ export async function GET(req: Request) {
     if (productIds.length > 0) {
       const { data: variantsData, error: variantsError } = await supabaseServer
         .from("product_variants")
-        .select("id, product_id, option1, option2, size, stock, memo, memo2, created_at")
+        .select(
+          "id, product_id, sku, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, created_at"
+        )
         .in("product_id", productIds);
 
       if (variantsError) {

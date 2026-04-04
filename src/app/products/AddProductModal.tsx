@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import { VariantEditor, type VariantRow } from "./VariantEditor";
-import { decomposeVariantSize, variantCompositeKey } from "./variantOptions";
+import { variantCompositeKey } from "./variantOptions";
 
 function parsePriceInput(value: string): number | null {
   const cleaned = String(value ?? "").replace(/,/g, "").trim();
@@ -17,28 +17,23 @@ export function AddProductModal({
   open,
   onClose,
   initialSku,
-  initialNameSpec,
+  initialName,
   initialCategory,
 }: {
   open: boolean;
   onClose: () => void;
   initialSku?: string;
-  initialNameSpec?: string;
+  initialName?: string;
   initialCategory?: string;
 }) {
   const [pending, setPending] = useState(false);
 
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState("");
-  const [nameSpec, setNameSpec] = useState("");
+  const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-
-  const [wholesalePrice, setWholesalePrice] = useState("");
-  const [msrpPrice, setMsrpPrice] = useState("");
-  const [salePrice, setSalePrice] = useState("");
-  const [extraPrice, setExtraPrice] = useState("");
 
   const [memo, setMemo] = useState("");
   const [memo2, setMemo2] = useState("");
@@ -51,39 +46,38 @@ export function AddProductModal({
 
     setSku((initialSku ?? "").trim());
     setCategory((initialCategory ?? "").trim());
-    setNameSpec((initialNameSpec ?? "").trim());
+    setName((initialName ?? "").trim());
 
-    // 나머지는 항상 빈값으로 시작(원하면 유지하도록 바꿀 수도 있음)
     setImageUrl("");
     setImageFile(null);
     setImagePreview(null);
-    setWholesalePrice("");
-    setMsrpPrice("");
-    setSalePrice("");
-    setExtraPrice("");
     setMemo("");
     setMemo2("");
     setVariantRows([]);
     setVariantError("");
-  }, [open, initialSku, initialNameSpec, initialCategory]);
+  }, [open, initialSku, initialName, initialCategory]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!sku.trim() || !nameSpec.trim()) return;
+    if (!sku.trim() || !name.trim()) return;
     if (pending) return;
 
-    const emptySizeRows = variantRows.filter((r) => (r.size ?? "").trim() === "");
-    const rowsWithSize = variantRows.filter((r) => (r.size ?? "").trim() !== "");
-    if (emptySizeRows.length > 0 && (variantRows.length > 1 || rowsWithSize.length > 0)) {
-      setVariantError("사이즈가 비어 있는 행이 있습니다. 사이즈를 입력하거나 해당 행을 삭제해 주세요.");
+    const rowsWithAny = variantRows.filter(
+      (r) =>
+        (r.color ?? "").trim() !== "" ||
+        (r.gender ?? "").trim() !== "" ||
+        (r.size ?? "").trim() !== ""
+    );
+    if (variantRows.length > 0 && rowsWithAny.length === 0) {
+      setVariantError("옵션 행이 있으면 color, gender, size 중 하나 이상 입력해 주세요.");
       return;
     }
-    const variantKeys = rowsWithSize.map((r) => {
-      const d = decomposeVariantSize((r.size ?? "").trim());
-      return variantCompositeKey(d.option1, d.option2, d.size);
-    });
+
+    const variantKeys = rowsWithAny.map((r) =>
+      variantCompositeKey(r.color, r.gender, r.size)
+    );
     if (new Set(variantKeys).size !== variantKeys.length) {
-      setVariantError("중복된 옵션(길이/성별/사이즈)이 있습니다.");
+      setVariantError("중복된 변형입니다. DB 기준으로 동일 SKU에서 color·gender·size 조합은 하나만 허용됩니다.");
       return;
     }
     setVariantError("");
@@ -98,37 +92,38 @@ export function AddProductModal({
         const { url } = await uploadProductImage(fd);
         finalImageUrl = url;
       }
-      const variants = rowsWithSize.map((r) => ({
-        size: (r.size ?? "").trim(),
-        stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
-        memo: (r.memo ?? "").trim() || null,
-        memo2: (r.memo2 ?? "").trim() || null,
-      }));
+      const variants =
+        rowsWithAny.length > 0
+          ? rowsWithAny.map((r) => ({
+              color: (r.color ?? "").trim(),
+              gender: (r.gender ?? "").trim(),
+              size: (r.size ?? "").trim(),
+              stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
+              wholesalePrice: parsePriceInput(r.wholesalePrice) ?? 0,
+              msrpPrice: parsePriceInput(r.msrpPrice) ?? 0,
+              salePrice: parsePriceInput(r.salePrice) ?? 0,
+              extraPrice: parsePriceInput(r.extraPrice) ?? 0,
+              memo: (r.memo ?? "").trim() || null,
+              memo2: (r.memo2 ?? "").trim() || null,
+            }))
+          : undefined;
 
       await createProduct({
         sku: sku.trim(),
         category: category.trim() || null,
-        nameSpec: nameSpec.trim(),
+        name: name.trim(),
         imageUrl: finalImageUrl,
-        wholesalePrice: parsePriceInput(wholesalePrice),
-        msrpPrice: parsePriceInput(msrpPrice),
-        salePrice: parsePriceInput(salePrice),
-        extraPrice: parsePriceInput(extraPrice),
         memo: memo.trim() || null,
         memo2: memo2.trim() || null,
-        variants: variants.length > 0 ? variants : undefined,
+        variants,
       });
 
       setSku("");
       setCategory("");
-      setNameSpec("");
+      setName("");
       setImageUrl("");
       setImageFile(null);
       setImagePreview(null);
-      setWholesalePrice("");
-      setMsrpPrice("");
-      setSalePrice("");
-      setExtraPrice("");
       setMemo("");
       setMemo2("");
       setVariantRows([]);
@@ -163,11 +158,11 @@ export function AddProductModal({
             placeholder="(선택)"
           />
 
-          <label>품명 *</label>
+          <label>상품명 *</label>
           <input
-            value={nameSpec}
-            onChange={(e) => setNameSpec(e.target.value)}
-            placeholder="품명 입력"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="상품명 입력"
             required
           />
 
@@ -208,54 +203,24 @@ export function AddProductModal({
           <input
             type="text"
             value={imageUrl}
-            onChange={(e) => { setImageUrl(e.target.value); if (e.target.value) setImageFile(null); setImagePreview(null); }}
+            onChange={(e) => {
+              setImageUrl(e.target.value);
+              if (e.target.value) {
+                setImageFile(null);
+                setImagePreview(null);
+              }
+            }}
             placeholder="또는 이미지 URL 입력"
           />
 
-          <label>출고가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={wholesalePrice}
-            onChange={(e) => setWholesalePrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>소비자가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={msrpPrice}
-            onChange={(e) => setMsrpPrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>실판매가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={salePrice}
-            onChange={(e) => setSalePrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>매장가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={extraPrice}
-            onChange={(e) => setExtraPrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>비고1</label>
+          <label>비고1 (상품)</label>
           <input
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             placeholder="(선택)"
           />
 
-          <label>비고2</label>
+          <label>비고2 (상품)</label>
           <textarea
             value={memo2}
             onChange={(e) => setMemo2(e.target.value)}

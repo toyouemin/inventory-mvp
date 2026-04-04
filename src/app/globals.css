@@ -254,11 +254,13 @@ button:hover {
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  padding-left: 8px;
-  padding-right: 22px;
+  padding-left: 10px;
+  padding-right: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   box-sizing: border-box;
+  text-align: center;
+  text-align-last: center;
 }
 
 .toolbar-actions {
@@ -320,10 +322,26 @@ button:hover {
   font-size: 14px;
   white-space: nowrap;
   line-height: 1.2;
+  text-align: center;
 }
 
 .download-dropdown__item:hover {
   background: #f0ebe5;
+}
+
+button.download-dropdown__item {
+  width: 100%;
+  text-align: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .download-dropdown__divider {
@@ -1182,8 +1200,8 @@ label {
   }
 
   .toolbar-row--search .products-category-select-wrap .products-category-select {
-    padding-left: 6px;
-    padding-right: 18px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
   .products-toolbar .btn-compact,

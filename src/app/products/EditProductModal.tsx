@@ -4,9 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
-import { decomposeVariantSize, joinVariantSizeForCsv, variantCompositeKey } from "./variantOptions";
-
-type VariantRow = { rowId: string; size: string; stock: string; memo: string; memo2: string; variantId?: string };
+import { VariantEditor, type VariantRow, generateRowId } from "./VariantEditor";
+import { variantCompositeKey } from "./variantOptions";
 
 function parsePriceInput(value: string): number | null {
   const cleaned = String(value ?? "").replace(/,/g, "").trim();
@@ -15,23 +14,42 @@ function parsePriceInput(value: string): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-function makeRow(size = "", stock = "0", memo = "", memo2 = "", variantId?: string): VariantRow {
-  return { rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`, size, stock, memo, memo2, variantId };
+function emptyVariantRow(stock = "0"): VariantRow {
+  return {
+    rowId: generateRowId(),
+    color: "",
+    gender: "",
+    size: "",
+    stock,
+    wholesalePrice: "",
+    msrpPrice: "",
+    salePrice: "",
+    extraPrice: "",
+    memo: "",
+    memo2: "",
+  };
+}
+
+function variantToRow(v: ProductVariant): VariantRow {
+  return {
+    rowId: generateRowId(),
+    color: v.color ?? "",
+    gender: v.gender ?? "",
+    size: v.size ?? "",
+    stock: String(v.stock ?? 0),
+    wholesalePrice: v.wholesalePrice != null ? String(v.wholesalePrice) : "",
+    msrpPrice: v.msrpPrice != null ? String(v.msrpPrice) : "",
+    salePrice: v.salePrice != null ? String(v.salePrice) : "",
+    extraPrice: v.extraPrice != null ? String(v.extraPrice) : "",
+    memo: (v.memo ?? "").trim(),
+    memo2: (v.memo2 ?? "").trim(),
+    variantId: v.id,
+  };
 }
 
 function variantsToRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
-  if (variants.length > 0) {
-    return variants.map((v) =>
-      makeRow(
-        joinVariantSizeForCsv(v.option1, v.option2, v.size).trim() || (v.size ?? "").trim(),
-        String(v.stock),
-        (v.memo ?? "").trim(),
-        (v.memo2 ?? "").trim(),
-        v.id
-      )
-    );
-  }
-  return [makeRow("", String(fallbackStock ?? 0))];
+  if (variants.length > 0) return variants.map(variantToRow);
+  return [emptyVariantRow(String(fallbackStock ?? 0))];
 }
 
 export function EditProductModal({
@@ -50,20 +68,14 @@ export function EditProductModal({
   const [pending, setPending] = useState(false);
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState("");
-  const [nameSpec, setNameSpec] = useState("");
+  const [name, setName] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // ✅ 가격 3개
-  const [wholesalePrice, setWholesalePrice] = useState("");
-  const [msrpPrice, setMsrpPrice] = useState("");
-  const [salePrice, setSalePrice] = useState("");
-  const [extraPrice, setExtraPrice] = useState("");
-
   const [memo, setMemo] = useState("");
   const [memo2, setMemo2] = useState("");
-  const [variantRows, setVariantRows] = useState<VariantRow[]>(() => [makeRow()]);
+  const [variantRows, setVariantRows] = useState<VariantRow[]>(() => [emptyVariantRow()]);
   const [variantError, setVariantError] = useState("");
 
   const initialVariantIds = useMemo(
@@ -77,55 +89,63 @@ export function EditProductModal({
     setPending(false);
     setSku(product.sku ?? "");
     setCategory(product.category ?? "");
-    setNameSpec(product.nameSpec ?? "");
+    setName(product.name ?? "");
     setImageUrl(product.imageUrl ?? "");
     setImageFile(null);
     setImagePreview(null);
 
-    setWholesalePrice(product.wholesalePrice != null ? String(product.wholesalePrice) : "");
-    setMsrpPrice(product.msrpPrice != null ? String(product.msrpPrice) : "");
-    setSalePrice(product.salePrice != null ? String(product.salePrice) : "");
-    setExtraPrice(product.extraPrice != null ? String(product.extraPrice) : "");
-
     setMemo(product.memo ?? "");
     setMemo2(product.memo2 ?? "");
     const rows = variantsToRows(variants ?? [], product.stock ?? 0);
-    setVariantRows(rows.length > 0 ? rows : [makeRow("", String(product.stock ?? 0))]);
+    setVariantRows(rows.length > 0 ? rows : [emptyVariantRow(String(product.stock ?? 0))]);
     setVariantError("");
   }, [open, product, variants]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!product) return;
-    if (!sku.trim() || !nameSpec.trim()) return;
+    if (!sku.trim() || !name.trim()) return;
     if (pending) return;
 
-    const emptySizeRows = variantRows.filter((r) => (r.size ?? "").trim() === "");
-    const rowsWithNonEmptySize = variantRows.filter((r) => (r.size ?? "").trim() !== "");
-    if (emptySizeRows.length > 0 && (variantRows.length > 1 || rowsWithNonEmptySize.length > 0)) {
-      setVariantError("사이즈가 비어 있는 행이 있습니다. 사이즈를 입력하거나 해당 행을 삭제해 주세요.");
+    const rowsWithAny = variantRows.filter(
+      (r) =>
+        (r.color ?? "").trim() !== "" ||
+        (r.gender ?? "").trim() !== "" ||
+        (r.size ?? "").trim() !== ""
+    );
+
+    if (variantRows.length > 0 && rowsWithAny.length === 0 && variantRows.some((r) => variantRows.length > 1)) {
+      setVariantError("옵션 행이 있으면 color, gender, size 중 하나 이상 입력해 주세요.");
       return;
     }
-    const variantKeys = rowsWithNonEmptySize.map((r) => {
-      const d = decomposeVariantSize((r.size ?? "").trim());
-      return variantCompositeKey(d.option1, d.option2, d.size);
-    });
+
+    const variantKeys = rowsWithAny.map((r) => variantCompositeKey(r.color, r.gender, r.size));
     if (new Set(variantKeys).size !== variantKeys.length) {
-      setVariantError("중복된 옵션(길이/성별/사이즈)이 있습니다.");
+      setVariantError("중복된 변형입니다. DB 기준으로 동일 SKU에서 color·gender·size 조합은 하나만 허용됩니다.");
       return;
     }
     setVariantError("");
 
-    const rowsWithSize = rowsWithNonEmptySize;
-    const singleStockRow = variantRows.find((r) => (r.size ?? "").trim() === "");
-    const updates = rowsWithSize.map((r) => ({
+    const singleStockRow = variantRows.find(
+      (r) =>
+        (r.color ?? "").trim() === "" &&
+        (r.gender ?? "").trim() === "" &&
+        (r.size ?? "").trim() === ""
+    );
+    const updates = rowsWithAny.map((r) => ({
       id: r.variantId,
+      color: (r.color ?? "").trim(),
+      gender: (r.gender ?? "").trim(),
       size: (r.size ?? "").trim(),
       stock: Math.max(0, parseInt(String(r.stock), 10) || 0),
+      wholesalePrice: parsePriceInput(r.wholesalePrice) ?? 0,
+      msrpPrice: parsePriceInput(r.msrpPrice) ?? 0,
+      salePrice: parsePriceInput(r.salePrice) ?? 0,
+      extraPrice: parsePriceInput(r.extraPrice) ?? 0,
       memo: (r.memo ?? "").trim() || null,
       memo2: (r.memo2 ?? "").trim() || null,
     }));
-    const remainingIds = new Set(rowsWithSize.map((r) => r.variantId).filter(Boolean));
+    const remainingIds = new Set(updates.map((u) => u.id).filter(Boolean));
     const deleteIds = initialVariantIds.filter((id) => !remainingIds.has(id));
     const stockForSingle =
       updates.length === 0 && singleStockRow
@@ -145,12 +165,8 @@ export function EditProductModal({
       await updateProduct(product.id, {
         sku: sku.trim(),
         category: category.trim() || null,
-        nameSpec: nameSpec.trim(),
+        name: name.trim(),
         imageUrl: finalImageUrl,
-        wholesalePrice: parsePriceInput(wholesalePrice),
-        msrpPrice: parsePriceInput(msrpPrice),
-        salePrice: parsePriceInput(salePrice),
-        extraPrice: parsePriceInput(extraPrice),
         memo: memo.trim() || null,
         memo2: memo2.trim() || null,
         variants: { updates, deleteIds },
@@ -170,33 +186,16 @@ export function EditProductModal({
 
   if (!open || !product) return null;
 
-  const rowsToShow = variantRows.length > 0 ? variantRows : variantsToRows(variants ?? [], product.stock ?? 0);
-
-  function addVariantRow() {
-    setVariantRows((prev) => [...prev, makeRow()]);
-  }
-  function updateVariantRow(rowId: string, field: "size" | "stock" | "memo" | "memo2", value: string) {
-    setVariantRows((prev) =>
-      prev.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r))
-    );
-  }
-  function removeVariantRow(rowId: string) {
-    setVariantRows((prev) => {
-      const next = prev.filter((r) => r.rowId !== rowId);
-      return next.length > 0 ? next : [makeRow()];
-    });
-  }
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>상품 수정</h3>
         <form onSubmit={handleSave} className="modal-form">
-        {product.updatedAt && (
-  <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
-    마지막 수정: {new Date(product.updatedAt).toLocaleString("ko-KR")}
-  </div>
-)}
+          {product.updatedAt && (
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
+              마지막 수정: {new Date(product.updatedAt).toLocaleString("ko-KR")}
+            </div>
+          )}
           <label>품목코드 (SKU) *</label>
           <input value={sku} onChange={(e) => setSku(e.target.value)} required />
 
@@ -207,78 +206,10 @@ export function EditProductModal({
             placeholder="(선택)"
           />
 
-          <label>품명 *</label>
-          <input value={nameSpec} onChange={(e) => setNameSpec(e.target.value)} required />
+          <label>상품명 *</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} required />
 
-          <label>사이즈 추가</label>
-          <div style={{ display: "block", minHeight: 80, marginTop: 4 }}>
-            {rowsToShow.map((row) => (
-              <div
-                key={row.rowId}
-                className="edit-variant-row"
-              >
-                <input
-                  type="text"
-                  placeholder="사이즈"
-                  value={row.size}
-                  onChange={(e) => updateVariantRow(row.rowId, "size", e.target.value)}
-                  className="edit-variant-input"
-                />
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  placeholder="재고"
-                  value={row.stock}
-                  onChange={(e) => updateVariantRow(row.rowId, "stock", e.target.value)}
-                  className="edit-variant-input edit-variant-stock"
-                />
-                <input
-                  type="text"
-                  placeholder="비고1"
-                  value={row.memo}
-                  onChange={(e) => updateVariantRow(row.rowId, "memo", e.target.value)}
-                  className="edit-variant-input edit-variant-memo"
-                />
-                <input
-                  type="text"
-                  placeholder="비고2"
-                  value={row.memo2}
-                  onChange={(e) => updateVariantRow(row.rowId, "memo2", e.target.value)}
-                  className="edit-variant-input edit-variant-memo"
-                />
-                <button
-                  type="button"
-                  onClick={() => removeVariantRow(row.rowId)}
-                  className="edit-variant-remove"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            {variantError && (
-              <div style={{ color: "crimson", fontSize: 13, marginTop: 6 }}>{variantError}</div>
-            )}
-            <button
-              type="button"
-              onClick={addVariantRow}
-              style={{
-                marginTop: 8,
-                width: "100%",
-                height: 44,
-                minHeight: 44,
-                border: "1px solid #ccc",
-                borderRadius: 8,
-                background: "#e0e0e0",
-                color: "#212121",
-                fontSize: 15,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              + 사이즈 추가
-            </button>
-          </div>
+          <VariantEditor rows={variantRows} onRowsChange={setVariantRows} error={variantError} />
 
           <label>이미지</label>
           {(imagePreview || imageUrl) && (
@@ -308,50 +239,20 @@ export function EditProductModal({
           <input
             type="text"
             value={imageUrl}
-            onChange={(e) => { setImageUrl(e.target.value); if (e.target.value) setImageFile(null); setImagePreview(null); }}
+            onChange={(e) => {
+              setImageUrl(e.target.value);
+              if (e.target.value) {
+                setImageFile(null);
+                setImagePreview(null);
+              }
+            }}
             placeholder="또는 이미지 URL 입력"
           />
 
-          <label>출고가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={wholesalePrice}
-            onChange={(e) => setWholesalePrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>소비자가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={msrpPrice}
-            onChange={(e) => setMsrpPrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>실판매가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={salePrice}
-            onChange={(e) => setSalePrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>매장가</label>
-          <input
-            type="number"
-            inputMode="decimal"
-            value={extraPrice}
-            onChange={(e) => setExtraPrice(e.target.value)}
-            placeholder="0"
-          />
-
-          <label>비고1</label>
+          <label>비고1 (상품)</label>
           <input value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="(선택)" />
 
-          <label>비고2</label>
+          <label>비고2 (상품)</label>
           <textarea
             value={memo2}
             onChange={(e) => setMemo2(e.target.value)}

@@ -1,6 +1,6 @@
 import type { Product, ProductVariant } from "./types";
 import { productNormSku, productNormSkuSource, variantMatchesNormSku } from "./skuNormalize";
-import { sortVariantRows, variantCompositeKey } from "./variantOptions";
+import { sortVariantsForDisplay, variantCompositeKey } from "./variantOptions";
 
 export type SkuDisplayGroupTrace = {
   representativeProductId: string;
@@ -74,8 +74,7 @@ function mergeVariantsForSameCompositeKey(
       memo2,
     });
   }
-  out.sort((a, b) => sortVariantRows(a, b));
-  return out;
+  return sortVariantsForDisplay(out);
 }
 
 function canonicalProductForSku(

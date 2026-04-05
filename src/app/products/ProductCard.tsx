@@ -5,7 +5,7 @@ import { updateProductMemo, updateVariantMemo } from "./actions";
 import { useProductImageSrc } from "./useProductImageSrc";
 import type { Product, ProductVariant } from "./types";
 import { normalizeSkuForMatch, variantMatchesNormSku } from "./skuNormalize";
-import { formatGenderSizeDisplay, sortVariantRows, variantCompositeKey } from "./variantOptions";
+import { formatGenderSizeDisplay, sortVariantsForDisplay, variantCompositeKey } from "./variantOptions";
 
 function VariantOptionChips({ variant }: { variant: ProductVariant }) {
   const color = (variant.color ?? "").trim();
@@ -98,10 +98,7 @@ export const ProductCard = memo(function ProductCard({
     [savingVariantIdsKey]
   );
 
-  const sortedVariants = useMemo(() => {
-    const copy = [...safeVariants];
-    return copy.sort((a, b) => sortVariantRows(a, b));
-  }, [safeVariants]);
+  const sortedVariants = useMemo(() => sortVariantsForDisplay(safeVariants), [safeVariants]);
 
   useEffect(() => {
     if (!debugVariantSkuMix || !displayGroupNormSku.trim()) return;

@@ -5,7 +5,7 @@ import type { CSSProperties, Ref } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Product, ProductVariant, ProductRow } from "./types";
-import { formatGenderSizeDisplay } from "./variantOptions";
+import { diagnoseSockSortVariant, formatGenderSizeDisplay, sortVariantsForDisplay, tryParseSockCombinedLabel } from "./variantOptions";
 import { useProductImageSrc } from "./useProductImageSrc";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
@@ -316,28 +316,47 @@ function listRowAdjustKey(row: ProductRow): string {
   return row.variantId ? `v:${row.variantId}` : `p:${row.id}`;
 }
 
-/** 카테고리 select 폭 안에 들어가도록 글자 크기 조절(네이티브 select는 줄바꿈 불가). */
-function fitCategorySelectFont(selectEl: HTMLSelectElement, displayedLabel: string) {
-  const maxFs = 13;
-  const minFs = 9;
-  const padApprox = 28;
-  const w = selectEl.clientWidth;
-  if (w < 40) return;
+const CATEGORY_SELECT_SEARCH_MIN_PX = 96;
+
+/** 선택 라벨 길이에 맞춰 래퍼 너비 확장(폰트 축소 없음). 행이 좁으면 검색창 최소 폭을 남기고 상한으로 맞춤. */
+function fitCategorySelectWidth(
+  selectEl: HTMLSelectElement,
+  displayedLabel: string,
+  rowEl: HTMLElement | null
+) {
+  selectEl.style.fontSize = "";
+  const wrap = selectEl.parentElement as HTMLElement | null;
+  if (!wrap) return;
+
   const cs = getComputedStyle(selectEl);
   const family = cs.fontFamily || "sans-serif";
   const weight = cs.fontWeight || "600";
+  const fontSizePx = parseFloat(cs.fontSize) || 13;
+
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  let bestFs = minFs;
-  for (let fs = maxFs; fs >= minFs; fs -= 0.5) {
-    ctx.font = `${weight} ${fs}px ${family}`;
-    if (ctx.measureText(displayedLabel).width + padApprox <= w) {
-      bestFs = fs;
-      break;
-    }
+  ctx.font = `${weight} ${fontSizePx}px ${family}`;
+  const textW = ctx.measureText(displayedLabel).width;
+  const padApprox = 52;
+  const desired = Math.ceil(textW + padApprox);
+  const minW = 72;
+
+  let maxW = desired;
+  if (rowEl) {
+    const btn = rowEl.querySelector("button");
+    const btnW = btn instanceof HTMLElement ? btn.getBoundingClientRect().width : 64;
+    const gapCount = Math.max(0, rowEl.children.length - 1);
+    const gapPx = 8 * gapCount;
+    const rowInner = rowEl.clientWidth;
+    const cap = rowInner - CATEGORY_SELECT_SEARCH_MIN_PX - btnW - gapPx;
+    maxW = Math.max(minW, Math.min(desired, cap));
   }
-  selectEl.style.fontSize = `${bestFs}px`;
+
+  const w = Math.max(minW, maxW);
+  wrap.style.width = `${w}px`;
+  wrap.style.flexShrink = "0";
+  selectEl.style.width = "100%";
 }
 
 export function ProductsClient({
@@ -402,10 +421,11 @@ export function ProductsClient({
   const [localVariantsByProductId, setLocalVariantsByProductId] =
     useState<Record<string, ProductVariant[]>>(variantsByProductId);
 
-  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [viewMode, setViewMode] = useState<ViewMode>("card");
   const [listImagePreview, setListImagePreview] = useState<{ url: string; alt: string } | null>(null);
 
   const categorySelectRef = useRef<HTMLSelectElement>(null);
+  const toolbarSearchRowRef = useRef<HTMLDivElement>(null);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   /** 액션 바가 데스크톱/모바일에 중복이라 ref를 나눔. 숨겨진 쪽은 getBoundingClientRect가 0이라 메뉴가 (0,0) 근처로 감 */
   const downloadWrapDesktopRef = useRef<HTMLDivElement | null>(null);
@@ -430,6 +450,9 @@ export function ProductsClient({
   const debugClientLifecycle =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("debugProductsClientLifecycle") === "1";
+
+  const debugSockSort =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugSockSort") === "1";
 
   if (debugClientLifecycle) {
     console.log("[ProductsClient] render", {
@@ -625,11 +648,14 @@ export function ProductsClient({
   useLayoutEffect(() => {
     const sel = categorySelectRef.current;
     if (!sel) return;
-    const run = () => fitCategorySelectFont(sel, categorySelectDisplayedLabel);
+    const run = () =>
+      fitCategorySelectWidth(sel, categorySelectDisplayedLabel, toolbarSearchRowRef.current);
     run();
     const ro = new ResizeObserver(() => {
       requestAnimationFrame(run);
     });
+    const row = toolbarSearchRowRef.current;
+    if (row) ro.observe(row);
     ro.observe(sel);
     return () => ro.disconnect();
   }, [categorySelectDisplayedLabel]);
@@ -722,41 +748,6 @@ export function ProductsClient({
   useEffect(() => {
     setLocalVariantsByProductId(variantsByProductId);
   }, [variantsByProductId]);
-
-  // 모바일이면 기본 카드형
-  const debugInit =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("debugInit") === "1";
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const m = window.matchMedia("(max-width: 768px)");
-    if (m.matches) setViewMode("card");
-    if (debugInit) {
-      console.log("[ProductsClient][debugInit] matchMedia", {
-        innerWidth: window.innerWidth,
-        mMatches: m.matches,
-      });
-    }
-  }, []);
-
-  // 저장된 보기 방식 불러오기
-  useEffect(() => {
-    const saved =
-      typeof window !== "undefined" ? window.localStorage.getItem("products:viewMode") : null;
-    if (saved === "card" || saved === "list") setViewMode(saved);
-    if (debugInit) {
-      console.log("[ProductsClient][debugInit] localStorage viewMode", { saved });
-    }
-  }, []);
-
-  // 보기 방식 저장
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem("products:viewMode", viewMode);
-    if (debugInit) {
-      console.log("[ProductsClient][debugInit] viewMode set", { viewMode });
-    }
-  }, [viewMode]);
 
   // categoryOrder(CSV 카테고리 등장 순) → SKU → created_at
   const orderedProducts = useMemo(() => {
@@ -898,6 +889,26 @@ export function ProductsClient({
     }
   }, [debugTargetSkus, skuDisplayGroups]);
 
+  useEffect(() => {
+    if (!debugSockSort) return;
+    const samples = ["3부-여85", "3부-여90", "3부-여95", "3부-여100", "4부-남95", "4부-남100"];
+    for (const s of samples) {
+      const p = tryParseSockCombinedLabel(s);
+      console.info("[socksSort][sample]", { label: s, ok: p != null, parsed: p });
+    }
+    const want = "T21PT4001";
+    const wantU = want.toUpperCase();
+    for (const g of skuDisplayGroups) {
+      const n = (g.normSku ?? "").toUpperCase();
+      const ps = (g.product.sku ?? "").toUpperCase();
+      if (n !== wantU && ps !== wantU && !n.includes(wantU) && !ps.includes(wantU)) continue;
+      console.info("[socksSort][group]", { normSku: g.normSku, productSku: g.product.sku, variantCount: g.variants.length });
+      for (const v of g.variants) {
+        console.info("[socksSort][variant]", diagnoseSockSortVariant(v));
+      }
+    }
+  }, [debugSockSort, skuDisplayGroups]);
+
   /** 디버그·레거시 호환: id dedupe만 (SKU 병합 전 단계) */
   const filteredForRender = useMemo(() => dedupeProductsById(filtered), [filtered]);
 
@@ -935,7 +946,7 @@ export function ProductsClient({
     const rows: ProductRow[] = [];
     for (const { product: p, variants } of skuDisplayGroups) {
       if (variants.length > 0) {
-        for (const v of variants) {
+        for (const v of sortVariantsForDisplay(variants)) {
           rows.push({
             ...p,
             variantOwnerProductId: v.productId,
@@ -1026,17 +1037,17 @@ export function ProductsClient({
         <div className="view-toggle" role="group" aria-label="보기 방식 전환">
           <button
             type="button"
-            className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => setViewMode("list")}
-          >
-            리스트
-          </button>
-          <button
-            type="button"
             className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
             onClick={() => setViewMode("card")}
           >
             카드
+          </button>
+          <button
+            type="button"
+            className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setViewMode("list")}
+          >
+            리스트
           </button>
         </div>
         <div className="download-dropdown" ref={downloadWrapRef}>
@@ -1149,7 +1160,7 @@ export function ProductsClient({
     <div className="products-page">
       <div className="products-toolbar products-toolbar--compact">
         {/* 1줄: 검색 + 검색버튼 + 카테고리 */}
-        <div className="toolbar-row toolbar-row--search">
+        <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">
           <input
             type="search"
             placeholder="품목·품명·카테고리·메모"
@@ -1183,7 +1194,7 @@ export function ProductsClient({
           </div>
         </div>
 
-        {/* 데스크톱 전용: 리스트/카드/CSV/추가 */}
+        {/* 데스크톱 전용: 카드/리스트/다운로드/CSV/추가 */}
         <div className="toolbar-actions toolbar-actions-desktop">
           <div className="toolbar-scroll">
             {renderToolbarActions(

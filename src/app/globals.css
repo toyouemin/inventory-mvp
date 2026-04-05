@@ -267,8 +267,8 @@ button:hover {
 
 .products-category-select-wrap {
   flex: 0 0 auto;
-  max-width: 112px;
-  min-width: 64px;
+  flex-shrink: 0;
+  min-width: 72px;
 }
 
 .toolbar-row--search .products-category-select-wrap .products-category-select {
@@ -1600,8 +1600,7 @@ label {
   }
 
   .products-category-select-wrap {
-    max-width: 86px;
-    min-width: 52px;
+    min-width: 64px;
   }
 
   .toolbar-row--search .products-category-select-wrap .products-category-select {

@@ -562,11 +562,11 @@ button.download-dropdown__item {
 
 .product-card__stock,
 .product-card__stock-label {
-  font-size: 14px;
+  font-size: calc(14px + 1pt);
 }
 
 .product-card__stock strong {
-  font-size: 18px;
+  font-size: calc(18px + 1pt);
   color: var(--accent);
 }
 
@@ -787,6 +787,10 @@ button.download-dropdown__item {
   flex-wrap: nowrap;
 }
 
+.product-card__option-qty strong {
+  font-size: calc(16px + 1pt);
+}
+
 .product-card__stock-row {
   display: flex;
   align-items: center;
@@ -946,6 +950,11 @@ label {
   vertical-align: middle;
 }
 
+.products-table__th-stock,
+.products-table__td-stock .stock-cell__qty {
+  font-size: calc(14px + 1pt);
+}
+
 /* /status 재고 현황 */
 .status-stock-table-wrap {
   overflow-x: auto;
@@ -985,6 +994,7 @@ label {
   padding-left: 4px;
   vertical-align: top;
   box-sizing: border-box;
+  font-size: calc(14px + 1pt);
 }
 
 .status-stock-table thead .status-stock-table__stock {
@@ -1145,7 +1155,7 @@ label {
   .products-table .stock-cell .stock-cell__qty-label-mobile {
     display: block;
     flex-shrink: 0;
-    font-size: 13px;
+    font-size: calc(13px + 1pt);
     font-weight: 600;
     color: var(--text);
     white-space: nowrap;
@@ -1733,8 +1743,12 @@ label {
   }
 
   .product-card__option-name {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
+  }
+
+  .product-card__opt-chip {
+    font-size: 14px;
   }
 
   .product-card__option-right {
@@ -1742,11 +1756,11 @@ label {
   }
 
   .product-card__option-row .product-card__stock-label {
-    font-size: 12px;
+    font-size: calc(12px + 1pt);
   }
 
   .product-card__option-qty strong {
-    font-size: 14px;
+    font-size: calc(14px + 1pt);
   }
 
   .product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty {

@@ -1,7 +1,13 @@
 import { supabaseServer } from "@/lib/supabaseClient";
+import { normalizeCategoryLabel } from "./categoryNormalize";
 import { getLocalImageHrefBySkuLower } from "./localProductImages.server";
 import { fetchCategoryOrderMap } from "./categorySortOrder.server";
-import { compareProductsByCategoryOrder, sortCategoryFilterLabels } from "./categorySortOrder.utils";
+import {
+  compareProductsByCategoryOrder,
+  diagnoseCategoryOrderPipeline,
+  mergeCategoryOrderMapForDisplay,
+  sortCategoryFilterLabels,
+} from "./categorySortOrder.utils";
 import { ProductsClient } from "./ProductsClient";
 import type { Product, ProductVariant } from "./types";
 import { normalizeSkuForMatch, productNormSku, variantMatchesNormSku } from "./skuNormalize";
@@ -16,10 +22,11 @@ function mapProduct(row: Record<string, unknown>): Product {
   const explicit = rawImageUrl && rawImageUrl.trim() !== "" ? rawImageUrl.trim() : null;
   const imageUrl = explicit;
 
+  const catNorm = normalizeCategoryLabel(row.category as string | null);
   return {
     id: String(row.id),
     sku,
-    category: (row.category as string) ?? null,
+    category: catNorm || null,
     name: String((row.name as string) ?? sku ?? ""),
     imageUrl,
     wholesalePrice: row.wholesale_price != null ? Number(row.wholesale_price) : null,
@@ -72,6 +79,7 @@ const DEBUG_DUPES_QUERY = "debugProductsDupes";
 const DEBUG_VARIANT_SKU_MIX_QUERY = "debugVariantSkuMix";
 const DEBUG_DISPLAY_GROUPS_QUERY = "debugDisplayGroups";
 const DEBUG_TARGET_SKUS_QUERY = "debugTargetSkus";
+const DEBUG_CATEGORY_ORDER_QUERY = "debugCategoryOrder";
 
 function pickSearchParam(
   searchParams: Record<string, string | string[] | undefined> | undefined,
@@ -91,6 +99,7 @@ export default async function ProductsPage({
   const debugVariantSkuMix = searchParams?.[DEBUG_VARIANT_SKU_MIX_QUERY] === "1";
   const debugDisplayGroups = searchParams?.[DEBUG_DISPLAY_GROUPS_QUERY] === "1";
   const debugTargetSkus = searchParams?.[DEBUG_TARGET_SKUS_QUERY] === "1";
+  const debugCategoryOrder = searchParams?.[DEBUG_CATEGORY_ORDER_QUERY] === "1";
   const focusSku = pickSearchParam(searchParams, "focusSku");
   if (!supabaseServer) {
     return (
@@ -117,11 +126,40 @@ export default async function ProductsPage({
     );
   }
 
-  const categoryOrder = await fetchCategoryOrderMap();
+  const categoryOrderFromDb = await fetchCategoryOrderMap();
   const localImageHrefBySkuLower = getLocalImageHrefBySkuLower();
   const products: Product[] = dedupeProductsById(
     (data ?? []).map((row: Record<string, unknown>) => mapProduct(row))
   );
+  const categoryOrder = mergeCategoryOrderMapForDisplay(products, categoryOrderFromDb);
+
+  if (debugCategoryOrder) {
+    const { data: coRows } = await supabaseServer.from("category_sort_order")
+      .select("category, position")
+      .order("position", { ascending: true });
+    const dbMapRaw: Record<string, number> = {};
+    for (const r of (coRows ?? []) as { category: string; position: number }[]) {
+      dbMapRaw[r.category] = Number(r.position);
+    }
+    const diag = diagnoseCategoryOrderPipeline(products, dbMapRaw);
+    const unsortedHead = products.slice(0, 25).map((p) => ({ sku: p.sku, category: p.category ?? "" }));
+    const sortedPreview = [...products].sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
+    const sortedHead = sortedPreview.slice(0, 40).map((p) => ({ sku: p.sku, category: p.category ?? "" }));
+    console.info("[debugCategoryOrder][server] 1) category_sort_order 원본 행", coRows);
+    console.info("[debugCategoryOrder][server] 2) mergePath & 카운트", diag.mergePath, {
+      dbMapRawKeyCount: diag.dbMapRawKeyCount,
+      dbNormKeyCount: diag.dbNormKeyCount,
+      labelCount: diag.labelCount,
+      labelsInDbCount: diag.labelsInDbCount,
+    });
+    console.info("[debugCategoryOrder][server] 3) appearance 맵", diag.appearance);
+    console.info("[debugCategoryOrder][server] 4) dbNorm 맵(일부)", diag.dbNorm);
+    console.info("[debugCategoryOrder][server] 5) merged 최종 맵", diag.merged);
+    console.info("[debugCategoryOrder][server] 6) 정렬 직전 상품 category 샘플", unsortedHead);
+    console.info("[debugCategoryOrder][server] 7) categoryOrder로 정렬 직후 category 순서(앞 40)", sortedHead);
+    console.info("[debugCategoryOrder][server] 8) sortedCategories 연속", diag.sortedCategories.slice(0, 60));
+  }
+
   products.sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
   const productIds = products.map((p) => p.id);
 
@@ -144,9 +182,7 @@ export default async function ProductsPage({
   }
 
   const categoriesRaw = Array.from(
-    new Set(
-      (data ?? []).map((r: { category?: string | null }) => r.category).filter((c): c is string => Boolean(c?.trim()))
-    )
+    new Set(products.map((p) => p.category).filter((c): c is string => Boolean(c)))
   );
   const categories = sortCategoryFilterLabels(categoriesRaw, categoryOrder);
 
@@ -289,6 +325,7 @@ export default async function ProductsPage({
       debugDisplayGroups={debugDisplayGroups}
       focusSku={focusSku}
       debugTargetSkus={debugTargetSkus}
+      debugCategoryOrder={debugCategoryOrder}
     />
   );
 }

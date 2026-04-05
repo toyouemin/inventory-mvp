@@ -10,6 +10,7 @@ import {
   variantCompositeKey,
 } from "./variantOptions";
 import { ensureCategorySortOrderRow, syncCategorySortOrderAfterCsv } from "./categorySortOrder.server";
+import { buildCategoryOrderMapFromCsvRows } from "./categorySortOrder.utils";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
 /** CSV 업로드 행별 재고 디버그: .env에 LOG_CSV_STOCK=1 */
@@ -476,7 +477,7 @@ export async function uploadProductsCsv(formData: FormData) {
   } else {
     await mergeProductsAndVariantsFromCsv(rows);
   }
-  await syncCategorySortOrderAfterCsv(rows, mode);
+  await syncCategorySortOrderAfterCsv(buildCategoryOrderMapFromCsvRows(rows), mode);
   revalidatePath("/products");
   revalidatePath("/status");
   if (LOG_MOVES) revalidatePath("/moves");

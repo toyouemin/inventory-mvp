@@ -10,6 +10,7 @@ import { useProductImageSrc } from "./useProductImageSrc";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
 import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } from "./actions";
+import { normalizeCategoryLabel } from "./categoryNormalize";
 import { compareProductsByCategoryOrder } from "./categorySortOrder.utils";
 import { EditProductModal } from "./EditProductModal";
 import { normalizeSkuForMatch, productNormSku } from "./skuNormalize";
@@ -370,6 +371,7 @@ export function ProductsClient({
   debugDisplayGroups = false,
   focusSku = "",
   debugTargetSkus = false,
+  debugCategoryOrder = false,
 }: {
   products: Product[];
   categories?: string[];
@@ -387,6 +389,8 @@ export function ProductsClient({
   focusSku?: string;
   /** `?debugTargetSkus=1` — 대상 SKU들의 skuDisplayGroups·variant 개수(서버 로그와 대조) */
   debugTargetSkus?: boolean;
+  /** `?debugCategoryOrder=1` — 카테고리 정렬·카드 순서 진단(콘솔) */
+  debugCategoryOrder?: boolean;
 }) {
   /** `?debugProductsClientLifecycle=1` — 렌더 횟수·마운트/언마운트·인스턴스 id */
   const lifecycleInstanceId = useRef(
@@ -749,17 +753,30 @@ export function ProductsClient({
     setLocalVariantsByProductId(variantsByProductId);
   }, [variantsByProductId]);
 
-  // categoryOrder(CSV 카테고리 등장 순) → SKU → created_at
+  /**
+   * 목록 순서: 서버가 넘긴 `categoryOrder`(= mergeCategoryOrderMapForDisplay 단일 결과)만 사용.
+   * 다른 sort·키는 넣지 않음. buildSkuDisplayGroups는 이 순서를 유지한 filtered에서 normSku 첫 등장 순.
+   */
   const orderedProducts = useMemo(() => {
     const sorted = [...localProducts].sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
     return dedupeProductsById(sorted);
   }, [localProducts, categoryOrder]);
 
+  useEffect(() => {
+    if (!debugCategoryOrder || typeof console === "undefined" || !console.info) return;
+    console.info("[debugCategoryOrder][client] categoryOrder 키 수", Object.keys(categoryOrder).length);
+    console.info(
+      "[debugCategoryOrder][client] orderedProducts 앞 40 (cat→sku)",
+      orderedProducts.slice(0, 40).map((p) => ({ cat: p.category ?? "", sku: p.sku }))
+    );
+  }, [debugCategoryOrder, categoryOrder, orderedProducts]);
+
   /** 카테고리만 적용한 목록 — 동일 SKU 그룹 variant 검색에 사용 */
   const orderedAfterCategory = useMemo(() => {
     let list = orderedProducts;
     if (categoryFilter) {
-      list = list.filter((p) => (p.category ?? "").trim() === categoryFilter);
+      const want = normalizeCategoryLabel(categoryFilter);
+      list = list.filter((p) => normalizeCategoryLabel(p.category) === want);
     }
     return list;
   }, [orderedProducts, categoryFilter]);
@@ -812,6 +829,14 @@ export function ProductsClient({
       }),
     [filtered, orderedAfterCategory, localVariantsByProductId, debugDisplayGroups]
   );
+
+  useEffect(() => {
+    if (!debugCategoryOrder || typeof console === "undefined" || !console.info) return;
+    console.info(
+      "[debugCategoryOrder][client] skuDisplayGroups 앞 40 (cat→normSku)",
+      skuDisplayGroups.slice(0, 40).map((g) => ({ cat: g.product.category ?? "", normSku: g.normSku }))
+    );
+  }, [debugCategoryOrder, skuDisplayGroups]);
 
   function skuDisplayGroupMatchesFocus(g: SkuDisplayGroup, focus: string): boolean {
     const f = focus.trim();

@@ -1,3 +1,4 @@
+import { normalizeCategoryLabel } from "./categoryNormalize";
 import { normalizeSkuForMatch } from "./skuNormalize";
 
 /**
@@ -258,7 +259,7 @@ export function runProductCsvPipeline(text: string): { rows: ParsedCsvRow[]; ski
       logDebugSkuRow(fileLine1, rawLine, cells, col, "after-normalize");
     }
 
-    const category = (cells[col.카테고리] ?? "").trim();
+    const category = normalizeCategoryLabel(cells[col.카테고리] ?? "");
     const imageUrl = (cells[col.이미지url] ?? "").trim();
     const color = (cells[col.color] ?? "").trim();
     const gender = (cells[col.gender] ?? "").trim();

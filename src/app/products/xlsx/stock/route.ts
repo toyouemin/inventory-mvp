@@ -1,7 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 import * as XLSX from "xlsx";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
-import { compareProductsByCategoryOrder } from "../../categorySortOrder.utils";
+import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,7 +63,7 @@ type VariantRow = {
 };
 
 export async function GET() {
-  const categoryOrder = await fetchCategoryOrderMap();
+  const categoryOrderFromDb = await fetchCategoryOrderMap();
 
   const { data: products, error: productsErr } = await supabaseServer
     .from("products")
@@ -77,6 +77,10 @@ export async function GET() {
   }
 
   const list = (products ?? []) as ProductRow[];
+  const categoryOrder = mergeCategoryOrderMapForDisplay(
+    list.map((p) => ({ category: p.category, createdAt: p.created_at, id: p.id })),
+    categoryOrderFromDb
+  );
   list.sort((a, b) =>
     compareProductsByCategoryOrder(
       { category: a.category, sku: a.sku, createdAt: a.created_at },

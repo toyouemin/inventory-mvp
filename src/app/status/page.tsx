@@ -1,13 +1,18 @@
 import { supabaseServer } from "@/lib/supabaseClient";
+import { normalizeCategoryLabel } from "@/app/products/categoryNormalize";
 import { fetchCategoryOrderMap } from "@/app/products/categorySortOrder.server";
-import { compareProductsByCategoryOrder, sortCategoryFilterLabels } from "@/app/products/categorySortOrder.utils";
+import {
+  compareProductsByCategoryOrder,
+  mergeCategoryOrderMapForDisplay,
+  sortCategoryFilterLabels,
+} from "@/app/products/categorySortOrder.utils";
 import { StatusClient } from "./StatusClient";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 export default async function StatusPage() {
-  const categoryOrder = await fetchCategoryOrderMap();
+  const categoryOrderFromDb = await fetchCategoryOrderMap();
 
   const { data, error } = await supabaseServer
     .from("products")
@@ -23,14 +28,24 @@ export default async function StatusPage() {
     );
   }
 
-  const products = (data ?? []) as Array<{
-    id: string;
-    sku: string;
-    category: string | null;
-    name: string | null;
-    stock: number | null;
-    created_at: string | null;
-  }>;
+  const products = (data ?? []).map((r) => {
+    const row = r as {
+      id: string;
+      sku: string;
+      category: string | null;
+      name: string | null;
+      stock: number | null;
+      created_at: string | null;
+    };
+    return {
+      ...row,
+      category: normalizeCategoryLabel(row.category) || null,
+    };
+  });
+  const categoryOrder = mergeCategoryOrderMapForDisplay(
+    products.map((p) => ({ category: p.category, createdAt: p.created_at, id: p.id })),
+    categoryOrderFromDb
+  );
   products.sort((a, b) =>
     compareProductsByCategoryOrder(
       { category: a.category, sku: a.sku, createdAt: a.created_at },
@@ -74,7 +89,7 @@ export default async function StatusPage() {
     };
   });
   const categoriesRaw = Array.from(
-    new Set(products.map((p) => p.category).filter((c): c is string => Boolean(c?.trim())))
+    new Set(products.map((p) => p.category).filter((c): c is string => Boolean(c)))
   );
   const categories = sortCategoryFilterLabels(categoriesRaw, categoryOrder);
 

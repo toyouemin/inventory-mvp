@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { updateProductMemo, updateVariantMemo } from "./actions";
 import { useProductImageSrc } from "./useProductImageSrc";
 import type { Product, ProductVariant } from "./types";
+import { normalizeSkuForMatch, variantMatchesNormSku } from "./skuNormalize";
 import { formatGenderSizeDisplay, sortVariantRows, variantCompositeKey } from "./variantOptions";
 
 function VariantOptionChips({ variant }: { variant: ProductVariant }) {
@@ -47,6 +48,12 @@ export type ProductCardProps = {
   onVariantStockDelta?: (productId: string, variantId: string, delta: number) => void | Promise<void>;
   productStockSaving?: boolean;
   savingVariantIdsKey?: string;
+  /** `?debugProductsDupes=1` — 렌더 시 id/sku 로그 */
+  debugProductsDupes?: boolean;
+  /** SKU 표시 그룹 정규화 키(병합 카드 기준 normSku) */
+  displayGroupNormSku?: string;
+  /** `?debugVariantSkuMix=1` — 카드에 붙은 각 variant의 product_id·sku·normSku 로그 */
+  debugVariantSkuMix?: boolean;
 };
 
 export const ProductCard = memo(function ProductCard({
@@ -59,7 +66,15 @@ export const ProductCard = memo(function ProductCard({
   onVariantStockDelta,
   productStockSaving = false,
   savingVariantIdsKey = "",
+  debugProductsDupes = false,
+  displayGroupNormSku = "",
+  debugVariantSkuMix = false,
 }: ProductCardProps) {
+  const debugInstanceId = useRef(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `rnd-${Math.random().toString(36).slice(2)}`
+  );
   const [imageOpen, setImageOpen] = useState(false);
   const [editingMemoVariantId, setEditingMemoVariantId] = useState<string | null>(null);
   const [editingProductMemo, setEditingProductMemo] = useState(false);
@@ -87,6 +102,25 @@ export const ProductCard = memo(function ProductCard({
     const copy = [...safeVariants];
     return copy.sort((a, b) => sortVariantRows(a, b));
   }, [safeVariants]);
+
+  useEffect(() => {
+    if (!debugVariantSkuMix || !displayGroupNormSku.trim()) return;
+    console.info("[productsPipeline][cardVariantSkuMix]", {
+      cardNormSku: displayGroupNormSku,
+      representativeProductId: product.id,
+      variants: sortedVariants.map((v) => {
+        const vn = normalizeSkuForMatch(v.sku);
+        return {
+          product_id: v.productId,
+          variant_id: v.id,
+          variant_sku: v.sku,
+          variantNormSku: vn || "(empty)",
+          cardNormSku: displayGroupNormSku,
+          matchesCardNormSku: variantMatchesNormSku(v, displayGroupNormSku),
+        };
+      }),
+    });
+  }, [debugVariantSkuMix, displayGroupNormSku, product.id, sortedVariants]);
 
   const variantOptionLabelsOverlap = useMemo(() => {
     if (sortedVariants.length <= 1) return false;
@@ -125,7 +159,7 @@ export const ProductCard = memo(function ProductCard({
       );
       return;
     }
-    void onVariantStockDelta?.(product.id, variant.id, delta);
+    void onVariantStockDelta?.(variant.productId, variant.id, delta);
   }
 
   function openMemoEditor(variant: ProductVariant) {
@@ -166,8 +200,20 @@ export const ProductCard = memo(function ProductCard({
 
   const displayName = (product?.name ?? "").trim() || product?.sku || "-";
 
+  if (debugProductsDupes) {
+    console.info("[productsPipeline][ProductCard render]", {
+      componentInstance: debugInstanceId.current,
+      productId: product.id,
+      sku: product.sku,
+    });
+  }
+
+  /**
+   * DOM에 `article.product-card`는 이 컴포넌트 호출당 정확히 1개.
+   * 옵션 행은 `sortedVariants.map` → `div.product-card__option-item`만 생성(카드 전체 반복 없음).
+   */
   return (
-    <article className="product-card">
+    <article className="product-card" data-product-id={product.id}>
       {!imgDead && imgSrc ? (
         <button
           type="button"

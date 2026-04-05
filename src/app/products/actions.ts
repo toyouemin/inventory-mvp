@@ -3,6 +3,7 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 import { revalidatePath } from "next/cache";
 import { runProductCsvPipeline, type ParsedCsvRow } from "./csvProductPipeline";
+import { dominantNormSkuFromVariantSkus, normalizeSkuForMatch } from "./skuNormalize";
 import {
   aggregateDuplicateVariantsByCompositeKey,
   PRODUCT_VARIANTS_ON_CONFLICT,
@@ -45,8 +46,19 @@ export async function createProduct(data: {
     memo2?: string | null;
   }[];
 }) {
-  const sku = (data.sku ?? "").trim();
+  const sku = normalizeSkuForMatch(data.sku ?? "");
   if (!sku) return;
+
+  const { data: dupP } = await supabaseServer.from("products").select("id").eq("sku", sku).limit(1).maybeSingle();
+  if (dupP?.id) {
+    throw new Error(
+      `동일 SKU(${sku})의 상품이 이미 있습니다. 목록에서 해당 상품을 수정하거나 CSV 병합 업로드를 사용하세요.`
+    );
+  }
+  const { data: dupV } = await supabaseServer.from("product_variants").select("id").eq("sku", sku).limit(1);
+  if (dupV && dupV.length > 0) {
+    throw new Error(`SKU ${sku}이(가) 이미 다른 상품의 옵션(variant)에 등록되어 있습니다.`);
+  }
 
   const hasVariants = Array.isArray(data.variants) && data.variants.length > 0;
 
@@ -95,6 +107,8 @@ export async function createProduct(data: {
     if (vErr) throw new Error(vErr.message);
   }
 
+  await syncProductsStockFromVariantSums([String(productId)]);
+
   revalidatePath("/products");
   revalidatePath("/status");
 }
@@ -131,7 +145,7 @@ export async function updateProduct(
   if (!productId) return;
 
   const updateData: Record<string, unknown> = {};
-  if (data.sku !== undefined) updateData.sku = data.sku.trim();
+  if (data.sku !== undefined) updateData.sku = normalizeSkuForMatch(data.sku);
   if (data.category !== undefined) updateData.category = data.category?.trim() || null;
   if (data.name !== undefined) updateData.name = data.name?.trim();
   if (data.imageUrl !== undefined) {
@@ -218,6 +232,8 @@ export async function updateProduct(
         .upsert(newRows, { onConflict: PRODUCT_VARIANTS_ON_CONFLICT });
       if (upErr) throw new Error(upErr.message);
     }
+
+    await syncProductsStockFromVariantSums([productId]);
   }
 
   revalidatePath("/products");
@@ -267,10 +283,26 @@ export async function uploadProductImage(formData: FormData): Promise<{ url: str
  * Stock: adjust + moves record
  * ----------------------------- */
 
-// 재고 조정 (delta만큼 stock 변경 + moves 기록)
+/**
+ * 상품 단위 재고 ±조정 (`products.stock`만 변경).
+ * **옵션(`product_variants`)이 하나라도 있으면 호출 불가** — 재고 원장은 variant 합계이며,
+ * 옵션 상품은 `adjustVariantStock`으로만 조정해야 `products.stock` 합계 캐시와 일치합니다.
+ */
 export async function adjustStock(productId: string, delta: number, note?: string | null) {
   if (!productId) return;
   if (!Number.isFinite(delta) || delta === 0) return;
+
+  const { count: variantCount, error: variantCountErr } = await supabaseServer
+    .from("product_variants")
+    .select("id", { count: "exact", head: true })
+    .eq("product_id", productId);
+
+  if (variantCountErr) throw new Error(variantCountErr.message);
+  if ((variantCount ?? 0) > 0) {
+    throw new Error(
+      "옵션이 있는 상품은 상품 단위 재고(±)를 사용할 수 없습니다. 옵션별 재고의 ±1을 사용해 주세요. (상품 재고는 옵션 합계와 자동으로 맞춰집니다.)"
+    );
+  }
 
   const { data: product, error: readErr } = await supabaseServer
     .from("products")
@@ -304,7 +336,7 @@ export async function adjustStock(productId: string, delta: number, note?: strin
   revalidatePath("/status");
 }
 
-// 입고/출고 기록 (필요하면 UI에서 이걸 쓰게 만들 수 있음)
+/** `adjustStock`과 동일 — 옵션 없는 상품만 가능 (`addMove` → `adjustStock`). */
 export async function addMove(productId: string, type: "in" | "out", qty: number, note?: string | null) {
   if (!productId) return;
   if (!Number.isFinite(qty) || qty <= 0) return;
@@ -326,7 +358,7 @@ export async function adjustVariantStock(
 
   const { data: row, error: readErr } = await supabaseServer
     .from("product_variants")
-    .select("stock")
+    .select("stock, product_id")
     .eq("id", variantId)
     .single();
 
@@ -344,11 +376,13 @@ export async function adjustVariantStock(
 
   if (upErr) throw new Error(upErr.message);
 
+  const productId = String((row as { product_id?: string }).product_id ?? "").trim();
+  if (productId) await syncProductsStockFromVariantSums([productId]);
+
   if (LOG_MOVES) {
-    const { data: v } = await supabaseServer.from("product_variants").select("product_id").eq("id", variantId).single();
-    if (v?.product_id) {
+    if (productId) {
       await supabaseServer.from("moves").insert({
-        product_id: v.product_id,
+        product_id: productId,
         type: "adjust",
         qty: Math.abs(actualDelta),
         note: note?.trim() || null,
@@ -459,6 +493,145 @@ function chunkArray<T>(arr: T[], chunkSize: number) {
   return out;
 }
 
+/** `products.sku`가 비었을 때: 해당 product의 variant sku 정규화 값 **다수결**로 묶기 키(클라이언트 productNormSku와 동일 규칙). */
+async function modeNormVariantSkuByProductId(productIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const unique = [...new Set(productIds.filter(Boolean))];
+  if (unique.length === 0) return out;
+  for (const chunk of chunkArray(unique, 500)) {
+    const { data: rows, error } = await supabaseServer
+      .from("product_variants")
+      .select("id, product_id, sku")
+      .in("product_id", chunk)
+      .order("id", { ascending: true });
+    if (error) throw new Error(error.message);
+    const byPid = new Map<string, { sku: string }[]>();
+    for (const r of rows ?? []) {
+      const pid = String((r as { product_id: string }).product_id);
+      const arr = byPid.get(pid) ?? [];
+      arr.push({ sku: String((r as { sku: string | null }).sku ?? "") });
+      byPid.set(pid, arr);
+    }
+    for (const pid of chunk) {
+      const list = byPid.get(pid) ?? [];
+      const { normSku } = dominantNormSkuFromVariantSkus(list);
+      if (normSku) out.set(pid, normSku);
+    }
+  }
+  return out;
+}
+
+/** products.sku 또는 variant 첫 SKU로 본 정규화 키(빈 문자열이면 그룹 없음) */
+function normSkuKeyForProductRow(
+  p: { id: string; sku: string },
+  variantKeyByPid: Map<string, string>
+): string {
+  return normalizeSkuForMatch(p.sku) || variantKeyByPid.get(String(p.id)) || "";
+}
+
+/**
+ * 동일 normSku의 products 행이 2건 이상 남지 않을 때까지 consolidate를 반복 호출.
+ */
+async function ensureSingleProductPerNormSku(maxPasses = 6): Promise<void> {
+  for (let pass = 0; pass < maxPasses; pass++) {
+    const { data: products, error } = await supabaseServer
+      .from("products")
+      .select("id, sku")
+      .order("id", { ascending: true });
+    if (error) throw new Error(error.message);
+    const list = (products ?? []) as { id: string; sku: string }[];
+    const variantKeyByPid = await modeNormVariantSkuByProductId(list.map((p) => String(p.id)));
+    const byNorm = new Map<string, string[]>();
+    for (const p of list) {
+      const k = normSkuKeyForProductRow(p, variantKeyByPid);
+      if (!k) continue;
+      const arr = byNorm.get(k) ?? [];
+      arr.push(String(p.id));
+      byNorm.set(k, arr);
+    }
+    let multi = 0;
+    for (const [, ids] of byNorm) {
+      if (ids.length > 1) multi++;
+    }
+    if (multi === 0) return;
+    await consolidateDuplicateProductsByNormalizedSku();
+  }
+  console.warn("[CSV] ensureSingleProductPerNormSku: 최대 반복 후에도 중복 normSku 그룹이 남을 수 있습니다.");
+}
+
+/**
+ * normSku당 최대 1개의 product id만 맵에 넣는다. 충돌이면 consolidate 후 재시도.
+ */
+async function buildSkuToProductIdMapRetry(maxRetries = 5): Promise<Map<string, string>> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { data: existingRaw, error: exErr } = await supabaseServer
+      .from("products")
+      .select("id, sku")
+      .order("id", { ascending: true });
+    if (exErr) throw new Error(exErr.message);
+    const sortedExisting = [...(existingRaw ?? [])] as { id: string; sku: string }[];
+    sortedExisting.sort((a, b) => a.id.localeCompare(b.id));
+    const variantKeyByPid = await modeNormVariantSkuByProductId(sortedExisting.map((p) => p.id));
+    const map = new Map<string, string>();
+    let conflict = false;
+    for (const p of sortedExisting) {
+      const id = String(p.id);
+      const s = normSkuKeyForProductRow(p, variantKeyByPid);
+      if (!s) continue;
+      const prev = map.get(s);
+      if (prev != null && prev !== id) {
+        conflict = true;
+        break;
+      }
+      if (!map.has(s)) map.set(s, id);
+    }
+    if (!conflict) return map;
+    await consolidateDuplicateProductsByNormalizedSku();
+  }
+  throw new Error("동일 정규화 SKU를 가진 중복 products 행을 통합하지 못했습니다. Supabase products·product_variants를 확인해 주세요.");
+}
+
+/**
+ * CSV merge/신규 삽입 전: DB에 이미 같은 normSku를 가진 product가 있으면 그 id 반환.
+ * products.sku 일치 → variant.sku 일치(해당 product의 유효 normSku와 일치할 때만).
+ */
+async function findExistingProductIdForNormSku(normSku: string, depth = 0): Promise<string | null> {
+  if (!normSku || depth > 6) return null;
+  const { data: direct, error: dErr } = await supabaseServer
+    .from("products")
+    .select("id")
+    .eq("sku", normSku)
+    .order("id", { ascending: true })
+    .limit(2);
+  if (dErr) throw new Error(dErr.message);
+  if (direct?.[0]?.id) {
+    if (direct.length > 1) {
+      await consolidateDuplicateProductsByNormalizedSku();
+      return findExistingProductIdForNormSku(normSku, depth + 1);
+    }
+    return String(direct[0].id);
+  }
+
+  const { data: vrows, error: vErr } = await supabaseServer
+    .from("product_variants")
+    .select("product_id")
+    .eq("sku", normSku);
+  if (vErr) throw new Error(vErr.message);
+  const cand = [...new Set((vrows ?? []).map((r) => String((r as { product_id: string }).product_id)))].sort(
+    (a, b) => a.localeCompare(b)
+  );
+  if (cand.length === 0) return null;
+  const vmap = await modeNormVariantSkuByProductId(cand);
+  for (const pid of cand) {
+    const { data: prow, error: pErr } = await supabaseServer.from("products").select("sku").eq("id", pid).maybeSingle();
+    if (pErr) throw new Error(pErr.message);
+    const pk =
+      normalizeSkuForMatch(String((prow as { sku?: string } | null)?.sku ?? "")) || vmap.get(pid) || "";
+    if (pk === normSku) return pid;
+  }
+  return null;
+}
+
 async function deleteByIdChunks(table: string, ids: string[], chunkSize = 500): Promise<void> {
   if (ids.length === 0) return;
   for (const chunk of chunkArray(ids, chunkSize)) {
@@ -467,16 +640,174 @@ async function deleteByIdChunks(table: string, ids: string[], chunkSize = 500): 
   }
 }
 
+/** product_variants.stock 합계를 products.stock에 반영(총재고 캐시). */
+async function syncProductsStockFromVariantSums(productIds: string[]): Promise<void> {
+  const unique = [...new Set(productIds.filter(Boolean))];
+  if (unique.length === 0) return;
+
+  for (const idChunk of chunkArray(unique, 200)) {
+    const { data: rows, error } = await supabaseServer
+      .from("product_variants")
+      .select("product_id, stock")
+      .in("product_id", idChunk);
+    if (error) throw new Error(error.message);
+
+    const sumByProduct = new Map<string, number>();
+    for (const id of idChunk) sumByProduct.set(id, 0);
+    for (const r of rows ?? []) {
+      const pid = String((r as { product_id: string }).product_id);
+      const n = Number((r as { stock: unknown }).stock);
+      const add = Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
+      sumByProduct.set(pid, (sumByProduct.get(pid) ?? 0) + add);
+    }
+
+    for (const [productId, total] of sumByProduct) {
+      const { error: upErr } = await supabaseServer.from("products").update({ stock: total }).eq("id", productId);
+      if (upErr) throw new Error(upErr.message);
+    }
+  }
+}
+
+/**
+ * 동일 정규화 SKU의 products 행이 여러 개면 variant를 한 product로 모으고 나머지 상품 행 삭제.
+ * (sku,color,gender,size) 유니크 충돌 시 재고 합산·메모 채워진 쪽 우선으로 1행만 남김.
+ */
+async function consolidateDuplicateProductsByNormalizedSku(): Promise<void> {
+  const { data: products, error } = await supabaseServer
+    .from("products")
+    .select("id, sku")
+    .order("id", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const list = (products ?? []) as { id: string; sku: string }[];
+  const variantKeyByPid = await modeNormVariantSkuByProductId(list.map((p) => String(p.id)));
+  const groups = new Map<string, { id: string; sku: string }[]>();
+  for (const p of list) {
+    const k = normSkuKeyForProductRow(p, variantKeyByPid);
+    if (!k) continue;
+    const g = groups.get(k) ?? [];
+    g.push({ id: String(p.id), sku: p.sku ?? "" });
+    groups.set(k, g);
+  }
+
+  const keepIdsForSync = new Set<string>();
+
+  for (const [normSku, arr] of groups) {
+    if (arr.length < 2) continue;
+
+    arr.sort((a, b) => a.id.localeCompare(b.id));
+    const keepId = arr[0]!.id;
+    const dropIds = arr.slice(1).map((x) => x.id);
+    const canonicalSku = normSku;
+    const allPids = [keepId, ...dropIds];
+
+    const { data: vars, error: vErr } = await supabaseServer
+      .from("product_variants")
+      .select(
+        "id, product_id, sku, color, gender, size, stock, memo, memo2, wholesale_price, msrp_price, sale_price, extra_price"
+      )
+      .in("product_id", allPids);
+    if (vErr) throw new Error(vErr.message);
+
+    type VRow = {
+      id: string;
+      product_id: string;
+      sku: string;
+      color: string | null;
+      gender: string | null;
+      size: string | null;
+      stock: number | null;
+      memo: string | null;
+      memo2: string | null;
+      wholesale_price: number | null;
+      msrp_price: number | null;
+      sale_price: number | null;
+      extra_price: number | null;
+    };
+
+    const byUk = new Map<string, VRow[]>();
+    for (const v of vars ?? []) {
+      const vr = v as VRow;
+      const uk = `${normalizeSkuForMatch(vr.sku)}\0${variantCompositeKey(vr.color, vr.gender, vr.size)}`;
+      const bucket = byUk.get(uk) ?? [];
+      bucket.push(vr);
+      byUk.set(uk, bucket);
+    }
+
+    const variantIdsToDelete: string[] = [];
+
+    for (const [, bucket] of byUk) {
+      if (bucket.length === 0) continue;
+      const sorted = [...bucket].sort((a, b) => {
+        const ak = a.product_id === keepId ? 0 : 1;
+        const bk = b.product_id === keepId ? 0 : 1;
+        if (ak !== bk) return ak - bk;
+        return String(a.id).localeCompare(String(b.id));
+      });
+      const primary = sorted[0]!;
+      let totalStock = 0;
+      for (const row of sorted) {
+        const n = Number(row.stock);
+        totalStock += Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
+      }
+      const pickMemo = (a: string | null, b: string | null) => {
+        const ta = (a ?? "").trim();
+        const tb = (b ?? "").trim();
+        if (ta && tb) return ta.length >= tb.length ? ta : tb;
+        return ta || tb || null;
+      };
+      let m1: string | null = primary.memo;
+      let m2: string | null = primary.memo2;
+      for (const row of sorted.slice(1)) {
+        m1 = pickMemo(m1, row.memo);
+        m2 = pickMemo(m2, row.memo2);
+      }
+      for (const row of sorted.slice(1)) {
+        variantIdsToDelete.push(String(row.id));
+      }
+      const { error: upErr } = await supabaseServer
+        .from("product_variants")
+        .update({
+          product_id: keepId,
+          sku: canonicalSku,
+          stock: totalStock,
+          memo: m1,
+          memo2: m2,
+        })
+        .eq("id", primary.id);
+      if (upErr) throw new Error(upErr.message);
+    }
+
+    if (variantIdsToDelete.length > 0) {
+      for (const chunk of chunkArray(variantIdsToDelete, 200)) {
+        const { error: delErr } = await supabaseServer.from("product_variants").delete().in("id", chunk);
+        if (delErr) throw new Error(delErr.message);
+      }
+    }
+
+    const { error: pUpErr } = await supabaseServer.from("products").update({ sku: canonicalSku }).eq("id", keepId);
+    if (pUpErr) throw new Error(pUpErr.message);
+
+    for (const did of dropIds) {
+      const { error: dErr } = await supabaseServer.from("products").delete().eq("id", did);
+      if (dErr) throw new Error(dErr.message);
+    }
+
+    keepIdsForSync.add(keepId);
+    console.warn(
+      `[merge] 중복 products 통합(SKU 정규화 동일): norm=${normSku} 유지=${keepId}, 삭제 product=${dropIds.join(",")}`
+    );
+  }
+
+  if (keepIdsForSync.size > 0) {
+    await syncProductsStockFromVariantSums([...keepIdsForSync]);
+  }
+}
+
 /** CSV merge: SKU별 상품 upsert/update, variant는 (sku,color,gender,size)로 upsert. CSV에 없는 variant는 삭제하지 않음. */
 async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<void> {
-  const { data: existingRaw, error: exErr } = await supabaseServer.from("products").select("id, sku");
-  if (exErr) throw new Error(exErr.message);
-
-  const skuToProductId = new Map<string, string>();
-  for (const p of existingRaw ?? []) {
-    const s = String((p as { sku: string }).sku ?? "").trim();
-    if (s) skuToProductId.set(s, String((p as { id: string }).id));
-  }
+  await ensureSingleProductPerNormSku();
+  let skuToProductId = await buildSkuToProductIdMapRetry();
 
   const skuOrder: string[] = [];
   const bySku = new Map<string, ParsedCsvRow[]>();
@@ -489,16 +820,18 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
   }
 
   const allVariantRows: Record<string, unknown>[] = [];
+  const productIdsTouched = new Set<string>();
 
   for (const sku of skuOrder) {
+    const normSku = normalizeSkuForMatch(sku);
     const group = bySku.get(sku)!;
     const row0 = group[0];
 
     const payloadBase = {
-      sku,
+      sku: normSku,
       category: row0.category || null,
       name: row0.name,
-      image_url: resolveProductImageUrl(sku, row0.imageUrl || null),
+      image_url: resolveProductImageUrl(normSku, row0.imageUrl || null),
       wholesale_price: null as number | null,
       msrp_price: null as number | null,
       sale_price: null as number | null,
@@ -508,7 +841,11 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
       memo2: null as string | null,
     };
 
-    let productId = skuToProductId.get(sku);
+    let productId = skuToProductId.get(normSku) ?? null;
+    if (!productId) {
+      productId = await findExistingProductIdForNormSku(normSku);
+      if (productId) skuToProductId.set(normSku, productId);
+    }
     if (!productId) {
       const { data: inserted, error: insErr } = await supabaseServer
         .from("products")
@@ -517,18 +854,21 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
         .single();
       if (insErr) throw new Error(insErr.message);
       productId = inserted.id as string;
-      skuToProductId.set(sku, productId);
+      skuToProductId.set(normSku, productId);
     } else {
       const { error: upErr } = await supabaseServer
         .from("products")
         .update({
+          sku: normSku,
           category: row0.category || null,
           name: row0.name,
-          image_url: resolveProductImageUrl(sku, row0.imageUrl || null),
+          image_url: resolveProductImageUrl(normSku, row0.imageUrl || null),
         })
         .eq("id", productId);
       if (upErr) throw new Error(upErr.message);
     }
+
+    productIdsTouched.add(productId);
 
     const dedupedGroup = aggregateDuplicateVariantsByCompositeKey(
       group.map((r) => ({
@@ -548,7 +888,7 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
     for (const v of dedupedGroup) {
       allVariantRows.push({
         product_id: productId,
-        sku,
+        sku: normSku,
         color: String(v.color ?? "").trim(),
         gender: String(v.gender ?? "").trim(),
         size: String(v.size ?? "").trim(),
@@ -592,6 +932,9 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
       .upsert(chunk as any, { onConflict: PRODUCT_VARIANTS_ON_CONFLICT });
     if (vUpsertErr) throw new Error(vUpsertErr.message);
   }
+
+  await syncProductsStockFromVariantSums([...productIdsTouched]);
+  await ensureSingleProductPerNormSku();
 }
 
 async function restoreProductsAndVariantsSnapshot(snapshot: {
@@ -658,15 +1001,18 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
       bySku.get(r.sku)!.push(r);
     }
 
+    const resetProductIds: string[] = [];
+
     for (const sku of skuOrder) {
+      const normSku = normalizeSkuForMatch(sku);
       const group = bySku.get(sku)!;
       const row0 = group[0];
 
       const payloadBase = {
-        sku,
+        sku: normSku,
         category: row0.category || null,
         name: row0.name,
-        image_url: resolveProductImageUrl(sku, row0.imageUrl || null),
+        image_url: resolveProductImageUrl(normSku, row0.imageUrl || null),
         wholesale_price: null as number | null,
         msrp_price: null as number | null,
         sale_price: null as number | null,
@@ -683,6 +1029,7 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
         .single();
       if (insErr) throw new Error(insErr.message);
       const productId = inserted.id as string;
+      resetProductIds.push(productId);
 
       const dedupedGroup = aggregateDuplicateVariantsByCompositeKey(
         group.map((r) => ({
@@ -701,7 +1048,7 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
 
       const variantsToInsert = dedupedGroup.map((v) => ({
         product_id: productId,
-        sku,
+        sku: normSku,
         color: String(v.color ?? "").trim(),
         gender: String(v.gender ?? "").trim(),
         size: String(v.size ?? "").trim(),
@@ -743,6 +1090,9 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
         }
       }
     }
+
+    await syncProductsStockFromVariantSums(resetProductIds);
+    await ensureSingleProductPerNormSku();
   } catch (err) {
     await restoreProductsAndVariantsSnapshot(snapshot);
     throw err;

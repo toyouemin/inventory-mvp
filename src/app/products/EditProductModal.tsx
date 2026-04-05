@@ -187,10 +187,15 @@ export function EditProductModal({
   if (!open || !product) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>상품 수정</h3>
-        <form onSubmit={handleSave} className="modal-form">
+    <div className="modal-overlay add-product-modal-overlay" onClick={onClose}>
+      <div className="modal add-product-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header-add-product">
+          <h3>상품 수정</h3>
+          <button type="button" className="modal-header-cancel" onClick={onClose}>
+            취소
+          </button>
+        </div>
+        <form onSubmit={handleSave} className="modal-form add-product-modal-form">
           {product.updatedAt && (
             <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
               마지막 수정: {new Date(product.updatedAt).toLocaleString("ko-KR")}
@@ -272,9 +277,6 @@ export function EditProductModal({
           <div className="modal-actions">
             <button type="submit" disabled={pending}>
               저장
-            </button>
-            <button type="button" onClick={onClose}>
-              취소
             </button>
           </div>
         </form>

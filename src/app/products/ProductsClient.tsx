@@ -12,6 +12,9 @@ import { AddProductModal } from "./AddProductModal";
 import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } from "./actions";
 import { compareProductsByCategoryOrder } from "./categorySortOrder.utils";
 import { EditProductModal } from "./EditProductModal";
+import { normalizeSkuForMatch, productNormSku } from "./skuNormalize";
+import { buildSkuDisplayGroups, type SkuDisplayGroup } from "./skuDisplayMerge";
+import { VARIANT_AUDIT_TARGET_SKUS } from "./variantAuditTargets";
 
 type ViewMode = "card" | "list";
 
@@ -20,6 +23,176 @@ type DownloadMenuDirection = "up" | "down";
 type CsvUploadMode = "merge" | "reset";
 
 const CSV_UPLOAD_HIGHLIGHT_MS = 6000;
+
+/** 동일 `product.id`가 배열에 중복이면 카드·개수가 2배로 보이므로 첫 항목만 유지 */
+function dedupeProductsById(products: Product[]): Product[] {
+  const seen = new Set<string>();
+  const out: Product[] = [];
+  for (const p of products) {
+    const id = String(p.id ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(p);
+  }
+  return out;
+}
+
+const DEBUG_FOCUS_SKU = "T25KT1033BL";
+
+function logProductsPipelineStage(label: string, list: Product[]) {
+  const ids = list.map((p) => p.id);
+  const skus = list.map((p) => p.sku);
+  const focus = list.filter((p) => p.sku === DEBUG_FOCUS_SKU);
+  const focusIds = focus.map((p) => p.id);
+  const focusIdSet = new Set(focusIds);
+  console.info(`[productsPipeline][client] ${label}`, {
+    length: list.length,
+    ids,
+    skus,
+    uniqueIdCount: new Set(ids).size,
+    focusSku: DEBUG_FOCUS_SKU,
+    focusCount: focus.length,
+    focusIds,
+    focusUniqueIdCount: focusIdSet.size,
+    focusSameIdRows:
+      focus.length > 1 && focusIdSet.size === 1 ? "동일 id로 여러 행(이론상 불가)" : "no",
+    focusSameSkuDifferentIds:
+      focus.length > 1 && focusIdSet.size > 1 ? "sku 동일·id 서로 다름" : "no",
+  });
+}
+
+/** `filtered` 기준: 동일 product.id 인덱스·포커스 SKU object reference */
+function logFilteredSkuFocusDetail(list: Product[], label: string) {
+  const ids = list.map((p) => p.id);
+  const skus = list.map((p) => p.sku);
+  const idToIndices = new Map<string, number[]>();
+  ids.forEach((id, i) => {
+    const arr = idToIndices.get(id) ?? [];
+    arr.push(i);
+    idToIndices.set(id, arr);
+  });
+  const duplicateIdIndexGroups = [...idToIndices.entries()].filter(([, ix]) => ix.length > 1);
+
+  const focusIndices: number[] = [];
+  list.forEach((p, i) => {
+    if (p.sku === DEBUG_FOCUS_SKU) focusIndices.push(i);
+  });
+  const focusRows = focusIndices.map((i) => ({
+    index: i,
+    id: list[i].id,
+    objectRef: list[i],
+  }));
+  const focusRefs = focusIndices.map((i) => list[i]);
+  const distinctFocusRefs = new Set(focusRefs);
+
+  console.info(`[productsPipeline][filtered 확정] ${label}`, {
+    length: list.length,
+    ids,
+    skus,
+    uniqueIdCount: new Set(ids).size,
+    [`${DEBUG_FOCUS_SKU}_count`]: focusIndices.length,
+    duplicateProductIdIndexGroups:
+      duplicateIdIndexGroups.length > 0
+        ? duplicateIdIndexGroups.map(([id, ix]) => ({ id, indices: ix }))
+        : "없음 — filtered에 동일 id가 두 슬롯에 없음",
+    focusSkuRows: focusRows,
+    focusDistinctObjectRefCount: distinctFocusRefs.size,
+    focusRefInterpretation:
+      focusIndices.length <= 1
+        ? "n/a"
+        : distinctFocusRefs.size === 1
+          ? "같은 id·같은 객체 reference가 배열에 여러 인덱스(비정상)"
+          : "서로 다른 객체 reference(동일 sku·다른 id 가능 또는 복제된 객체)",
+  });
+}
+
+/** Record 키는 유일. 버킷 내부 variant.id 중복 push 여부 */
+function logVariantsMapIntegrity(
+  map: Record<string, ProductVariant[]>,
+  label: string,
+  filteredList: Product[]
+) {
+  const keys = Object.keys(map);
+  const bucketsWithDupVariantId: { productId: string; duplicateVariantIds: string[] }[] = [];
+  for (const [pid, arr] of Object.entries(map)) {
+    const seen = new Set<string>();
+    const dup = new Set<string>();
+    for (const v of arr) {
+      if (seen.has(v.id)) dup.add(v.id);
+      seen.add(v.id);
+    }
+    if (dup.size > 0) bucketsWithDupVariantId.push({ productId: pid, duplicateVariantIds: [...dup] });
+  }
+
+  const focusProductIds = [
+    ...new Set(filteredList.filter((p) => p.sku === DEBUG_FOCUS_SKU).map((p) => p.id)),
+  ];
+  const focusBuckets = focusProductIds.map((pid) => ({
+    productId: pid,
+    variantCount: (map[pid] ?? []).length,
+    variantIds: (map[pid] ?? []).map((v) => v.id),
+  }));
+
+  console.info(`[productsPipeline][localVariantsByProductId] ${label}`, {
+    recordKeyCount: keys.length,
+    duplicateKeysInRecord: "불가(객체 키는 유일)",
+    bucketsWithDuplicateVariantIds:
+      bucketsWithDupVariantId.length > 0 ? bucketsWithDupVariantId : "없음",
+    focusSkuProductIds: focusProductIds,
+    focusSkuVariantBuckets: focusBuckets,
+  });
+}
+
+function 남100ishVariant(v: ProductVariant): boolean {
+  const g = (v.gender ?? "").trim();
+  const s = (v.size ?? "").trim();
+  const male = g.includes("남") || /^m$/i.test(g) || g === "남성";
+  return male && s === "100";
+}
+
+/** 포커스 SKU 카드마다 product.id·연결 variant(남100 표시 포함) — 버킷 분리 확정용 */
+function logFocusSkuCardsPerCard(
+  cards: Product[],
+  map: Record<string, ProductVariant[]>,
+  mapLabel: string
+) {
+  const focus = cards.filter((p) => p.sku === DEBUG_FOCUS_SKU);
+  const ids = focus.map((c) => c.id);
+  console.info(`[productsPipeline][클라이언트 카드별 ${DEBUG_FOCUS_SKU}] ${mapLabel}`, {
+    focusCardCount: focus.length,
+    distinctProductIds: new Set(ids).size,
+    확정:
+      focus.length <= 1
+        ? "카드 1장 이하"
+        : new Set(ids).size === 1
+          ? "동일 product.id로 카드 여러 장(비정상)"
+          : "서로 다른 product.id + 동일 sku → DB에 동일 SKU 상품이 복수 행",
+    cards: focus.map((p, idx) => {
+      const vars = map[p.id] ?? [];
+      const wrongBucket = vars.filter((v) => v.productId !== p.id);
+      return {
+        cardIndex: idx,
+        productId: p.id,
+        sku: p.sku,
+        name: p.name,
+        variantCount: vars.length,
+        variantIds: vars.map((v) => v.id),
+        variantsWrongProductId: wrongBucket.length > 0 ? wrongBucket.map((v) => v.id) : "없음",
+        variants: vars.map((v) => ({
+          variantId: v.id,
+          productId: v.productId,
+          variantSku: v.sku,
+          color: v.color,
+          gender: v.gender,
+          size: v.size,
+          stock: v.stock,
+          displaySize: formatGenderSizeDisplay(v.gender, v.size),
+          남100: 남100ishVariant(v),
+        })),
+      };
+    }),
+  });
+}
 
 function measureFixedMenuPosition(
   menu: HTMLDivElement | null,
@@ -173,6 +346,11 @@ export function ProductsClient({
   categoryOrder = {},
   localImageHrefBySkuLower,
   variantsByProductId = {},
+  debugProductsDupes = false,
+  debugVariantSkuMix = false,
+  debugDisplayGroups = false,
+  focusSku = "",
+  debugTargetSkus = false,
 }: {
   products: Product[];
   categories?: string[];
@@ -180,7 +358,26 @@ export function ProductsClient({
   /** public/images 스캔 결과(항상 전달; 빈 객체면 로컬 SKU .jpg 추측 URL 비활성화) */
   localImageHrefBySkuLower: Record<string, string>;
   variantsByProductId?: Record<string, ProductVariant[]>;
+  /** `?debugProductsDupes=1` — 파이프라인·카드 렌더 단계 로그 */
+  debugProductsDupes?: boolean;
+  /** `?debugVariantSkuMix=1` — 카드별 variant의 product_id·variant_sku·normSku 로그 */
+  debugVariantSkuMix?: boolean;
+  /** `?debugDisplayGroups=1` — 카드 그룹 trace·빈 product sku → normSku 로그 */
+  debugDisplayGroups?: boolean;
+  /** `?focusSku=T25KT1033BL` — 위 디버그 시 해당 문자열/정규화 SKU와 맞는 카드끼리 cardNormSku 비교 */
+  focusSku?: string;
+  /** `?debugTargetSkus=1` — 대상 SKU들의 skuDisplayGroups·variant 개수(서버 로그와 대조) */
+  debugTargetSkus?: boolean;
 }) {
+  /** `?debugProductsClientLifecycle=1` — 렌더 횟수·마운트/언마운트·인스턴스 id */
+  const lifecycleInstanceId = useRef(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `pc-${Math.random().toString(36).slice(2)}`
+  );
+  const lifecycleRenderCount = useRef(0);
+  lifecycleRenderCount.current += 1;
+
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
@@ -194,7 +391,14 @@ export function ProductsClient({
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingVariants, setEditingVariants] = useState<ProductVariant[]>([]);
-  const [localProducts, setLocalProducts] = useState<Product[]>(products);
+  /**
+   * 서버 `products`로만 목록을 맞춤 — prev에 append/merge/concat 금지.
+   * props가 바뀔 때마다 `setLocalProducts(한 번에 통째로)`만 사용(Strict Mode 이중 실행에도 누적 없음).
+   * 인자는 `dedupeProductsById(products)` — prev와 병합이 아니라 교체 직전 id당 1행 정규화.
+   */
+  const [localProducts, setLocalProducts] = useState<Product[]>(() =>
+    dedupeProductsById(products)
+  );
   const [localVariantsByProductId, setLocalVariantsByProductId] =
     useState<Record<string, ProductVariant[]>>(variantsByProductId);
 
@@ -223,11 +427,33 @@ export function ProductsClient({
   const [uploadMenuStyle, setUploadMenuStyle] = useState<CSSProperties>({});
   const [adjustingStockKeys, setAdjustingStockKeys] = useState(() => new Set<string>());
 
+  const debugClientLifecycle =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debugProductsClientLifecycle") === "1";
+
+  if (debugClientLifecycle) {
+    console.log("[ProductsClient] render", {
+      count: lifecycleRenderCount.current,
+      instanceId: lifecycleInstanceId.current,
+      productsLength: products.length,
+      variantsByProductIdKeys: Object.keys(variantsByProductId).length,
+    });
+  }
+
   useEffect(() => {
     return () => {
       if (csvUploadHighlightTimerRef.current) clearTimeout(csvUploadHighlightTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!debugClientLifecycle) return;
+    const id = lifecycleInstanceId.current;
+    console.log("[ProductsClient] mount (useEffect)", { instanceId: id });
+    return () => {
+      console.log("[ProductsClient] unmount (useEffect)", { instanceId: id });
+    };
+  }, [debugClientLifecycle]);
 
   function showUploadHighlight(kind: "success" | "error") {
     if (csvUploadHighlightTimerRef.current) clearTimeout(csvUploadHighlightTimerRef.current);
@@ -374,7 +600,8 @@ export function ProductsClient({
 
   const onListRowStockDelta = useCallback(
     async (row: ProductRow, delta: number) => {
-      if (row.variantId) await onVariantStockDelta(row.id, row.variantId, delta);
+      const owner = row.variantOwnerProductId ?? row.id;
+      if (row.variantId) await onVariantStockDelta(owner, row.variantId, delta);
       else await onProductStockDelta(row.id, delta);
     },
     [onProductStockDelta, onVariantStockDelta]
@@ -490,7 +717,7 @@ export function ProductsClient({
   }, [uploadOpen, updateUploadMenuPosition]);
 
   useEffect(() => {
-    setLocalProducts(products);
+    setLocalProducts(dedupeProductsById(products));
   }, [products]);
   useEffect(() => {
     setLocalVariantsByProductId(variantsByProductId);
@@ -533,42 +760,185 @@ export function ProductsClient({
 
   // categoryOrder(CSV 카테고리 등장 순) → SKU → created_at
   const orderedProducts = useMemo(() => {
-    return [...localProducts].sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
+    const sorted = [...localProducts].sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
+    return dedupeProductsById(sorted);
   }, [localProducts, categoryOrder]);
 
-  // 검색 + 카테고리: orderedProducts 기준 필터링(순서 유지)
-  const filtered = useMemo(() => {
+  /** 카테고리만 적용한 목록 — 동일 SKU 그룹 variant 검색에 사용 */
+  const orderedAfterCategory = useMemo(() => {
     let list = orderedProducts;
     if (categoryFilter) {
       list = list.filter((p) => (p.category ?? "").trim() === categoryFilter);
     }
+    return list;
+  }, [orderedProducts, categoryFilter]);
+
+  const productsByNormSku = useMemo(() => {
+    const m = new Map<string, Product[]>();
+    for (const p of orderedAfterCategory) {
+      const k = productNormSku(p, localVariantsByProductId);
+      if (!k) continue;
+      const arr = m.get(k) ?? [];
+      arr.push(p);
+      m.set(k, arr);
+    }
+    return m;
+  }, [orderedAfterCategory, localVariantsByProductId]);
+
+  // 검색 + 카테고리: orderedProducts 기준 필터링(순서 유지). variant 메모는 같은 SKU 전체 product의 옵션을 합쳐 검색
+  const filtered = useMemo(() => {
+    const list = orderedAfterCategory;
     if (!search.trim()) return list;
     const q = search.trim().toLowerCase();
     const textHas = (s: string | null | undefined) => (s ?? "").toLowerCase().includes(q);
+    const skuMatches = (p: Product) => {
+      if ((p.sku ?? "").toLowerCase().includes(q)) return true;
+      const normKey = productNormSku(p, localVariantsByProductId);
+      if (normKey && normKey.toLowerCase().includes(q)) return true;
+      for (const v of localVariantsByProductId[p.id] ?? []) {
+        if ((v.sku ?? "").toLowerCase().includes(q)) return true;
+        const nv = normalizeSkuForMatch(v.sku);
+        if (nv && nv.toLowerCase().includes(q)) return true;
+      }
+      return false;
+    };
     return list.filter((p) => {
-      if (
-        p.sku.toLowerCase().includes(q) ||
-        textHas(p.name) ||
-        textHas(p.category) ||
-        textHas(p.memo) ||
-        textHas(p.memo2)
-      ) {
+      if (skuMatches(p) || textHas(p.name) || textHas(p.category) || textHas(p.memo) || textHas(p.memo2)) {
         return true;
       }
-      const vars = localVariantsByProductId[p.id] ?? [];
-      return vars.some((v) => textHas(v.memo) || textHas(v.memo2));
+      const nk = productNormSku(p, localVariantsByProductId);
+      const group = productsByNormSku.get(nk) ?? [p];
+      const allVars = group.flatMap((gp) => localVariantsByProductId[gp.id] ?? []);
+      return allVars.some((v) => textHas(v.memo) || textHas(v.memo2));
     });
-  }, [orderedProducts, search, categoryFilter, localVariantsByProductId]);
+  }, [orderedAfterCategory, search, productsByNormSku, localVariantsByProductId]);
 
-  /** List view: one row per (product, size). No total stock. */
+  /** 화면: 정규화 SKU당 1카드/1그룹 — DB에 동일 SKU product가 여러 개여도 합쳐서 표시 */
+  const skuDisplayGroups = useMemo(
+    () =>
+      buildSkuDisplayGroups(filtered, orderedAfterCategory, localVariantsByProductId, {
+        debugDisplayGroups,
+      }),
+    [filtered, orderedAfterCategory, localVariantsByProductId, debugDisplayGroups]
+  );
+
+  function skuDisplayGroupMatchesFocus(g: SkuDisplayGroup, focus: string): boolean {
+    const f = focus.trim();
+    if (!f) return false;
+    const fn = normalizeSkuForMatch(f);
+    if (fn && g.normSku === fn) return true;
+    const fl = f.toLowerCase();
+    const t = g.trace;
+    if (t) {
+      if (t.cardTitle.toLowerCase().includes(fl)) return true;
+      if (t.representativeRawProductSku.toLowerCase().includes(fl)) return true;
+      for (const row of t.productsInGroup) {
+        if (row.rawProductSku.toLowerCase().includes(fl)) return true;
+        if (row.fallbackVariantSku && row.fallbackVariantSku.toLowerCase().includes(fl)) return true;
+        if (row.normSku.toLowerCase().includes(fl)) return true;
+      }
+    }
+    if (g.normSku.toLowerCase().includes(fl)) return true;
+    return false;
+  }
+
+  useEffect(() => {
+    if (!debugDisplayGroups) return;
+    for (const g of skuDisplayGroups) {
+      const t = g.trace;
+      if (!t) continue;
+      console.info("[productsPipeline][displayGroupCard]", {
+        representativeProductId: t.representativeProductId,
+        groupProductIds: t.groupProductIds,
+        cardNormSku: t.cardNormSku,
+        representativeRawProductSku: t.representativeRawProductSku,
+        representativeFallbackVariantSku: t.representativeFallbackVariantSku,
+        cardTitle: t.cardTitle,
+        productsInGroup: t.productsInGroup,
+      });
+    }
+    const focus = (focusSku ?? "").trim();
+    if (!focus) {
+      console.info("[productsPipeline][focusSkuCardCompare]", {
+        hint: "같은 품번처럼 보이는 카드가 여러 장이면 URL에 focusSku=T25KT1033BL 처럼 주면 cardNormSku 동일 여부를 출력합니다.",
+      });
+      return;
+    }
+    const matched = skuDisplayGroups.filter((g) => skuDisplayGroupMatchesFocus(g, focus));
+    const norms = matched.map((g) => g.normSku);
+    const distinct = [...new Set(norms)];
+    console.info("[productsPipeline][focusSkuCardCompare]", {
+      focusSkuRaw: focus,
+      focusNormSku: normalizeSkuForMatch(focus) || null,
+      matchedCardCount: matched.length,
+      /** true면 매칭된 카드들의 cardNormSku가 모두 동일(이론상 1장이어야 함). false면 정규화 키가 달라 카드가 갈라진 상태 */
+      allMatchedCardsShareSameCardNormSku: distinct.length <= 1,
+      distinctCardNormSkuValues: distinct,
+      cards: matched.map((g) => ({
+        cardNormSku: g.normSku,
+        representativeProductId: g.trace?.representativeProductId,
+        groupProductIds: g.trace?.groupProductIds,
+        cardTitle: g.trace?.cardTitle,
+      })),
+    });
+  }, [debugDisplayGroups, focusSku, skuDisplayGroups]);
+
+  useEffect(() => {
+    if (!debugTargetSkus) return;
+    const targets = new Set(VARIANT_AUDIT_TARGET_SKUS.map((s) => normalizeSkuForMatch(s)));
+    for (const g of skuDisplayGroups) {
+      if (!targets.has(g.normSku)) continue;
+      const ownerIds = [...new Set(g.variants.map((v) => v.productId))].sort();
+      console.info("[variantAudit][client] skuDisplayGroups → ProductCard에 넘기는 variants", {
+        cardNormSku: g.normSku,
+        mergedVariantLengthForCard: g.variants.length,
+        representativeProductId: g.product.id,
+        variantOwnerProductIds: ownerIds,
+      });
+    }
+  }, [debugTargetSkus, skuDisplayGroups]);
+
+  /** 디버그·레거시 호환: id dedupe만 (SKU 병합 전 단계) */
+  const filteredForRender = useMemo(() => dedupeProductsById(filtered), [filtered]);
+
+  useEffect(() => {
+    if (!debugProductsDupes) return;
+    logProductsPipelineStage("1 props products", products);
+    logProductsPipelineStage("2 localProducts", localProducts);
+    logProductsPipelineStage("3 orderedProducts", orderedProducts);
+    logProductsPipelineStage("4 filtered", filtered);
+    logProductsPipelineStage("5 card map 직전 deduped (= filteredForRender)", filteredForRender);
+    logFilteredSkuFocusDetail(filtered, "원본 filtered");
+    logFilteredSkuFocusDetail(filteredForRender, "렌더용 filteredForRender");
+    logVariantsMapIntegrity(localVariantsByProductId, "props 동기화 후 state", filteredForRender);
+    logVariantsMapIntegrity(variantsByProductId, "직전 props 원본", filteredForRender);
+    logFocusSkuCardsPerCard(filteredForRender, localVariantsByProductId, "localVariantsByProductId");
+    logFocusSkuCardsPerCard(filteredForRender, variantsByProductId, "props variantsByProductId");
+    console.info("[productsPipeline][skuDisplayGroups]", {
+      groupCount: skuDisplayGroups.length,
+      normSkus: skuDisplayGroups.map((g) => g.normSku),
+    });
+  }, [
+    debugProductsDupes,
+    products,
+    localProducts,
+    orderedProducts,
+    filtered,
+    filteredForRender,
+    skuDisplayGroups,
+    localVariantsByProductId,
+    variantsByProductId,
+  ]);
+
+  /** List view: SKU 병합 후 (product, variant) 행 */
   const listRows = useMemo((): ProductRow[] => {
     const rows: ProductRow[] = [];
-    for (const p of filtered) {
-      const variants = localVariantsByProductId[p.id] ?? [];
+    for (const { product: p, variants } of skuDisplayGroups) {
       if (variants.length > 0) {
         for (const v of variants) {
           rows.push({
             ...p,
+            variantOwnerProductId: v.productId,
             variantId: v.id,
             color: (v.color ?? "").trim(),
             size: formatGenderSizeDisplay(v.gender, v.size),
@@ -584,6 +954,7 @@ export function ProductsClient({
       } else {
         rows.push({
           ...p,
+          variantOwnerProductId: undefined,
           variantId: "",
           color: "",
           size: "",
@@ -596,7 +967,7 @@ export function ProductsClient({
       }
     }
     return rows;
-  }, [filtered, localVariantsByProductId]);
+  }, [skuDisplayGroups]);
 
   async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -884,13 +1255,13 @@ export function ProductsClient({
         : null}
 
       <p className="products-count">
-        {filtered.length}개 상품
+        {skuDisplayGroups.length}개 상품
         {search && ` (전체 ${localProducts.length}개 중)`}
       </p>
 
       {viewMode === "card" ? (
         <div className="products-grid">
-          {filtered.length === 0 ? (
+          {skuDisplayGroups.length === 0 ? (
             <div>
               <p className="muted">검색 결과가 없습니다.</p>
 
@@ -906,28 +1277,28 @@ export function ProductsClient({
               )}
             </div>
           ) : (
-            filtered.map((p) => {
-              const vars = localVariantsByProductId[p.id] ?? [];
-              return (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  localImageHrefBySkuLower={localImageHrefBySkuLower}
-                  variants={vars}
-                  onEditClick={openEditById}
-                  onDeleteClick={requestDeleteProduct}
-                  onProductStockDelta={onProductStockDelta}
-                  onVariantStockDelta={onVariantStockDelta}
-                  productStockSaving={adjustingStockKeys.has(`p:${p.id}`)}
-                  savingVariantIdsKey={variantSavingKeyForProduct(adjustingStockKeys, vars)}
-                />
-              );
-            })
+            skuDisplayGroups.map(({ normSku, product: p, variants: vars }) => (
+              <ProductCard
+                key={normSku}
+                product={p}
+                displayGroupNormSku={normSku}
+                localImageHrefBySkuLower={localImageHrefBySkuLower}
+                variants={vars}
+                onEditClick={openEditById}
+                onDeleteClick={requestDeleteProduct}
+                onProductStockDelta={onProductStockDelta}
+                onVariantStockDelta={onVariantStockDelta}
+                productStockSaving={adjustingStockKeys.has(`p:${p.id}`)}
+                savingVariantIdsKey={variantSavingKeyForProduct(adjustingStockKeys, vars)}
+                debugProductsDupes={debugProductsDupes}
+                debugVariantSkuMix={debugVariantSkuMix}
+              />
+            ))
           )}
         </div>
       ) : (
         <div className="table-wrap">
-          {filtered.length === 0 ? (
+          {skuDisplayGroups.length === 0 ? (
             <div>
               <p className="muted">검색 결과가 없습니다.</p>
 

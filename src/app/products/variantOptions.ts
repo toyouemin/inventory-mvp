@@ -72,17 +72,43 @@ export function formatVariantSizeLabel(v: {
   return formatGenderSizeDisplay(v.gender, v.size);
 }
 
+function normColorForSort(c: string | null | undefined): string {
+  return (c ?? "").trim().replace(/\s+/g, " ");
+}
+
+/** 사이즈 문자열에서 선행 숫자(예: 100, 90.5) 추출 — 없으면 null */
+function sizeNumericPart(size: string | null | undefined): number | null {
+  const raw = (size ?? "").trim();
+  const m = /^\s*(\d+(?:\.\d+)?)/.exec(raw) ?? /\d+(?:\.\d+)?/.exec(raw);
+  if (!m) return null;
+  const n = Number(m[1] ?? m[0]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * 카드 옵션 목록 정렬: 색상 그룹 유지 후, **같은 색 안에서는 사이즈(숫자) → 사이즈 문자열 → 성별** 순.
+ * 예전(색→성별→사이즈)은 '여' 행이 많을 때 '남100'만 맨 아래로 밀려 스크롤 밖으로 떨어져 보이기 쉬움.
+ */
 export function sortVariantRows(
   a: { color?: string | null; gender?: string | null; size?: string | null },
   b: { color?: string | null; gender?: string | null; size?: string | null }
 ): number {
-  const ca = (a.color ?? "").trim();
-  const cb = (b.color ?? "").trim();
+  const ca = normColorForSort(a.color);
+  const cb = normColorForSort(b.color);
   if (ca !== cb) return ca.localeCompare(cb, "ko");
-  const ga = (a.gender ?? "").trim();
-  const gb = (b.gender ?? "").trim();
-  if (ga !== gb) return ga.localeCompare(gb, "ko");
+
+  const na = sizeNumericPart(a.size);
+  const nb = sizeNumericPart(b.size);
+  if (na != null && nb != null && na !== nb) return na - nb;
+  if (na != null && nb == null) return -1;
+  if (na == null && nb != null) return 1;
+
   const sa = (a.size ?? "").trim();
   const sb = (b.size ?? "").trim();
-  return sa.localeCompare(sb, "ko", { numeric: true });
+  const sizeCmp = sa.localeCompare(sb, "ko", { numeric: true });
+  if (sizeCmp !== 0) return sizeCmp;
+
+  const ga = (a.gender ?? "").trim();
+  const gb = (b.gender ?? "").trim();
+  return ga.localeCompare(gb, "ko");
 }

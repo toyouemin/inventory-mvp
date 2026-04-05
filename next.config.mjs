@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  /** 개발 중 이중 마운트(Strict Mode)로 카드·DOM이 겹쳐 보이는지 구분할 때 false로 둠 */
+  reactStrictMode: false,
   images: {
     remotePatterns: [
       {

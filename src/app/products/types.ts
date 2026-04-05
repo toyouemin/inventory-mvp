@@ -45,4 +45,6 @@ export type ProductRow = Product & {
   variantMsrpPrice?: number | null;
   variantSalePrice?: number | null;
   variantExtraPrice?: number | null;
+  /** variant 행일 때 실제 소유 product_id(±재고 API). 없으면 `id`(대표 상품) 사용 */
+  variantOwnerProductId?: string;
 };

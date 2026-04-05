@@ -1,6 +1,19 @@
+import { normalizeSkuForMatch } from "./skuNormalize";
+
 /**
  * 상품 CSV: 컬럼값만 사용(상품명·색·성별·사이즈 추론 없음).
  * 헤더: SKU,카테고리,상품명,이미지url,color,gender,size,stock,wholesalePrice,msrpPrice,salePrice,extraPrice,memo,memo2
+ *
+ * --- 재고가 0으로만 저장되는 흔한 원인 (color/gender 공백 행) ---
+ * 1) 데이터 행의 셀 개수가 헤더(14칸)와 다르면, color·gender를 비울 때 콤마를 덜 넣은 경우
+ *    값들이 한 칸씩 당겨져 size·stock 인덱스가 어긋납니다. (stock 칸이 빈 문자열 → parse → 0)
+ * 2) 본 파서는 헤더 이름으로 인덱스를 고정하므로 "빈 칸이 사라져 인덱스가 밀린다"는 현상은
+ *    실제로는 **파싱 결과 cells[] 길이가 14가 아닐 때** 발생합니다.
+ * 3) 엑셀 등에서 **끝쪽 빈 컬럼만** 잘려 나온 경우는 아래에서 뒤를 ""로 패딩해 완화합니다.
+ *    가운데 빈 color/gender는 반드시 `,,` 처럼 **구분자 개수**를 맞춰야 합니다.
+ *
+ * 디버그: .env.local 에 `DEBUG_CSV_SKU=T21AC01NP` (normalizeSkuForMatch 기준으로 비교)
+ *        또는 `DEBUG_CSV_PRODUCT_PIPELINE=1` 이면 칸 수 불일치 행마다 원본 라인·cells 요약 로그.
  */
 
 const REQUIRED_HEADERS = [
@@ -39,6 +52,100 @@ export type ParsedCsvRow = {
 };
 
 type ColMap = Record<(typeof REQUIRED_HEADERS)[number], number>;
+
+const EXPECTED_COL_COUNT = REQUIRED_HEADERS.length;
+
+function envFlag(name: string) {
+  return String(process.env[name] ?? "").trim() === "1";
+}
+
+function debugSkuMatches(sku: string) {
+  const want = String(process.env.DEBUG_CSV_SKU ?? "").trim();
+  return want.length > 0 && normalizeSkuForMatch(sku) === normalizeSkuForMatch(want);
+}
+
+function logPipelineMismatch(
+  kind: string,
+  ctx: {
+    fileLine1: number;
+    rawLine: string;
+    cellCount: number;
+    cells: string[];
+    col?: ColMap;
+  }
+) {
+  const { fileLine1, rawLine, cellCount, cells, col } = ctx;
+  const base = {
+    kind,
+    fileLine1,
+    cellCount,
+    expected: EXPECTED_COL_COUNT,
+    rawLinePreview: rawLine.length > 500 ? `${rawLine.slice(0, 500)}…` : rawLine,
+    cells,
+  };
+  if (col) {
+    console.warn("[csvProductPipeline]", JSON.stringify({ ...base, colIndices: { size: col.size, stock: col.stock }, sizeRaw: cells[col.size], stockRaw: cells[col.stock] }));
+  } else {
+    console.warn("[csvProductPipeline]", JSON.stringify(base));
+  }
+}
+
+function logDebugSkuRow(
+  fileLine1: number,
+  rawLine: string,
+  cells: string[],
+  col: ColMap,
+  phase: "after-normalize"
+) {
+  console.info(
+    "[csvProductPipeline][DEBUG_CSV_SKU]",
+    JSON.stringify({
+      phase,
+      fileLine1,
+      cellCount: cells.length,
+      rawLine: rawLine.length > 800 ? `${rawLine.slice(0, 800)}…` : rawLine,
+      cells,
+      colIndices: {
+        color: col.color,
+        gender: col.gender,
+        size: col.size,
+        stock: col.stock,
+      },
+      colorRaw: cells[col.color],
+      genderRaw: cells[col.gender],
+      sizeRaw: cells[col.size],
+      stockRaw: cells[col.stock],
+    })
+  );
+}
+
+/** 셀 수를 헤더와 맞춤: 부족하면 뒤에 "" 패딩, 초과면 잘라냄(경고). */
+function normalizeCellCount(
+  cells: string[],
+  fileLine1: number,
+  rawLine: string,
+  col: ColMap
+): string[] {
+  const n = cells.length;
+  if (n === EXPECTED_COL_COUNT) return cells;
+
+  if (n < EXPECTED_COL_COUNT) {
+    if (envFlag("DEBUG_CSV_PRODUCT_PIPELINE")) {
+      logPipelineMismatch("cells_short_will_pad_trailing", { fileLine1, rawLine, cellCount: n, cells, col });
+    }
+    const out = cells.slice();
+    while (out.length < EXPECTED_COL_COUNT) out.push("");
+    return out;
+  }
+
+  console.warn(
+    `[csvProductPipeline] ${fileLine1}행: 컬럼 ${n}개(필요 ${EXPECTED_COL_COUNT}). 앞 ${EXPECTED_COL_COUNT}칸만 사용합니다(값에 콤마·따옴표 확인).`
+  );
+  if (envFlag("DEBUG_CSV_PRODUCT_PIPELINE")) {
+    logPipelineMismatch("cells_long_will_truncate", { fileLine1, rawLine, cellCount: n, cells, col });
+  }
+  return cells.slice(0, EXPECTED_COL_COUNT);
+}
 
 function detectDelimiter(line: string) {
   const comma = (line.match(/,/g) ?? []).length;
@@ -128,9 +235,12 @@ export function runProductCsvPipeline(text: string): { rows: ParsedCsvRow[]; ski
 
   for (let i = headerLineIndex + 1; i < rawLines.length; i++) {
     if (!rawLines[i] || rawLines[i].trim() === "") continue;
-    const cells = parseCsvLine(rawLines[i], delimiter);
+    const rawLine = rawLines[i];
+    const fileLine1 = i + 1;
+    const parsed = parseCsvLine(rawLine, delimiter);
+    const cells = normalizeCellCount(parsed, fileLine1, rawLine, col);
 
-    const sku = (cells[col.SKU] ?? "").trim();
+    const sku = normalizeSkuForMatch(cells[col.SKU] ?? "");
     if (!sku) {
       skippedRows.push(i + 1);
       continue;
@@ -144,12 +254,17 @@ export function runProductCsvPipeline(text: string): { rows: ParsedCsvRow[]; ski
 
     dataRowIndex += 1;
 
+    if (debugSkuMatches(sku)) {
+      logDebugSkuRow(fileLine1, rawLine, cells, col, "after-normalize");
+    }
+
     const category = (cells[col.카테고리] ?? "").trim();
     const imageUrl = (cells[col.이미지url] ?? "").trim();
     const color = (cells[col.color] ?? "").trim();
     const gender = (cells[col.gender] ?? "").trim();
     const size = (cells[col.size] ?? "").trim();
-    const stock = parseNumberCell(cells[col.stock], 0);
+    const stockRaw = cells[col.stock];
+    const stock = parseNumberCell(stockRaw, 0);
     const wholesale = parseNumberCell(cells[col.wholesalePrice], 0);
     const msrp = parseNumberCell(cells[col.msrpPrice], 0);
     const sale = parseNumberCell(cells[col.salePrice], 0);

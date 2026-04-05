@@ -622,14 +622,21 @@ button.download-dropdown__item {
   gap: 6px;
 }
 
+/* 옵션 전체를 한 덩어리로: 내부 스크롤/높이 제한 없음 → 8줄이 잘리지 않고 연속 표시 */
 .product-card__option-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  /* 하단 수정|삭제 영역을 헤더로 옮긴 만큼 스크롤 영역 확대 */
-  max-height: 272px;
-  overflow-y: auto;
-  padding-right: 4px;
+  gap: 0;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #faf7f3;
+}
+
+.product-card__option-item:not(:last-child) {
+  border-bottom: 1px solid rgba(212, 205, 195, 0.85);
 }
 
 .product-card__option-row {
@@ -637,10 +644,10 @@ button.download-dropdown__item {
   flex-direction: row;
   align-items: center;
   gap: 8px;
-  padding: 3px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #faf7f3;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .product-card__option-chips-scroll {
@@ -744,6 +751,10 @@ button.download-dropdown__item {
   grid-template-columns: 1fr 1fr auto;
   gap: 6px;
   align-items: center;
+}
+
+.product-card__option-item .product-card__memo-editor {
+  padding: 0 10px 8px;
 }
 
 .product-card__memo-editor input {
@@ -1221,7 +1232,8 @@ label {
   margin-top: 16px;
 }
 
-.modal-actions button:last-child {
+/* 취소 등 보조 버튼이 둘째일 때만 — 단일 저장 버튼은 primary 유지 */
+.modal-actions button:last-child:not(:only-child) {
   background: #e8e4de;
   color: var(--text);
 }
@@ -1625,8 +1637,9 @@ label {
   }
 
   .product-card__option-list {
-    max-height: 192px;
-    gap: 6px;
+    max-height: none;
+    overflow: visible;
+    gap: 0;
   }
 
   .product-card {
@@ -1693,7 +1706,7 @@ label {
   }
 
   .product-card__option-row {
-    padding: 2px 6px;
+    padding: 5px 8px;
     gap: 6px;
   }
 

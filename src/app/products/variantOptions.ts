@@ -1,3 +1,5 @@
+import { compareWearSize } from "@/lib/sizeSort";
+
 /**
  * variant: color / gender / size 분리 저장, UI는 gender+size 붙여 표시.
  * DB 유니크: (sku, color, gender, size) — 한 상품 내에서는 sku가 고정이므로
@@ -82,20 +84,6 @@ function sizeNumericPart(size: string | null | undefined): number | null {
   const m = /^\s*(\d+(?:\.\d+)?)/.exec(raw) ?? /\d+(?:\.\d+)?/.exec(raw);
   if (!m) return null;
   const n = Number(m[1] ?? m[0]);
-  return Number.isFinite(n) ? n : null;
-}
-
-/** 일반형: `size`에 숫자 없으면 `gender` 안 숫자(예: `여85`)에서 추출 */
-function generalVariantNumericSize(v: {
-  gender?: string | null;
-  size?: string | null;
-}): number | null {
-  const fromSize = sizeNumericPart(v.size);
-  if (fromSize != null) return fromSize;
-  const g = (v.gender ?? "").trim();
-  const m = /\d+(?:\.\d+)?/.exec(g);
-  if (!m) return null;
-  const n = Number(m[0]);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -240,9 +228,35 @@ export function sortVariantsForDisplay<T extends { color?: string | null; gender
 }
 
 /**
+ * 비양말형 표시 순서. DB 컬럼 color / gender / size (= UI에서의 option1·option2·size).
+ * 의류 알파/숫자 사이즈는 `gender+size` 붙인 라벨로 비교해 공용·남M 등 표기와 맞춤.
+ */
+export function compareVariantDisplay(
+  a: { color?: string | null; gender?: string | null; size?: string | null },
+  b: { color?: string | null; gender?: string | null; size?: string | null }
+): number {
+  const colorA = normColorForSort(a.color);
+  const colorB = normColorForSort(b.color);
+  if (colorA !== colorB) return colorA.localeCompare(colorB, "ko");
+
+  const la = formatGenderSizeDisplay(a.gender, a.size);
+  const lb = formatGenderSizeDisplay(b.gender, b.size);
+  const wear = compareWearSize(la, lb);
+  if (wear !== 0) return wear;
+
+  const genderA = (a.gender ?? "").trim();
+  const genderB = (b.gender ?? "").trim();
+  if (genderA !== genderB) return genderA.localeCompare(genderB, "ko");
+
+  const sza = (a.size ?? "").trim();
+  const szb = (b.size ?? "").trim();
+  return sza.localeCompare(szb, "ko", { numeric: true });
+}
+
+/**
  * 카드·리스트 옵션 정렬:
- * - **양말형**(gsLabel·color·split 중 한 경로로 파싱 성공): 길이(3부→4부) → 여→남 → 사이즈 숫자 →(동률) color → composite
- * - **비양말형**: color 동일 시 → 성별(여→남) → 사이즈 숫자 오름차순 →(동률) 사이즈 문자·gender 문자
+ * - **양말형**(gsLabel·color·split 중 한 경로로 파싱 성공): 길이(3부→4부) → 여→남 → 사이즈 숫자 →(동률) composite
+ * - **비양말형**: `compareVariantDisplay`(의류 사이즈 순 포함) → composite
  */
 export function sortVariantRows(
   a: { color?: string | null; gender?: string | null; size?: string | null },
@@ -269,22 +283,10 @@ export function sortVariantRows(
   if (sa && !sb) return -1;
   if (!sa && sb) return 1;
 
-  const gra = sockGenderRank(a.gender ?? "");
-  const grb = sockGenderRank(b.gender ?? "");
-  if (gra !== grb) return gra - grb;
-
-  const na = generalVariantNumericSize(a);
-  const nb = generalVariantNumericSize(b);
-  if (na != null && nb != null && na !== nb) return na - nb;
-  if (na != null && nb == null) return -1;
-  if (na == null && nb != null) return 1;
-
-  const sza = (a.size ?? "").trim();
-  const szb = (b.size ?? "").trim();
-  const sizeCmp = sza.localeCompare(szb, "ko", { numeric: true });
-  if (sizeCmp !== 0) return sizeCmp;
-
-  const ga = (a.gender ?? "").trim();
-  const gb = (b.gender ?? "").trim();
-  return ga.localeCompare(gb, "ko");
+  const v = compareVariantDisplay(a, b);
+  if (v !== 0) return v;
+  return variantCompositeKey(a.color, a.gender, a.size).localeCompare(
+    variantCompositeKey(b.color, b.gender, b.size),
+    "ko"
+  );
 }

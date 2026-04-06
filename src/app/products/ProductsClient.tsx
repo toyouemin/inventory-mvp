@@ -1464,46 +1464,53 @@ export function ProductsClient({
       {(orphanResult || orphanNotice) && (
         <section className="orphan-cleanup-panel" aria-live="polite">
           <div className="orphan-cleanup-panel__head">
-            <strong>Storage 고아 이미지 정리 결과</strong>
+            <strong>스토리지 고아 이미지 점검 결과</strong>
             {orphanNotice ? <span className="orphan-cleanup-panel__notice">{orphanNotice}</span> : null}
           </div>
           {orphanResult ? (
             <>
               <p className="orphan-cleanup-panel__summary">
-                bucket <strong>{orphanResult.bucket || "-"}</strong> · referenced{" "}
-                <strong>{orphanResult.referencedCount}</strong> · storage files{" "}
-                <strong>{orphanResult.storageFileCount}</strong> · orphan <strong>{orphanResult.orphanCount}</strong>
+                저장소 <strong>{orphanResult.bucket || "-"}</strong> · DB에서 사용 중{" "}
+                <strong>{orphanResult.referencedCount}개</strong> · 스토리지 전체{" "}
+                <strong>{orphanResult.storageFileCount}개</strong> · 고아 이미지{" "}
+                <strong>{orphanResult.orphanCount}개</strong>
                 {orphanResult.deletedCount > 0 ? (
                   <>
                     {" "}
-                    · deleted <strong>{orphanResult.deletedCount}</strong>
+                    · 삭제 완료 <strong>{orphanResult.deletedCount}개</strong>
                   </>
                 ) : null}
               </p>
 
               <div className="orphan-cleanup-panel__grid">
                 <div className="orphan-cleanup-panel__box">
-                  <p className="orphan-cleanup-panel__label">orphanPaths ({orphanResult.orphanPaths.length})</p>
+                  <p className="orphan-cleanup-panel__label">
+                    고아 이미지 경로 ({orphanResult.orphanPaths.length}개)
+                  </p>
                   <pre className="orphan-cleanup-panel__list">
-                    {orphanResult.orphanPaths.length > 0 ? orphanResult.orphanPaths.join("\n") : "(없음)"}
+                    {orphanResult.orphanPaths.length > 0 ? orphanResult.orphanPaths.join("\n") : "없음"}
                   </pre>
                 </div>
                 <div className="orphan-cleanup-panel__box">
-                  <p className="orphan-cleanup-panel__label">parseFailures ({orphanResult.parseFailures.length})</p>
+                  <p className="orphan-cleanup-panel__label">
+                    경로 해석 실패 ({orphanResult.parseFailures.length}개)
+                  </p>
                   <pre className="orphan-cleanup-panel__list">
                     {orphanResult.parseFailures.length > 0
                       ? orphanResult.parseFailures
                           .map((x) => `${x.imageUrl} :: ${x.reason}`)
                           .join("\n")
-                      : "(없음)"}
+                      : "없음"}
                   </pre>
                 </div>
                 <div className="orphan-cleanup-panel__box">
-                  <p className="orphan-cleanup-panel__label">failedPaths ({orphanResult.failedPaths.length})</p>
+                  <p className="orphan-cleanup-panel__label">
+                    삭제 실패 경로 ({orphanResult.failedPaths.length}개)
+                  </p>
                   <pre className="orphan-cleanup-panel__list">
                     {orphanResult.failedPaths.length > 0
                       ? orphanResult.failedPaths.map((x) => `${x.path} :: ${x.message}`).join("\n")
-                      : "(없음)"}
+                      : "없음"}
                   </pre>
                 </div>
               </div>

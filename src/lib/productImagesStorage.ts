@@ -132,6 +132,7 @@ export type ProductImageOrphanCleanupResult = {
 };
 
 const DELETABLE_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp", "tif", "tiff"]);
+const RESET_IMAGE_MATCH_EXTENSION_PRIORITY = ["jpg", "jpeg", "png", "webp"] as const;
 
 function isDeletableImageObjectPath(path: string): boolean {
   const p = String(path ?? "").trim();
@@ -178,6 +179,130 @@ async function listAllProductImagesObjectPaths(): Promise<string[]> {
     }
   }
   return out;
+}
+
+function publicUrlForProductImagesPath(path: string): string {
+  const { data } = supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+function splitImageObjectPath(path: string): { stem: string; ext: string; fileNameLower: string } | null {
+  const base = (path.split("/").pop() ?? "").trim();
+  if (!base || base.startsWith(".")) return null;
+  const m = /^(.+)\.([a-zA-Z0-9]+)$/.exec(base);
+  if (!m) return null;
+  const stem = m[1]!.trim();
+  const ext = m[2]!.toLowerCase();
+  if (!stem || !DELETABLE_IMAGE_EXTENSIONS.has(ext)) return null;
+  return { stem, ext, fileNameLower: `${stem}.${ext}`.toLowerCase() };
+}
+
+export type ResetSkuImageReconnectResult = {
+  bucket: string;
+  productsChecked: number;
+  matchedCount: number;
+  updatedCount: number;
+  skippedNonMatchedCount: number;
+  skippedExistingImageCount: number;
+  failedCount: number;
+  matchedSamples: Array<{ sku: string; path: string }>;
+  failedSamples: Array<{ productId: string; sku: string; message: string }>;
+};
+
+/**
+ * Reset 후 보정용:
+ * products.sku를 normalizeSkuForMatch로 맞춰 product-images 파일명 stem과 매칭해 image_url 재연결.
+ * 기본은 image_url이 비어 있는 상품만 갱신.
+ */
+export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
+  onlyIfImageUrlEmpty?: boolean;
+}): Promise<ResetSkuImageReconnectResult> {
+  const onlyIfImageUrlEmpty = options?.onlyIfImageUrlEmpty !== false;
+  const result: ResetSkuImageReconnectResult = {
+    bucket: PRODUCT_IMAGES_BUCKET,
+    productsChecked: 0,
+    matchedCount: 0,
+    updatedCount: 0,
+    skippedNonMatchedCount: 0,
+    skippedExistingImageCount: 0,
+    failedCount: 0,
+    matchedSamples: [],
+    failedSamples: [],
+  };
+
+  const storagePaths = await listAllProductImagesObjectPaths();
+  storagePaths.sort((a, b) => a.localeCompare(b, "ko"));
+  const byFileNameLower = new Map<string, string>();
+  for (const p of storagePaths) {
+    const info = splitImageObjectPath(p);
+    if (!info) continue;
+    // 같은 파일명이 여러 경로에 있으면 정렬상 앞선(안정적인) 경로를 사용
+    if (!byFileNameLower.has(info.fileNameLower)) {
+      byFileNameLower.set(info.fileNameLower, p);
+    }
+  }
+
+  const { data: rows, error } = await supabaseServer
+    .from("products")
+    .select("id, sku, image_url")
+    .order("id", { ascending: true });
+  if (error) throw new Error(`[products 조회 실패] ${error.message}`);
+
+  for (const row of rows ?? []) {
+    const productId = String((row as { id?: string }).id ?? "").trim();
+    const sku = String((row as { sku?: string }).sku ?? "");
+    const currentUrl = String((row as { image_url?: string | null }).image_url ?? "").trim();
+    if (!productId) continue;
+    result.productsChecked++;
+
+    if (onlyIfImageUrlEmpty && currentUrl !== "") {
+      result.skippedExistingImageCount++;
+      continue;
+    }
+
+    const skuTrim = sku.trim();
+    if (!skuTrim) {
+      result.skippedNonMatchedCount++;
+      continue;
+    }
+
+    let hitPath: string | null = null;
+    for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
+      const wanted = `${skuTrim}.${ext}`.toLowerCase();
+      const found = byFileNameLower.get(wanted);
+      if (found) {
+        hitPath = found;
+        break;
+      }
+    }
+    if (!hitPath) {
+      result.skippedNonMatchedCount++;
+      continue;
+    }
+
+    result.matchedCount++;
+    if (result.matchedSamples.length < 20) {
+      result.matchedSamples.push({ sku, path: hitPath });
+    }
+
+    const url = publicUrlForProductImagesPath(hitPath);
+    try {
+      const { error: upErr } = await supabaseServer.from("products").update({ image_url: url }).eq("id", productId);
+      if (upErr) throw new Error(upErr.message);
+      result.updatedCount++;
+    } catch (e) {
+      result.failedCount++;
+      if (result.failedSamples.length < 20) {
+        result.failedSamples.push({
+          productId,
+          sku,
+          message: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+  }
+
+  return result;
 }
 
 async function removeStoragePaths(paths: string[]): Promise<{

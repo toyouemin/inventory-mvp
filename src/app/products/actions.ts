@@ -11,7 +11,10 @@ import {
 } from "./variantOptions";
 import { ensureCategorySortOrderRow, syncCategorySortOrderAfterCsv } from "./categorySortOrder.server";
 import { buildCategoryOrderMapFromCsvRows } from "./categorySortOrder.utils";
-import { removeReplacedProductImageFromStorage } from "@/lib/productImagesStorage";
+import {
+  reconnectProductsImageUrlsFromStorageBySku,
+  removeReplacedProductImageFromStorage,
+} from "@/lib/productImagesStorage";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
 /** CSV 업로드 행별 재고 디버그: .env에 LOG_CSV_STOCK=1 */
@@ -21,6 +24,10 @@ function resolveProductImageUrl(sku: string, imageUrl: string | null | undefined
   const explicit = (imageUrl ?? "").trim();
   if (explicit) return explicit;
   return null;
+}
+
+function hasExplicitImageUrl(imageUrl: string | null | undefined): boolean {
+  return String(imageUrl ?? "").trim() !== "";
 }
 
 /* -----------------------------
@@ -278,6 +285,7 @@ export async function deleteProduct(productId: string) {
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const SKU_IMAGE_CLEANUP_EXTENSIONS = ["jpg", "jpeg", "png", "webp"] as const;
 
 /** Storage `product-images`에 새 객체로 업로드(매번 고유 경로 — 단건·일괄 공통). */
 async function uploadImageFileToProductImagesBucket(file: File): Promise<string> {
@@ -303,11 +311,63 @@ async function uploadImageFileToProductImagesBucket(file: File): Promise<string>
   return urlData.publicUrl;
 }
 
+function safeSkuForImageFilename(rawSku: string): string {
+  const normalized = normalizeSkuForMatch(rawSku);
+  // Storage 경로 안전성: 경로 구분자/제어문자 제거
+  return normalized.replace(/[\/\\:*?"<>|\u0000-\u001F]/g, "-").trim();
+}
+
+async function removeOtherSkuImageExtensions(skuBase: string, keepExt: string): Promise<void> {
+  const removeTargets = SKU_IMAGE_CLEANUP_EXTENSIONS
+    .filter((ext) => ext !== keepExt)
+    .map((ext) => `${skuBase}.${ext}`);
+  if (removeTargets.length === 0) return;
+  const { error } = await supabaseServer.storage.from("product-images").remove(removeTargets);
+  if (error) {
+    console.warn("[product-images] SKU 이미지 확장자 정리 실패", {
+      skuBase,
+      keepExt,
+      message: error.message,
+    });
+  }
+}
+
+/** 개별 업로드 전용: 원본 파일명 무시, `product-images/{SKU}.{ext}`로 저장(upsert). */
+async function uploadImageFileToProductImagesBucketBySku(file: File, skuRaw: string): Promise<string> {
+  const type = file.type?.toLowerCase() ?? "";
+  if (!ALLOWED_IMAGE_TYPES.includes(type)) {
+    throw new Error("jpg, png, webp만 업로드할 수 있습니다.");
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    throw new Error("파일 크기는 5MB 이하여야 합니다.");
+  }
+  const skuBase = safeSkuForImageFilename(skuRaw);
+  if (!skuBase) {
+    throw new Error("SKU가 비어 있어 이미지를 업로드할 수 없습니다.");
+  }
+
+  const ext = type === "image/jpeg" ? "jpg" : type === "image/png" ? "png" : "webp";
+  const path = `${skuBase}.${ext}`;
+
+  const { error } = await supabaseServer.storage.from("product-images").upload(path, file, {
+    contentType: type,
+    upsert: true,
+  });
+  if (error) throw new Error(error.message);
+
+  // 같은 SKU의 기존 확장자 파일(jpg/jpeg/png/webp) 중 현재 확장자 외는 정리
+  await removeOtherSkuImageExtensions(skuBase, ext);
+
+  const { data: urlData } = supabaseServer.storage.from("product-images").getPublicUrl(path);
+  return urlData.publicUrl;
+}
+
 /** Upload image to Supabase Storage bucket product-images; returns public URL. */
 export async function uploadProductImage(formData: FormData): Promise<{ url: string }> {
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File)) throw new Error("파일이 없습니다.");
-  const url = await uploadImageFileToProductImagesBucket(file);
+  const sku = String(formData.get("sku") ?? "");
+  const url = await uploadImageFileToProductImagesBucketBySku(file, sku);
   return { url };
 }
 
@@ -1028,13 +1088,14 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
       productId = inserted.id as string;
       skuToProductId.set(normSku, productId);
     } else {
+      const nextImageUrl = resolveProductImageUrl(normSku, row0.imageUrl || null);
       const { error: upErr } = await supabaseServer
         .from("products")
         .update({
           sku: normSku,
           category: row0.category || null,
           name: row0.name,
-          image_url: resolveProductImageUrl(normSku, row0.imageUrl || null),
+          ...(hasExplicitImageUrl(row0.imageUrl) ? { image_url: nextImageUrl } : {}),
         })
         .eq("id", productId);
       if (upErr) throw new Error(upErr.message);
@@ -1265,6 +1326,26 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
 
     await syncProductsStockFromVariantSums(resetProductIds);
     await ensureSingleProductPerNormSku();
+    const reconnect = await reconnectProductsImageUrlsFromStorageBySku({ onlyIfImageUrlEmpty: true });
+    console.info("[CSV reset][image reconnect][summary]", {
+      totalProducts: reconnect.productsChecked,
+      reconnectSuccessCount: reconnect.updatedCount,
+      failedCount: reconnect.failedCount,
+    });
+    if (reconnect.failedCount > 0) {
+      console.warn("[CSV reset] SKU 기준 Storage 이미지 재연결 일부 실패", reconnect);
+      console.warn(
+        "[CSV reset][image reconnect][failed sku list]",
+        reconnect.failedSamples.map((f) => f.sku)
+      );
+      for (const f of reconnect.failedSamples) {
+        console.warn("[CSV reset][image reconnect][failed sku]", {
+          sku: f.sku,
+          productId: f.productId,
+          message: f.message,
+        });
+      }
+    }
   } catch (err) {
     await restoreProductsAndVariantsSnapshot(snapshot);
     throw err;

@@ -86,9 +86,13 @@ export function AddProductModal({
     try {
       let finalImageUrl = imageUrl.trim() || null;
       if (imageFile) {
+        if (!sku.trim()) {
+          throw new Error("SKU를 먼저 입력한 뒤 이미지를 업로드해 주세요.");
+        }
         const resized = await resizeAndCompressImage(imageFile);
         const fd = new FormData();
         fd.append("file", resized);
+        fd.append("sku", sku.trim());
         const { url } = await uploadProductImage(fd);
         finalImageUrl = url;
       }

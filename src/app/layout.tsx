@@ -34,9 +34,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <h1 className="app-site-title">재고관리 프로그램</h1>
         </header>
         <nav>
-          <a href="/products">상품검색</a>
+          <a href="/products">상품</a>
           {/*href="/moves">재고 변동</a>*/}
-          <a href="/status">총 재고</a>
+          <a href="/status">재고 현황</a>
           <AdaptiveHomepageLink />
           <a
             href="https://tagosports.cafe24.com/intro/member.html?returnUrl=%2Findex.html"

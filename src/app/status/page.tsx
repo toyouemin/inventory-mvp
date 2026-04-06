@@ -16,7 +16,7 @@ export default async function StatusPage() {
 
   const { data, error } = await supabaseServer
     .from("products")
-    .select("id, sku, category, name, stock, created_at")
+    .select("id, sku, category, name, stock, memo, memo2, created_at")
     .order("sku", { ascending: true });
 
   if (error) {
@@ -35,6 +35,8 @@ export default async function StatusPage() {
       category: string | null;
       name: string | null;
       stock: number | null;
+      memo: string | null;
+      memo2: string | null;
       created_at: string | null;
     };
     return {
@@ -86,6 +88,8 @@ export default async function StatusPage() {
       category: r.category ?? null,
       name: displayName,
       stock,
+      memo: (r.memo ?? "").trim(),
+      memo2: (r.memo2 ?? "").trim(),
     };
   });
   const categoriesRaw = Array.from(

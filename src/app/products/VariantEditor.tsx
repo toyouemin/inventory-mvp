@@ -96,7 +96,9 @@ export function VariantEditor({
 
   return (
     <div className="variant-editor">
-      <label className="variant-editor-main-label">옵션 (색상 · 성별 · 사이즈)</label>
+      <label className="variant-editor-main-label">
+        옵션 (색상 · 성별 · 사이즈 · 수량 · 금액)
+      </label>
       {displayRows.map((row, idx) => (
         <Fragment key={row.rowId}>
           <div className="variant-editor-row">

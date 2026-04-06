@@ -981,6 +981,15 @@ label {
   font-weight: 700;
 }
 
+.status-stock-table__category {
+  min-width: 0;
+  max-width: 22ch;
+  padding-right: 8px;
+  word-break: break-word;
+  color: var(--muted, #666);
+  font-size: 13px;
+}
+
 .status-stock-table__name {
   min-width: 0;
   padding-right: 6px;
@@ -1006,15 +1015,33 @@ label {
   color: var(--muted);
 }
 
+.status-stock-stats-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 0 0 16px;
+  max-width: 56rem;
+}
+
+.status-stock-stats-note code {
+  font-size: 0.95em;
+  padding: 0 0.2em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
 /*
- * 태블릿·데스크톱: 100% 폭으로 재고만 오른쪽 끝으로 밀리지 않게
- * - 테이블 폭 = 내용 기반(max-content)이되 상한 = 품명열(최대 48ch) + 재고열 여유
- * - 래퍼는 왼쪽 정렬(가운데 정렬 없음)
+ * 태블릿·데스크톱: 카테고리·품명·재고 열 폭 상한
+ * - 테이블 폭 = 내용 기반(max-content), 상한 ≈ 22ch + 48ch + 재고열
  */
 @media (min-width: 769px) {
   .table.status-stock-table {
     width: max-content;
-    max-width: min(100%, calc(48ch + 8.5rem));
+    max-width: min(100%, calc(22ch + 48ch + 8.5rem));
+  }
+
+  .status-stock-table__category {
+    max-width: 22ch;
   }
 
   .status-stock-table__name {

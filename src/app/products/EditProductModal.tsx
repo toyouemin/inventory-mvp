@@ -278,6 +278,9 @@ export function EditProductModal({
             <button type="submit" disabled={pending}>
               저장
             </button>
+            <button type="button" onClick={onClose} disabled={pending}>
+              취소
+            </button>
           </div>
         </form>
       </div>

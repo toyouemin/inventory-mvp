@@ -1505,9 +1505,28 @@ label {
   justify-content: space-between;
 }
 
+.orphan-cleanup-panel__head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .orphan-cleanup-panel__notice {
   color: var(--muted);
   font-size: 12px;
+}
+
+.orphan-cleanup-panel__close {
+  width: auto;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #e8e4de;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.2;
+  cursor: pointer;
 }
 
 .orphan-cleanup-panel__summary {

@@ -104,22 +104,15 @@ export function StatusClient({
         </div>
       </div>
 
-      <p className="products-count">
-        {totalSkus}개 상품
-        {search && ` (전체 ${rows.length}개 중)`}
-      </p>
-
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
+      <div className="status-stock-stats" role="group" aria-label="재고 요약">
         <Stat label="품목 수" value={`${totalSkus.toLocaleString()}개`} />
         <Stat label="총 재고" value={`${totalQty.toLocaleString()}개`} />
         <Stat label="재고 0" value={`${zeroStock.toLocaleString()}개`} />
       </div>
       <p className="status-stock-stats-note">
-        위 숫자와 표는 <strong>현재 검색·카테고리 필터</strong>가 적용된 목록 기준입니다. 상품별 재고는 옵션이 있으면{" "}
-        <strong>모든 옵션 수량의 합</strong>이며, CSV의 <code>stock</code>과 같게 저장됩니다. 같은 색상·성별·사이즈 조합이
-        CSV에 여러 줄이면 업로드 시 <strong>재고만 합산</strong>됩니다. CSV <strong>초기화(reset)</strong> 후에는 DB가
-        파일 내용과 일치하고, <strong>덮어쓰기(merge)</strong>는 파일에 없는 기존 옵션이 DB에 남아 있으면 그 수량이
-        총재고·상품별 합에 <strong>추가로</strong> 포함될 수 있습니다.
+        ※ 검색·카테고리 필터 기준. 재고는 <strong>옵션 수량 합</strong>. CSV 동일 옵션 여러 줄은{" "}
+        <strong>수량 합산</strong>. <strong>초기화</strong>는 파일과 일치, <strong>덮어쓰기</strong>는 파일에 없는 옵션이
+        DB에 남으면 합계에 포함될 수 있음.
       </p>
 
       <div className="table-wrap status-stock-table-wrap">
@@ -160,16 +153,9 @@ export function StatusClient({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        border: "1px solid #ddd",
-        borderRadius: 10,
-        padding: "10px 12px",
-        minWidth: 160,
-      }}
-    >
-      <div style={{ color: "#666", fontSize: 12, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{value}</div>
+    <div className="status-stock-stat">
+      <div className="status-stock-stat__label">{label}</div>
+      <div className="status-stock-stat__value">{value}</div>
     </div>
   );
 }

@@ -1015,19 +1015,74 @@ label {
   color: var(--muted);
 }
 
-.status-stock-stats-note {
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--muted);
-  margin: 0 0 16px;
-  max-width: 56rem;
+/* 재고 현황: 품목 수 · 총 재고 · 재고 0 — 모바일 한 줄(균등), 넓은 화면에서 여유 */
+.status-stock-stats {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 10px;
+  box-sizing: border-box;
 }
 
-.status-stock-stats-note code {
-  font-size: 0.95em;
-  padding: 0 0.2em;
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.06);
+.status-stock-stat {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  padding: 8px 6px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.status-stock-stat__label {
+  color: #666;
+  font-size: 11px;
+  line-height: 1.2;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-stock-stat__value {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: keep-all;
+}
+
+@media (min-width: 769px) {
+  .status-stock-stats {
+    gap: 12px;
+    max-width: 42rem;
+  }
+
+  .status-stock-stat {
+    padding: 10px 14px;
+    flex: 0 1 auto;
+    min-width: 7.5rem;
+    text-align: left;
+  }
+
+  .status-stock-stat__label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .status-stock-stat__value {
+    font-size: 18px;
+  }
+}
+
+.status-stock-stats-note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 0 0 14px;
+  max-width: 56rem;
 }
 
 /*

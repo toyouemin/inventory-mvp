@@ -510,7 +510,6 @@ export const ProductCard = memo(function ProductCard({
             src={imgSrc}
             alt={displayName}
             decoding="async"
-            onClick={(e) => e.stopPropagation()}
             onError={onImgError}
           />
         </div>

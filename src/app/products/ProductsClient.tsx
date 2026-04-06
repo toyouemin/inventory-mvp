@@ -1656,7 +1656,6 @@ export function ProductsClient({
             className="product-image-modal__img"
             src={listImagePreview.url}
             alt={listImagePreview.alt}
-            onClick={(e) => e.stopPropagation()}
             onError={() => setListImagePreview(null)}
           />
         </div>

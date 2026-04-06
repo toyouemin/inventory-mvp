@@ -861,6 +861,7 @@ button.download-dropdown__item:disabled {
   object-fit: contain;
   border-radius: 10px;
   background: #111;
+  cursor: pointer;
 }
 
 .product-image-modal__close {

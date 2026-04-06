@@ -11,6 +11,7 @@ import {
 } from "./variantOptions";
 import { ensureCategorySortOrderRow, syncCategorySortOrderAfterCsv } from "./categorySortOrder.server";
 import { buildCategoryOrderMapFromCsvRows } from "./categorySortOrder.utils";
+import { removeReplacedProductImageFromStorage } from "@/lib/productImagesStorage";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
 /** CSV 업로드 행별 재고 디버그: .env에 LOG_CSV_STOCK=1 */
@@ -146,16 +147,28 @@ export async function updateProduct(
   if (!productId) return;
 
   const updateData: Record<string, unknown> = {};
+  let imageUrlReplaceForStorageCleanup: { prev: string; next: string } | null = null;
+
   if (data.sku !== undefined) updateData.sku = normalizeSkuForMatch(data.sku);
   if (data.category !== undefined) updateData.category = data.category?.trim() || null;
   if (data.name !== undefined) updateData.name = data.name?.trim();
   if (data.imageUrl !== undefined) {
+    const { data: row } = await supabaseServer
+      .from("products")
+      .select("sku, image_url")
+      .eq("id", productId)
+      .maybeSingle();
+    const previousUrlTrim = String((row?.image_url as string | null) ?? "").trim();
     let skuForImg = data.sku?.trim() ?? "";
     if (!skuForImg) {
-      const { data: row } = await supabaseServer.from("products").select("sku").eq("id", productId).maybeSingle();
       skuForImg = (row?.sku as string | undefined)?.trim() ?? "";
     }
-    updateData.image_url = resolveProductImageUrl(skuForImg, data.imageUrl);
+    const resolved = resolveProductImageUrl(skuForImg, data.imageUrl);
+    updateData.image_url = resolved;
+    imageUrlReplaceForStorageCleanup = {
+      prev: previousUrlTrim,
+      next: String(resolved ?? "").trim(),
+    };
   }
 
   if (data.memo !== undefined) {
@@ -171,6 +184,19 @@ export async function updateProduct(
 
   const { error } = await supabaseServer.from("products").update(updateData).eq("id", productId);
   if (error) throw new Error(error.message);
+
+  if (imageUrlReplaceForStorageCleanup) {
+    const rm = await removeReplacedProductImageFromStorage({
+      previousPublicUrl: imageUrlReplaceForStorageCleanup.prev,
+      newPublicUrl: imageUrlReplaceForStorageCleanup.next,
+    });
+    if (rm.errorMessage) {
+      console.error("[products] 단건/수정: Storage 이전 이미지 삭제 실패(상품 URL은 갱신됨)", {
+        productId,
+        message: rm.errorMessage,
+      });
+    }
+  }
 
   if (data.category !== undefined) {
     await ensureCategorySortOrderRow(data.category?.trim() || null);
@@ -253,11 +279,8 @@ export async function deleteProduct(productId: string) {
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-/** Upload image to Supabase Storage bucket product-images; returns public URL. */
-export async function uploadProductImage(formData: FormData): Promise<{ url: string }> {
-  const file = formData.get("file") as File | null;
-  if (!file || !(file instanceof File)) throw new Error("파일이 없습니다.");
-
+/** Storage `product-images`에 새 객체로 업로드(매번 고유 경로 — 단건·일괄 공통). */
+async function uploadImageFileToProductImagesBucket(file: File): Promise<string> {
   const type = file.type?.toLowerCase() ?? "";
   if (!ALLOWED_IMAGE_TYPES.includes(type)) {
     throw new Error("jpg, png, webp만 업로드할 수 있습니다.");
@@ -271,13 +294,161 @@ export async function uploadProductImage(formData: FormData): Promise<{ url: str
 
   const { error } = await supabaseServer.storage.from("product-images").upload(path, file, {
     contentType: type,
-    upsert: true,
+    upsert: false,
   });
 
   if (error) throw new Error(error.message);
 
   const { data: urlData } = supabaseServer.storage.from("product-images").getPublicUrl(path);
-  return { url: urlData.publicUrl };
+  return urlData.publicUrl;
+}
+
+/** Upload image to Supabase Storage bucket product-images; returns public URL. */
+export async function uploadProductImage(formData: FormData): Promise<{ url: string }> {
+  const file = formData.get("file") as File | null;
+  if (!file || !(file instanceof File)) throw new Error("파일이 없습니다.");
+  const url = await uploadImageFileToProductImagesBucket(file);
+  return { url };
+}
+
+function imageFilenameBasename(name: string): string {
+  const n = name.replace(/\\/g, "/").split("/").pop() ?? name;
+  return n.trim();
+}
+
+function stemFromProductImageFilename(name: string): string {
+  return imageFilenameBasename(name).replace(/\.(jpe?g|png|webp)$/i, "").trim();
+}
+
+export type BulkProductImageUploadResult = {
+  successCount: number;
+  matchFailedCount: number;
+  uploadFailedCount: number;
+  skippedExistingImageCount: number;
+  /** 매칭 실패 파일명(최대 30개) */
+  matchFailedSamples: string[];
+  /** 업로드 오류 */
+  uploadErrors: { filename: string; message: string }[];
+  /** 이미지 있어 건너뜀(onlyIfEmpty 모드) */
+  skippedExistingSamples: string[];
+  /** 동일 정규화 SKU 상품이 DB에 여러 개일 때 첫 행만 사용한 normSku (참고) */
+  duplicateNormSkuUsedFirst: string[];
+  /** 교체 후 이전 Storage 객체 삭제 실패(최대 20건, 업로드·DB 반영은 성공한 경우만) */
+  storageDeleteFailures: { filename: string; message: string }[];
+};
+
+/**
+ * 여러 이미지 일괄 업로드: 파일명 stem → normalizeSkuForMatch → products.sku 매칭 후 image_url 갱신.
+ * Storage는 매번 새 경로(덮어쓰기 아님). DB 갱신 성공 후 이전 product-images 객체는 공용 정리 로직으로 삭제 시도.
+ */
+export async function bulkUploadProductImages(formData: FormData): Promise<BulkProductImageUploadResult> {
+  if (!supabaseServer) {
+    throw new Error("Supabase server client not ready");
+  }
+
+  const onlyIfEmpty =
+    formData.get("onlyIfEmpty") === "1" || String(formData.get("onlyIfEmpty") ?? "").toLowerCase() === "true";
+  const rawFiles = formData.getAll("files");
+  const files = rawFiles.filter((x): x is File => x instanceof File);
+
+  const result: BulkProductImageUploadResult = {
+    successCount: 0,
+    matchFailedCount: 0,
+    uploadFailedCount: 0,
+    skippedExistingImageCount: 0,
+    matchFailedSamples: [],
+    uploadErrors: [],
+    skippedExistingSamples: [],
+    duplicateNormSkuUsedFirst: [],
+    storageDeleteFailures: [],
+  };
+
+  if (files.length === 0) {
+    return result;
+  }
+
+  const { data: productRows, error: pe } = await supabaseServer
+    .from("products")
+    .select("id, sku, image_url")
+    .order("id", { ascending: true });
+  if (pe) throw new Error(pe.message);
+
+  /** 정규화 SKU → 대표 상품 1건 (동일 norm 여러 행이면 id 오름차순 첫 행) */
+  const byNormSku = new Map<string, { id: string; image_url: string | null }>();
+  const seenNormDuplicate = new Set<string>();
+  for (const row of productRows ?? []) {
+    const r = row as { id: string; sku: string | null; image_url: string | null };
+    const n = normalizeSkuForMatch(r.sku);
+    if (!n) continue;
+    if (byNormSku.has(n)) {
+      if (!seenNormDuplicate.has(n)) {
+        seenNormDuplicate.add(n);
+        result.duplicateNormSkuUsedFirst.push(n);
+      }
+      continue;
+    }
+    byNormSku.set(n, { id: r.id, image_url: r.image_url });
+  }
+
+  const pushSample = (arr: string[], s: string, max = 30) => {
+    if (arr.length < max) arr.push(s);
+  };
+
+  for (const file of files) {
+    const displayName = imageFilenameBasename(file.name);
+    const stem = stemFromProductImageFilename(file.name);
+    const norm = normalizeSkuForMatch(stem);
+
+    if (!stem || !norm) {
+      result.matchFailedCount++;
+      pushSample(result.matchFailedSamples, displayName);
+      continue;
+    }
+
+    const prod = byNormSku.get(norm);
+    if (!prod) {
+      result.matchFailedCount++;
+      pushSample(result.matchFailedSamples, displayName);
+      continue;
+    }
+
+    if (onlyIfEmpty && String(prod.image_url ?? "").trim() !== "") {
+      result.skippedExistingImageCount++;
+      pushSample(result.skippedExistingSamples, displayName);
+      continue;
+    }
+
+    const previousPublicUrl = String(prod.image_url ?? "").trim();
+
+    try {
+      const url = await uploadImageFileToProductImagesBucket(file);
+      const { error: upErr } = await supabaseServer
+        .from("products")
+        .update({ image_url: url })
+        .eq("id", prod.id);
+      if (upErr) throw new Error(upErr.message);
+      result.successCount++;
+      prod.image_url = url;
+
+      const rm = await removeReplacedProductImageFromStorage({
+        previousPublicUrl,
+        newPublicUrl: url,
+      });
+      if (rm.errorMessage && result.storageDeleteFailures.length < 20) {
+        result.storageDeleteFailures.push({ filename: displayName, message: rm.errorMessage });
+      }
+    } catch (e) {
+      result.uploadFailedCount++;
+      result.uploadErrors.push({
+        filename: displayName,
+        message: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  revalidatePath("/products");
+  revalidatePath("/status");
+  return result;
 }
 
 /* -----------------------------

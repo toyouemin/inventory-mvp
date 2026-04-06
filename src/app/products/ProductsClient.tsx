@@ -9,7 +9,15 @@ import { diagnoseSockSortVariant, formatGenderSizeDisplay, sortVariantsForDispla
 import { useProductImageSrc } from "./useProductImageSrc";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
-import { adjustStock, adjustVariantStock, deleteProduct, uploadProductsCsv } from "./actions";
+import {
+  adjustStock,
+  adjustVariantStock,
+  bulkUploadProductImages,
+  deleteProduct,
+  uploadProductsCsv,
+  type BulkProductImageUploadResult,
+} from "./actions";
+import { resizeAndCompressImage } from "./imageUtils";
 import { normalizeCategoryLabel } from "./categoryNormalize";
 import { compareProductsByCategoryOrder } from "./categorySortOrder.utils";
 import { EditProductModal } from "./EditProductModal";
@@ -408,6 +416,12 @@ export function ProductsClient({
   const [uploadMenuDirection, setUploadMenuDirection] = useState<DownloadMenuDirection>("down");
   const [uploadMenuStyle, setUploadMenuStyle] = useState<CSSProperties>({});
   const [adjustingStockKeys, setAdjustingStockKeys] = useState(() => new Set<string>());
+
+  const [bulkImageModalOpen, setBulkImageModalOpen] = useState(false);
+  const [bulkOnlyEmptyImage, setBulkOnlyEmptyImage] = useState(false);
+  const [bulkImageWorking, setBulkImageWorking] = useState(false);
+  const [bulkImageResult, setBulkImageResult] = useState<BulkProductImageUploadResult | null>(null);
+  const bulkImageInputRef = useRef<HTMLInputElement>(null);
 
   const debugClientLifecycle =
     typeof window !== "undefined" &&
@@ -1005,6 +1019,35 @@ export function ProductsClient({
     }
   }
 
+  const handleBulkImageFiles = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const list = e.target.files;
+      if (!list?.length) return;
+      setBulkImageWorking(true);
+      setBulkImageResult(null);
+      try {
+        const fd = new FormData();
+        fd.append("onlyIfEmpty", bulkOnlyEmptyImage ? "1" : "0");
+        const arr = Array.from(list);
+        for (const f of arr) {
+          const processed = await resizeAndCompressImage(f);
+          fd.append("files", processed);
+        }
+        const res = await bulkUploadProductImages(fd);
+        setBulkImageResult(res);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => router.refresh());
+        });
+      } catch (err) {
+        alert(err instanceof Error ? err.message : String(err));
+      } finally {
+        setBulkImageWorking(false);
+        e.target.value = "";
+      }
+    },
+    [bulkOnlyEmptyImage, router]
+  );
+
   function runSearch() {
     setSearch(searchInput);
   }
@@ -1069,7 +1112,7 @@ export function ProductsClient({
             aria-haspopup="menu"
             aria-expanded={uploadOpen}
             disabled={uploading}
-            aria-label="CSV 업로드 방식 선택"
+            aria-label="업로드 메뉴"
           >
             {uploading
               ? "업로드..."
@@ -1177,7 +1220,7 @@ export function ProductsClient({
           </div>
         </div>
 
-        {/* 데스크톱 전용: 카드/리스트/다운로드/CSV/추가 */}
+        {/* 데스크톱 전용: 카드/리스트/다운로드/업로드(CSV·이미지)/추가 */}
         <div className="toolbar-actions toolbar-actions-desktop">
           <div className="toolbar-scroll">
             {renderToolbarActions(
@@ -1208,10 +1251,25 @@ export function ProductsClient({
               ref={uploadMenuRef}
               className="download-dropdown__menu"
               role="menu"
-              aria-label="CSV 업로드 방식"
+              aria-label="업로드 메뉴"
               data-placement={uploadMenuDirection}
               style={uploadMenuStyle}
             >
+              <button
+                type="button"
+                role="menuitem"
+                className="download-dropdown__item"
+                disabled={bulkImageWorking}
+                onClick={() => {
+                  setUploadOpen(false);
+                  setDownloadOpen(false);
+                  setBulkImageResult(null);
+                  setBulkImageModalOpen(true);
+                }}
+              >
+                이미지 업로드
+              </button>
+              <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
               <button
                 type="button"
                 role="menuitem"
@@ -1468,6 +1526,116 @@ export function ProductsClient({
           setEditingVariants([]);
         }}
       />
+
+      {bulkImageModalOpen ? (
+        <div
+          className="modal-overlay add-product-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="bulk-image-modal-title"
+          onClick={() => {
+            if (!bulkImageWorking) setBulkImageModalOpen(false);
+          }}
+        >
+          <div className="modal add-product-modal bulk-image-modal" onClick={(ev) => ev.stopPropagation()}>
+            <div className="modal-header-add-product bulk-image-modal__header">
+              <h3 id="bulk-image-modal-title">이미지 업로드</h3>
+            </div>
+            <p className="bulk-image-modal__hint">
+              파일명(확장자 제외)을 상품 SKU와 같게 맞추세요. 예: <code>T21KT1005RD.jpg</code>,{" "}
+              <code>TGT-901RD.webp</code>
+              <br />
+              브라우저에서 리사이즈·압축 후 Supabase Storage에 저장되며 <code>products.image_url</code>이 갱신됩니다.
+            </p>
+            <label className="bulk-image-modal__checkbox">
+              <span className="bulk-image-modal__checkbox-label">이미지 URL이 비어 있는 상품만 적용</span>
+              <input
+                type="checkbox"
+                className="bulk-image-modal__checkbox-input"
+                checked={bulkOnlyEmptyImage}
+                onChange={(e) => setBulkOnlyEmptyImage(e.target.checked)}
+                disabled={bulkImageWorking}
+              />
+            </label>
+            <div className="bulk-image-modal__actions">
+              <button
+                type="button"
+                className="btn btn-primary btn-compact bulk-image-modal__action-file"
+                disabled={bulkImageWorking}
+                onClick={() => bulkImageInputRef.current?.click()}
+              >
+                {bulkImageWorking ? "처리 중…" : "파일 선택 (여러 개)"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-compact bulk-image-modal__action-close"
+                disabled={bulkImageWorking}
+                onClick={() => setBulkImageModalOpen(false)}
+              >
+                닫기
+              </button>
+            </div>
+            <input
+              ref={bulkImageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="products-csv-file-input"
+              aria-hidden
+              tabIndex={-1}
+              onChange={(e) => void handleBulkImageFiles(e)}
+              disabled={bulkImageWorking}
+            />
+            {bulkImageResult ? (
+              <div className="bulk-image-modal__result">
+                <p>
+                  성공 <strong>{bulkImageResult.successCount}</strong> · 매칭 실패{" "}
+                  <strong>{bulkImageResult.matchFailedCount}</strong> · 업로드 실패{" "}
+                  <strong>{bulkImageResult.uploadFailedCount}</strong>
+                  {bulkImageResult.skippedExistingImageCount > 0 ? (
+                    <>
+                      {" "}
+                      · 이미지 있음 건너뜀 <strong>{bulkImageResult.skippedExistingImageCount}</strong>
+                    </>
+                  ) : null}
+                </p>
+                {bulkImageResult.matchFailedSamples.length > 0 ? (
+                  <p className="bulk-image-modal__result-muted">
+                    매칭 실패 파일 예: {bulkImageResult.matchFailedSamples.join(", ")}
+                  </p>
+                ) : null}
+                {bulkImageResult.uploadErrors.length > 0 ? (
+                  <p className="bulk-image-modal__result-error">
+                    업로드 오류:{" "}
+                    {bulkImageResult.uploadErrors.map((x) => `${x.filename} (${x.message})`).join(" · ")}
+                  </p>
+                ) : null}
+                {bulkImageResult.skippedExistingSamples.length > 0 ? (
+                  <p className="bulk-image-modal__result-muted">
+                    건너뜀(기존 이미지): {bulkImageResult.skippedExistingSamples.slice(0, 12).join(", ")}
+                    {bulkImageResult.skippedExistingSamples.length > 12 ? "…" : ""}
+                  </p>
+                ) : null}
+                {bulkImageResult.duplicateNormSkuUsedFirst.length > 0 ? (
+                  <p className="bulk-image-modal__result-note">
+                    동일 정규화 SKU가 여러 상품이면 첫 행만 갱신:{" "}
+                    {bulkImageResult.duplicateNormSkuUsedFirst.slice(0, 10).join(", ")}
+                    {bulkImageResult.duplicateNormSkuUsedFirst.length > 10 ? "…" : ""}
+                  </p>
+                ) : null}
+                {bulkImageResult.storageDeleteFailures.length > 0 ? (
+                  <p className="bulk-image-modal__result-error">
+                    이전 Storage 파일 삭제 실패(새 이미지는 반영됨):{" "}
+                    {bulkImageResult.storageDeleteFailures
+                      .map((x) => `${x.filename} (${x.message})`)
+                      .join(" · ")}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {listImagePreview ? (
         <div

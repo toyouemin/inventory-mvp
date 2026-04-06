@@ -39,7 +39,7 @@ function fmtPrice(n: number | null | undefined) {
 
 export type ProductCardProps = {
   product: Product;
-  /** public/images 스캔 맵(빈 객체면 SKU 기반 .jpg 추측 URL 비활성화) */
+  /** `getLocalImageHrefBySkuLower()` 맵(키 = 정규화 SKU) */
   localImageHrefBySkuLower: Record<string, string>;
   variants?: ProductVariant[];
   onEditClick?: (productId: string) => void;

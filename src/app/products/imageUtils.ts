@@ -1,47 +1,14 @@
-import { filterFailedProductImageCandidates } from "./imageLoadFailureCache";
-
+/** 긴 변 기준(초과 시 비율 유지 축소). 이미 이하면 해상도는 유지할 수 있음 */
+const MAX_SIZE_PX = 600;
+/** 600px급 리스트/카드용 — 0.75~0.80 범위에서 용량·화질 균형 */
+const JPEG_QUALITY = 0.78;
+/** 투명 유지; 사진형 PNG도 어느 정도만 줄임(무손실 아님). 더 작게 하면 텍스트·로고가 거칠어질 수 있음 */
+const PNG_QUALITY = 0.88;
 /**
- * 상품 표시용 이미지 URL 후보 (순서대로 시도).
- * 1) image_url이 비어 있지 않으면 그 값
- * 2) localImageHrefBySkuLower 가 전달된 경우(빈 {} 포함): public/images 실제 파일과 매칭된 URL만 (추측 .jpg 없음 → 404 폭주 방지)
- * 3) 인자 생략(undefined): 호환용 `/images/{encodeURIComponent(SKU)}.jpg`
+ * 해상도는 이미 충분한데 원본만 큰 경우(고압축 PNG·메타데이터 등) 재인코딩해 업로드·전송 부담 감소.
+ * 이 크기 이하면 그대로 통과(불필요한 재압축 방지).
  */
-export function buildProductImageCandidates(
-  sku: string,
-  imageUrl: string | null | undefined,
-  localImageHrefBySkuLower?: Record<string, string>
-): string[] {
-  const out: string[] = [];
-  const u = (imageUrl ?? "").trim();
-  if (u) out.push(u);
-  const s = (sku ?? "").trim();
-  if (!s) return out;
-
-  if (localImageHrefBySkuLower !== undefined) {
-    const href = localImageHrefBySkuLower[s.toLowerCase()];
-    if (href && !out.includes(href)) out.push(href);
-    return out;
-  }
-
-  const path = `/images/${encodeURIComponent(s)}.jpg`;
-  if (!out.includes(path)) out.push(path);
-  return out;
-}
-
-/** 첫 번째 후보만 필요할 때(비권장: UI는 useProductImageSrc 사용) */
-export function productDisplayImageSrc(
-  sku: string,
-  imageUrl: string | null | undefined,
-  localImageHrefBySkuLower?: Record<string, string>
-): string {
-  const c = filterFailedProductImageCandidates(
-    buildProductImageCandidates(sku, imageUrl, localImageHrefBySkuLower)
-  );
-  return c[0] ?? "";
-}
-
-const MAX_SIZE_PX = 1200;
-const JPEG_QUALITY = 0.82;
+const SOFT_REENCODE_MAX_BYTES = 380 * 1024;
 
 export function readAsDataURL(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -52,35 +19,48 @@ export function readAsDataURL(file: File): Promise<string> {
   });
 }
 
-/** Resize image to max 1200px and compress. Returns new File for upload. */
+function targetDimensions(naturalW: number, naturalH: number): { w: number; h: number } {
+  let w = naturalW;
+  let h = naturalH;
+  if (w <= MAX_SIZE_PX && h <= MAX_SIZE_PX) {
+    return { w, h };
+  }
+  if (w > h) {
+    h = Math.round((h * MAX_SIZE_PX) / w);
+    w = MAX_SIZE_PX;
+  } else {
+    w = Math.round((w * MAX_SIZE_PX) / h);
+    h = MAX_SIZE_PX;
+  }
+  return { w, h };
+}
+
+/** 긴 변 최대 600px + (선택) 과대 용량 시 동일 해상도 재인코딩. Returns new File for upload. */
 export function resizeAndCompressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-      if (w <= MAX_SIZE_PX && h <= MAX_SIZE_PX) {
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      const { w: tw, h: th } = targetDimensions(nw, nh);
+      const needsResize = nw !== tw || nh !== th;
+      const needsReencode = file.size > SOFT_REENCODE_MAX_BYTES;
+      if (!needsResize && !needsReencode) {
         resolve(file);
         return;
       }
-      if (w > h) {
-        h = Math.round((h * MAX_SIZE_PX) / w);
-        w = MAX_SIZE_PX;
-      } else {
-        w = Math.round((w * MAX_SIZE_PX) / h);
-        h = MAX_SIZE_PX;
-      }
+
       const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = tw;
+      canvas.height = th;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         resolve(file);
         return;
       }
-      ctx.drawImage(img, 0, 0, w, h);
+      ctx.drawImage(img, 0, 0, tw, th);
       const type = file.type === "image/png" ? "image/png" : "image/jpeg";
       canvas.toBlob(
         (blob) => {
@@ -92,7 +72,7 @@ export function resizeAndCompressImage(file: File): Promise<File> {
           resolve(new File([blob], name, { type }));
         },
         type,
-        type === "image/jpeg" ? JPEG_QUALITY : 0.92
+        type === "image/jpeg" ? JPEG_QUALITY : PNG_QUALITY
       );
     };
     img.onerror = () => {

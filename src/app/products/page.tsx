@@ -127,6 +127,7 @@ export default async function ProductsPage({
   }
 
   const categoryOrderFromDb = await fetchCategoryOrderMap();
+  /** `public/images` 파일명 stem ↔ `normalizeSkuForMatch`로 매칭 (jpg>jpeg>png>webp) */
   const localImageHrefBySkuLower = getLocalImageHrefBySkuLower();
   const products: Product[] = dedupeProductsById(
     (data ?? []).map((row: Record<string, unknown>) => mapProduct(row))

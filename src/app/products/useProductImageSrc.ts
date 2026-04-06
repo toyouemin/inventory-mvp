@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { buildProductImageCandidates } from "./imageUtils";
+import { buildProductImageCandidates } from "./productImageCandidates";
 import {
   filterFailedProductImageCandidates,
   getProductImageFailureCacheVersion,
@@ -18,9 +18,7 @@ export type UseProductImageSrcResult = {
 };
 
 /**
- * 1) image_url 비어 있지 않으면 그 URL
- * 2) localImageHrefBySkuLower 전달 시 public/images 스캔 매칭 URL만(추측 .jpg 없음)
- * 3) 맵 미전달(undefined) 시 호환용 /images/{SKU}.jpg
+ * 후보 순서는 `buildProductImageCandidates`와 동일 (image_url → 로컬 맵 → 맵 없을 때만 확장자 순 추측 URL).
  * onError 시 URL을 세션 실패 캐시에 기록 → 후보에서 제외.
  *
  * SSR/첫 하이드레이션: sessionStorage·실패 캐시를 읽지 않음(서버와 첫 클라 HTML 동일).

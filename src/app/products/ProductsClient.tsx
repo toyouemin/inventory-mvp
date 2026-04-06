@@ -334,7 +334,7 @@ export function ProductsClient({
   products: Product[];
   categories?: string[];
   categoryOrder?: Record<string, number>;
-  /** public/images 스캔 결과(항상 전달; 빈 객체면 로컬 SKU .jpg 추측 URL 비활성화) */
+  /** `getLocalImageHrefBySkuLower()` — 키는 `normalizeSkuForMatch`(파일명 stem·상품 SKU 공통) */
   localImageHrefBySkuLower: Record<string, string>;
   variantsByProductId?: Record<string, ProductVariant[]>;
   /** `?debugProductsDupes=1` — 파이프라인·카드 렌더 단계 로그 */

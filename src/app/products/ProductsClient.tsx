@@ -1435,7 +1435,7 @@ export function ProductsClient({
                   requestAnimationFrame(() => csvFileInputRef.current?.click());
                 }}
               >
-                덮어쓰기
+                CSV 덮어쓰기
               </button>
               <button
                 type="button"
@@ -1454,7 +1454,7 @@ export function ProductsClient({
                   requestAnimationFrame(() => csvFileInputRef.current?.click());
                 }}
               >
-                초기화
+                CSV 초기화
               </button>
             </div>,
             document.body

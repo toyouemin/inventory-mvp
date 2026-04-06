@@ -616,10 +616,13 @@ button.download-dropdown__item:disabled {
 }
 
 .product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty {
-  max-width: min(160px, 36vw);
+  max-width: clamp(64px, 26vw, 132px);
   flex-shrink: 1;
   min-width: 0;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .product-card__memo-btn--filled {
@@ -639,6 +642,9 @@ button.download-dropdown__item:disabled {
   display: flex;
   flex-direction: column;
   gap: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   max-height: none;
   overflow: visible;
   padding: 0;
@@ -656,15 +662,21 @@ button.download-dropdown__item:disabled {
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 6px 10px;
   border: none;
   border-radius: 0;
   background: transparent;
+  overflow: hidden;
 }
 
 .product-card__option-chips-scroll {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
@@ -697,6 +709,10 @@ button.download-dropdown__item:disabled {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .product-card__option-name {
@@ -744,7 +760,10 @@ button.download-dropdown__item:disabled {
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  min-width: max-content;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .product-card__memo-btn {
@@ -818,10 +837,12 @@ button.download-dropdown__item:disabled {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  flex: 0 0 auto;
 }
 
 .product-card__adjust button {
+  flex: 0 0 auto;
   width: 40px;
   min-width: 40px;
   padding: 8px;
@@ -2104,7 +2125,7 @@ label {
   }
 
   .product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty {
-    max-width: min(130px, 48vw);
+    max-width: clamp(56px, 24vw, 120px);
   }
 
   .product-card__option-row .product-card__adjust {

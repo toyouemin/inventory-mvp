@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
@@ -65,6 +66,7 @@ export function EditProductModal({
   onClose: () => void;
   onSaved?: (payload: { productId: string; memo: string | null; memo2: string | null }) => void;
 }) {
+  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [sku, setSku] = useState("");
   const [category, setCategory] = useState("");
@@ -176,6 +178,7 @@ export function EditProductModal({
         variants: { updates, deleteIds },
         stock: stockForSingle,
       });
+      router.refresh();
       onSaved?.({
         productId: product.id,
         memo: memo.trim() || null,

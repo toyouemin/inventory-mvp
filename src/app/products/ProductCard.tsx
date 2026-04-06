@@ -86,6 +86,7 @@ export const ProductCard = memo(function ProductCard({
   const { src: imgSrc, onError: onImgError, dead: imgDead } = useProductImageSrc(
     product.sku,
     product.imageUrl,
+    product.updatedAt,
     localImageHrefBySkuLower
   );
 

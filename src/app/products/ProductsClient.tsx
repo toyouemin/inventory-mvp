@@ -294,17 +294,19 @@ function measureFixedMenuPosition(
 function ProductsTableThumbCell({
   sku,
   imageUrl,
+  updatedAt,
   alt,
   onOpenPreview,
   localImageHrefBySkuLower,
 }: {
   sku: string;
   imageUrl: string | null | undefined;
+  updatedAt?: string | null;
   alt: string;
   onOpenPreview: (url: string, altText: string) => void;
   localImageHrefBySkuLower: Record<string, string>;
 }) {
-  const { src, onError, dead } = useProductImageSrc(sku, imageUrl, localImageHrefBySkuLower);
+  const { src, onError, dead } = useProductImageSrc(sku, imageUrl, updatedAt, localImageHrefBySkuLower);
   return (
     <div className="products-table__thumb-root">
       {dead || !src ? (
@@ -1613,6 +1615,7 @@ export function ProductsClient({
                         <ProductsTableThumbCell
                           sku={row.sku}
                           imageUrl={row.imageUrl}
+                          updatedAt={row.updatedAt}
                           alt={(row.name ?? row.sku ?? "").toString()}
                           onOpenPreview={(url, altText) => setListImagePreview({ url, alt: altText })}
                           localImageHrefBySkuLower={localImageHrefBySkuLower}

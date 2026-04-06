@@ -27,11 +27,12 @@ export type UseProductImageSrcResult = {
 export function useProductImageSrc(
   sku: string,
   imageUrl: string | null | undefined,
+  updatedAt?: string | null,
   localImageHrefBySkuLower?: Record<string, string>
 ): UseProductImageSrcResult {
   const rawCandidates = useMemo(
-    () => buildProductImageCandidates(sku, imageUrl, localImageHrefBySkuLower),
-    [sku, imageUrl, localImageHrefBySkuLower]
+    () => buildProductImageCandidates(sku, imageUrl, updatedAt, localImageHrefBySkuLower),
+    [sku, imageUrl, updatedAt, localImageHrefBySkuLower]
   );
 
   const [applyFailureCache, setApplyFailureCache] = useState(false);
@@ -59,7 +60,7 @@ export function useProductImageSrc(
   const errorOncePerUrl = useRef<Set<string>>(new Set());
   useEffect(() => {
     errorOncePerUrl.current.clear();
-  }, [sku, imageUrl]);
+  }, [sku, imageUrl, updatedAt]);
 
   const src = dead || candidates.length === 0 ? null : candidates[0] ?? null;
 

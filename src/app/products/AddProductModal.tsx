@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import { VariantEditor, type VariantRow } from "./VariantEditor";
@@ -26,6 +27,7 @@ export function AddProductModal({
   initialName?: string;
   initialCategory?: string;
 }) {
+  const router = useRouter();
   const [pending, setPending] = useState(false);
 
   const [sku, setSku] = useState("");
@@ -121,6 +123,7 @@ export function AddProductModal({
         memo2: memo2.trim() || null,
         variants,
       });
+      router.refresh();
 
       setSku("");
       setCategory("");

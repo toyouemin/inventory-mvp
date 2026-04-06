@@ -14,11 +14,25 @@ import { normalizeSkuForMatch } from "./skuNormalize";
 export function buildProductImageCandidates(
   sku: string,
   imageUrl: string | null | undefined,
+  updatedAt?: string | null,
   localImageHrefBySkuLower?: Record<string, string>
 ): string[] {
   const out: string[] = [];
   const u = (imageUrl ?? "").trim();
-  if (u) out.push(u);
+  if (u) {
+    if (updatedAt?.trim()) {
+      try {
+        const parsed = new URL(u, "http://local");
+        parsed.searchParams.set("v", updatedAt.trim());
+        const withVersion = parsed.toString().replace(/^http:\/\/local/, "");
+        out.push(withVersion);
+      } catch {
+        out.push(u);
+      }
+    } else {
+      out.push(u);
+    }
+  }
 
   const normSku = normalizeSkuForMatch(sku);
   if (!normSku) return out;
@@ -41,10 +55,11 @@ export function buildProductImageCandidates(
 export function productDisplayImageSrc(
   sku: string,
   imageUrl: string | null | undefined,
+  updatedAt?: string | null,
   localImageHrefBySkuLower?: Record<string, string>
 ): string {
   const c = filterFailedProductImageCandidates(
-    buildProductImageCandidates(sku, imageUrl, localImageHrefBySkuLower)
+    buildProductImageCandidates(sku, imageUrl, updatedAt, localImageHrefBySkuLower)
   );
   return c[0] ?? "";
 }

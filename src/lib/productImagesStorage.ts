@@ -131,6 +131,18 @@ export type ProductImageOrphanCleanupResult = {
   parseFailures: Array<{ imageUrl: string; reason: string }>;
 };
 
+const DELETABLE_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp", "tif", "tiff"]);
+
+function isDeletableImageObjectPath(path: string): boolean {
+  const p = String(path ?? "").trim();
+  if (!p) return false;
+  const base = p.split("/").pop() ?? p;
+  if (!base || base.startsWith(".")) return false; // .emptyFolderPlaceholder 등 보존
+  const m = /\.([a-zA-Z0-9]+)$/.exec(base);
+  if (!m?.[1]) return false;
+  return DELETABLE_IMAGE_EXTENSIONS.has(m[1].toLowerCase());
+}
+
 async function listAllProductImagesObjectPaths(): Promise<string[]> {
   const out: string[] = [];
   const queue: string[] = [""];
@@ -225,7 +237,11 @@ export async function cleanupProductImageOrphans(options?: {
   }
 
   const storagePaths = await listAllProductImagesObjectPaths();
-  const orphanPaths = storagePaths.filter((p) => !referenced.has(p)).sort((a, b) => a.localeCompare(b, "ko"));
+  // placeholder/비이미지 파일은 orphan 계산·삭제 대상에서 제외
+  const orphanPaths = storagePaths
+    .filter((p) => !referenced.has(p))
+    .filter((p) => isDeletableImageObjectPath(p))
+    .sort((a, b) => a.localeCompare(b, "ko"));
 
   let deletedPaths: string[] = [];
   let failedPaths: Array<{ path: string; message: string }> = [];

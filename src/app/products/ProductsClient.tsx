@@ -34,6 +34,18 @@ type CsvUploadMode = "merge" | "reset";
 
 const CSV_UPLOAD_HIGHLIGHT_MS = 6000;
 
+type StorageOrphanCleanupResult = {
+  bucket: string;
+  referencedCount: number;
+  storageFileCount: number;
+  orphanCount: number;
+  orphanPaths: string[];
+  deletedCount: number;
+  deletedPaths: string[];
+  failedPaths: Array<{ path: string; message: string }>;
+  parseFailures: Array<{ imageUrl: string; reason: string }>;
+};
+
 /** 동일 `product.id`가 배열에 중복이면 카드·개수가 2배로 보이므로 첫 항목만 유지 */
 function dedupeProductsById(products: Product[]): Product[] {
   const seen = new Set<string>();
@@ -422,6 +434,9 @@ export function ProductsClient({
   const [bulkImageWorking, setBulkImageWorking] = useState(false);
   const [bulkImageResult, setBulkImageResult] = useState<BulkProductImageUploadResult | null>(null);
   const bulkImageInputRef = useRef<HTMLInputElement>(null);
+  const [orphanResult, setOrphanResult] = useState<StorageOrphanCleanupResult | null>(null);
+  const [orphanWorkingMode, setOrphanWorkingMode] = useState<"scan" | "delete" | null>(null);
+  const [orphanNotice, setOrphanNotice] = useState<string>("");
 
   const debugClientLifecycle =
     typeof window !== "undefined" &&
@@ -1048,6 +1063,114 @@ export function ProductsClient({
     [bulkOnlyEmptyImage, router]
   );
 
+  const scanStorageOrphans = useCallback(async () => {
+    setOrphanWorkingMode("scan");
+    setOrphanNotice("");
+    try {
+      const res = await fetch("/api/admin/storage-orphans", {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string } & Partial<StorageOrphanCleanupResult>;
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `고아 이미지 점검 실패 (${res.status})`);
+      }
+      setOrphanResult({
+        bucket: String(json.bucket ?? ""),
+        referencedCount: Number(json.referencedCount ?? 0),
+        storageFileCount: Number(json.storageFileCount ?? 0),
+        orphanCount: Number(json.orphanCount ?? 0),
+        orphanPaths: Array.isArray(json.orphanPaths) ? json.orphanPaths.map((x) => String(x)) : [],
+        deletedCount: Number(json.deletedCount ?? 0),
+        deletedPaths: Array.isArray(json.deletedPaths) ? json.deletedPaths.map((x) => String(x)) : [],
+        failedPaths: Array.isArray(json.failedPaths)
+          ? json.failedPaths.map((x) => ({
+              path: String((x as { path?: unknown }).path ?? ""),
+              message: String((x as { message?: unknown }).message ?? ""),
+            }))
+          : [],
+        parseFailures: Array.isArray(json.parseFailures)
+          ? json.parseFailures.map((x) => ({
+              imageUrl: String((x as { imageUrl?: unknown }).imageUrl ?? ""),
+              reason: String((x as { reason?: unknown }).reason ?? ""),
+            }))
+          : [],
+      });
+      setOrphanNotice("고아 이미지 점검 완료");
+    } catch (err) {
+      setOrphanNotice(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOrphanWorkingMode(null);
+    }
+  }, []);
+
+  const deleteStorageOrphans = useCallback(async () => {
+    if (!orphanResult) return;
+    if (orphanResult.parseFailures.length > 0) return;
+    if (orphanResult.orphanCount === 0) return;
+    if (
+      !confirm(
+        `고아 이미지 ${orphanResult.orphanCount}건을 삭제합니다. 계속할까요?\n(참조 중 이미지와 placeholder는 삭제하지 않습니다.)`
+      )
+    ) {
+      return;
+    }
+    setOrphanWorkingMode("delete");
+    setOrphanNotice("");
+    try {
+      const res = await fetch("/api/admin/storage-orphans", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ dryRun: false, confirm: true }),
+      });
+      const json = (await res.json()) as { ok?: boolean; error?: string } & Partial<StorageOrphanCleanupResult>;
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || `고아 이미지 삭제 실패 (${res.status})`);
+      }
+      const next: StorageOrphanCleanupResult = {
+        bucket: String(json.bucket ?? orphanResult.bucket),
+        referencedCount: Number(json.referencedCount ?? orphanResult.referencedCount),
+        storageFileCount: Number(json.storageFileCount ?? orphanResult.storageFileCount),
+        orphanCount: Number(json.orphanCount ?? 0),
+        orphanPaths: Array.isArray(json.orphanPaths) ? json.orphanPaths.map((x) => String(x)) : [],
+        deletedCount: Number(json.deletedCount ?? 0),
+        deletedPaths: Array.isArray(json.deletedPaths) ? json.deletedPaths.map((x) => String(x)) : [],
+        failedPaths: Array.isArray(json.failedPaths)
+          ? json.failedPaths.map((x) => ({
+              path: String((x as { path?: unknown }).path ?? ""),
+              message: String((x as { message?: unknown }).message ?? ""),
+            }))
+          : [],
+        parseFailures: Array.isArray(json.parseFailures)
+          ? json.parseFailures.map((x) => ({
+              imageUrl: String((x as { imageUrl?: unknown }).imageUrl ?? ""),
+              reason: String((x as { reason?: unknown }).reason ?? ""),
+            }))
+          : [],
+      };
+      setOrphanResult(next);
+      setOrphanNotice(
+        next.failedPaths.length > 0
+          ? `삭제 완료(일부 실패 ${next.failedPaths.length}건)`
+          : `삭제 완료(${next.deletedCount}건)`
+      );
+    } catch (err) {
+      setOrphanNotice(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOrphanWorkingMode(null);
+    }
+  }, [orphanResult]);
+
+  const orphanDeleteDisabled =
+    orphanWorkingMode !== null ||
+    !orphanResult ||
+    orphanResult.orphanCount === 0 ||
+    orphanResult.parseFailures.length > 0;
+
   function runSearch() {
     setSearch(searchInput);
   }
@@ -1259,6 +1382,38 @@ export function ProductsClient({
                 type="button"
                 role="menuitem"
                 className="download-dropdown__item"
+                disabled={orphanWorkingMode !== null}
+                onClick={() => {
+                  setUploadOpen(false);
+                  void scanStorageOrphans();
+                }}
+              >
+                {orphanWorkingMode === "scan" ? "고아 이미지 점검 중…" : "고아 이미지 점검"}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className="download-dropdown__item"
+                disabled={orphanDeleteDisabled}
+                title={
+                  orphanResult?.parseFailures.length
+                    ? "parse 실패가 있어 삭제할 수 없습니다."
+                    : orphanResult?.orphanCount === 0
+                      ? "삭제할 고아 이미지가 없습니다."
+                      : undefined
+                }
+                onClick={() => {
+                  setUploadOpen(false);
+                  void deleteStorageOrphans();
+                }}
+              >
+                {orphanWorkingMode === "delete" ? "고아 이미지 삭제 중…" : "고아 이미지 삭제"}
+              </button>
+              <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
+              <button
+                type="button"
+                role="menuitem"
+                className="download-dropdown__item"
                 disabled={bulkImageWorking}
                 onClick={() => {
                   setUploadOpen(false);
@@ -1305,6 +1460,57 @@ export function ProductsClient({
             document.body
           )
         : null}
+
+      {(orphanResult || orphanNotice) && (
+        <section className="orphan-cleanup-panel" aria-live="polite">
+          <div className="orphan-cleanup-panel__head">
+            <strong>Storage 고아 이미지 정리 결과</strong>
+            {orphanNotice ? <span className="orphan-cleanup-panel__notice">{orphanNotice}</span> : null}
+          </div>
+          {orphanResult ? (
+            <>
+              <p className="orphan-cleanup-panel__summary">
+                bucket <strong>{orphanResult.bucket || "-"}</strong> · referenced{" "}
+                <strong>{orphanResult.referencedCount}</strong> · storage files{" "}
+                <strong>{orphanResult.storageFileCount}</strong> · orphan <strong>{orphanResult.orphanCount}</strong>
+                {orphanResult.deletedCount > 0 ? (
+                  <>
+                    {" "}
+                    · deleted <strong>{orphanResult.deletedCount}</strong>
+                  </>
+                ) : null}
+              </p>
+
+              <div className="orphan-cleanup-panel__grid">
+                <div className="orphan-cleanup-panel__box">
+                  <p className="orphan-cleanup-panel__label">orphanPaths ({orphanResult.orphanPaths.length})</p>
+                  <pre className="orphan-cleanup-panel__list">
+                    {orphanResult.orphanPaths.length > 0 ? orphanResult.orphanPaths.join("\n") : "(없음)"}
+                  </pre>
+                </div>
+                <div className="orphan-cleanup-panel__box">
+                  <p className="orphan-cleanup-panel__label">parseFailures ({orphanResult.parseFailures.length})</p>
+                  <pre className="orphan-cleanup-panel__list">
+                    {orphanResult.parseFailures.length > 0
+                      ? orphanResult.parseFailures
+                          .map((x) => `${x.imageUrl} :: ${x.reason}`)
+                          .join("\n")
+                      : "(없음)"}
+                  </pre>
+                </div>
+                <div className="orphan-cleanup-panel__box">
+                  <p className="orphan-cleanup-panel__label">failedPaths ({orphanResult.failedPaths.length})</p>
+                  <pre className="orphan-cleanup-panel__list">
+                    {orphanResult.failedPaths.length > 0
+                      ? orphanResult.failedPaths.map((x) => `${x.path} :: ${x.message}`).join("\n")
+                      : "(없음)"}
+                  </pre>
+                </div>
+              </div>
+            </>
+          ) : null}
+        </section>
+      )}
 
       <p className="products-count">
         {skuDisplayGroups.length}개 상품

@@ -1161,6 +1161,21 @@ label {
   outline-offset: 2px;
 }
 
+/* 리스트 모드: 이미지 열 썸네일을 세로·가로 모두 키워 행에 맞춤(기본 thumb-small은 아래) */
+.products-table .products-table__thumb-root {
+  min-height: 64px;
+}
+
+.products-table .products-table__thumb-btn {
+  border-radius: 10px;
+}
+
+.products-table .thumb-small {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+}
+
 .thumb-small {
   width: 36px;
   height: 36px;
@@ -1220,6 +1235,52 @@ label {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+/* 리스트 PC: 재고 -1 → 수량 → +1 한 줄(열이 너무 좁아 세로로 깨지지 않게) */
+@media (min-width: 769px) {
+  .products-table__th-stock,
+  .products-table__td-stock {
+    min-width: 9.5rem;
+    white-space: nowrap;
+  }
+
+  .products-table .stock-cell {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+
+  .products-table .stock-cell .stock-buttons {
+    display: contents;
+  }
+
+  .products-table .stock-cell .stock-cell__qty {
+    order: 2;
+  }
+
+  .products-table .stock-cell .stock-buttons .btn-mini:first-of-type {
+    order: 1;
+  }
+
+  .products-table .stock-cell .stock-buttons .btn-mini:last-of-type {
+    order: 3;
+  }
+
+  .products-table .row-actions {
+    flex-wrap: nowrap;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .products-table .btn-row {
+    padding: 4px 8px;
+    font-size: 13px;
+    line-height: 1.25;
+    min-height: 0;
+  }
 }
 
 /* 리스트 모드 좁은 화면: 재고 조절을 -1 → 재고·수량 → +1 세로 순으로 */

@@ -1465,21 +1465,19 @@ export function ProductsClient({
         <section className="orphan-cleanup-panel" aria-live="polite">
           <div className="orphan-cleanup-panel__head">
             <strong>스토리지 고아 이미지 점검 결과</strong>
-            <div className="orphan-cleanup-panel__head-actions">
-              {orphanNotice ? <span className="orphan-cleanup-panel__notice">{orphanNotice}</span> : null}
-              <button
-                type="button"
-                className="orphan-cleanup-panel__close"
-                onClick={() => {
-                  setOrphanResult(null);
-                  setOrphanNotice("");
-                }}
-                aria-label="고아 이미지 점검 결과 닫기"
-              >
-                닫기
-              </button>
-            </div>
+            <button
+              type="button"
+              className="orphan-cleanup-panel__close"
+              onClick={() => {
+                setOrphanResult(null);
+                setOrphanNotice("");
+              }}
+              aria-label="고아 이미지 점검 결과 닫기"
+            >
+              닫기
+            </button>
           </div>
+          {orphanNotice ? <p className="orphan-cleanup-panel__notice">{orphanNotice}</p> : null}
           {orphanResult ? (
             <>
               <p className="orphan-cleanup-panel__summary">

@@ -2174,9 +2174,9 @@ label {
     right: 0;
     z-index: 35;
     margin: 0;
-    padding: 6px 8px 8px;
+    padding: 0;
     background: var(--bg);
-    border-bottom: 1px solid var(--border);
+    border-bottom: none;
   }
 
   .products-sticky-dup-header {
@@ -2184,22 +2184,9 @@ label {
     margin: 0;
   }
 
-  .products-sticky-dup-header .app-site-header {
-    max-width: none;
-    margin: 0;
-    padding: 12px 0 6px;
-  }
-
   .products-sticky-dup-nav {
-    display: flex;
-    margin: 0 0 6px;
-  }
-
-  .products-sticky-dup-nav nav {
-    position: static;
-    width: 100%;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    display: block;
+    margin: 0;
   }
 
   .products-toolbar--sticky {

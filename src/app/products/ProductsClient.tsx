@@ -1429,7 +1429,7 @@ export function ProductsClient({
       });
       const json = (await res.json()) as { ok?: boolean; error?: string } & Partial<StorageOrphanCleanupResult>;
       if (!res.ok || !json.ok) {
-        throw new Error(json.error || `고아 이미지 점검 실패 (${res.status})`);
+        throw new Error(json.error || `불필요 이미지 점검 실패 (${res.status})`);
       }
       setOrphanResult({
         bucket: String(json.bucket ?? ""),
@@ -1452,7 +1452,7 @@ export function ProductsClient({
             }))
           : [],
       });
-      setOrphanNotice("고아 이미지 점검 완료");
+      setOrphanNotice("불필요 이미지 점검 완료");
     } catch (err) {
       setOrphanNotice(err instanceof Error ? err.message : String(err));
     } finally {
@@ -1466,7 +1466,7 @@ export function ProductsClient({
     if (orphanResult.orphanCount === 0) return;
     if (
       !confirm(
-        `고아 이미지 ${orphanResult.orphanCount}건을 삭제합니다. 계속할까요?\n(참조 중 이미지와 placeholder는 삭제하지 않습니다.)`
+        `불필요 이미지 ${orphanResult.orphanCount}건을 삭제합니다. 계속할까요?\n(참조 중 이미지와 placeholder는 삭제하지 않습니다.)`
       )
     ) {
       return;
@@ -1484,7 +1484,7 @@ export function ProductsClient({
       });
       const json = (await res.json()) as { ok?: boolean; error?: string } & Partial<StorageOrphanCleanupResult>;
       if (!res.ok || !json.ok) {
-        throw new Error(json.error || `고아 이미지 삭제 실패 (${res.status})`);
+        throw new Error(json.error || `불필요 이미지 삭제 실패 (${res.status})`);
       }
       const next: StorageOrphanCleanupResult = {
         bucket: String(json.bucket ?? orphanResult.bucket),
@@ -1802,7 +1802,7 @@ export function ProductsClient({
                   void scanStorageOrphans();
                 }}
               >
-                {orphanWorkingMode === "scan" ? "고아 이미지 점검 중…" : "고아 이미지 점검"}
+                {orphanWorkingMode === "scan" ? "불필요 이미지 점검 중…" : "불필요 이미지 점검"}
               </button>
               <button
                 type="button"
@@ -1813,7 +1813,7 @@ export function ProductsClient({
                   orphanResult?.parseFailures.length
                     ? "parse 실패가 있어 삭제할 수 없습니다."
                     : orphanResult?.orphanCount === 0
-                      ? "삭제할 고아 이미지가 없습니다."
+                      ? "삭제할 불필요 이미지가 없습니다."
                       : undefined
                 }
                 onClick={() => {
@@ -1821,7 +1821,7 @@ export function ProductsClient({
                   void deleteStorageOrphans();
                 }}
               >
-                {orphanWorkingMode === "delete" ? "고아 이미지 삭제 중…" : "고아 이미지 삭제"}
+                {orphanWorkingMode === "delete" ? "불필요 이미지 삭제 중…" : "불필요 이미지 삭제"}
               </button>
               <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
               <button
@@ -1836,7 +1836,7 @@ export function ProductsClient({
                   setBulkImageModalOpen(true);
                 }}
               >
-                이미지 업로드
+                일괄 이미지 업로드
               </button>
               <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
               <button
@@ -1878,7 +1878,7 @@ export function ProductsClient({
         {(orphanResult || orphanNotice) && (
         <section className="orphan-cleanup-panel" aria-live="polite">
           <div className="orphan-cleanup-panel__head">
-            <strong>스토리지 고아 이미지 점검 결과</strong>
+            <strong>스토리지 불필요 이미지 점검 결과</strong>
             <button
               type="button"
               className="orphan-cleanup-panel__close"
@@ -1886,7 +1886,7 @@ export function ProductsClient({
                 setOrphanResult(null);
                 setOrphanNotice("");
               }}
-              aria-label="고아 이미지 점검 결과 닫기"
+              aria-label="불필요 이미지 점검 결과 닫기"
             >
               닫기
             </button>
@@ -1897,7 +1897,7 @@ export function ProductsClient({
               <p className="orphan-cleanup-panel__summary">
                 저장소 <strong>{orphanResult.bucket || "-"}</strong> · DB에서 사용 중{" "}
                 <strong>{orphanResult.referencedCount}개</strong> · 스토리지 전체{" "}
-                <strong>{orphanResult.storageFileCount}개</strong> · 고아 이미지{" "}
+                <strong>{orphanResult.storageFileCount}개</strong> · 불필요 이미지{" "}
                 <strong>{orphanResult.orphanCount}개</strong>
                 {orphanResult.deletedCount > 0 ? (
                   <>
@@ -1910,7 +1910,7 @@ export function ProductsClient({
               <div className="orphan-cleanup-panel__grid">
                 <div className="orphan-cleanup-panel__box">
                   <p className="orphan-cleanup-panel__label">
-                    고아 이미지 경로 ({orphanResult.orphanPaths.length}개)
+                    불필요 이미지 경로 ({orphanResult.orphanPaths.length}개)
                   </p>
                   <pre className="orphan-cleanup-panel__list">
                     {orphanResult.orphanPaths.length > 0 ? orphanResult.orphanPaths.join("\n") : "없음"}
@@ -2091,7 +2091,7 @@ export function ProductsClient({
         >
           <div className="modal add-product-modal bulk-image-modal" onClick={(ev) => ev.stopPropagation()}>
             <div className="modal-header-add-product bulk-image-modal__header">
-              <h3 id="bulk-image-modal-title">이미지 업로드</h3>
+              <h3 id="bulk-image-modal-title">일괄 이미지 업로드</h3>
             </div>
             <p className="bulk-image-modal__hint">
               파일명(확장자 제외)을 상품 SKU와 같게 맞추세요. 예: <code>T21KT1005RD.jpg</code>,{" "}

@@ -74,6 +74,25 @@ function debugVariantAddRowEnabled(): boolean {
   return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugVariantAddRow") === "1";
 }
 
+function normalizeStockInput(raw: string): string {
+  const trimmed = String(raw ?? "").trim();
+  if (trimmed === "") return "";
+  const digitsOnly = trimmed.replace(/[^\d]/g, "");
+  if (digitsOnly === "") return "";
+  return digitsOnly.replace(/^0+(?=\d)/, "");
+}
+
+function normalizePriceInput(raw: string): string {
+  const trimmed = String(raw ?? "").trim();
+  if (trimmed === "") return "";
+  const digitsOnly = trimmed.replace(/[^\d]/g, "");
+  if (digitsOnly === "") return "";
+  const normalized = digitsOnly.replace(/^0+(?=\d)/, "");
+  const n = Number(normalized);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString("ko-KR");
+}
+
 export function VariantEditor({
   rows,
   onRowsChange,
@@ -138,15 +157,22 @@ export function VariantEditor({
   );
 
   type Field = keyof Omit<VariantRow, "rowId" | "variantId">;
+  const priceFields: ReadonlySet<Field> = new Set(["wholesalePrice", "msrpPrice", "salePrice", "extraPrice"]);
 
   const updateRow = useCallback(
     (rowId: string, field: Field, value: string) => {
+      const nextValue =
+        field === "stock"
+          ? normalizeStockInput(value)
+          : priceFields.has(field)
+            ? normalizePriceInput(value)
+            : value;
       onRowsChange((prev) => {
         if (prev.length === 0) {
           const r = emptyRow();
-          return [{ ...r, rowId: generateRowId(), [field]: value }];
+          return [{ ...r, rowId: generateRowId(), [field]: nextValue }];
         }
-        return prev.map((r) => (r.rowId === rowId ? { ...r, [field]: value } : r));
+        return prev.map((r) => (r.rowId === rowId ? { ...r, [field]: nextValue } : r));
       });
     },
     [onRowsChange]
@@ -209,6 +235,9 @@ export function VariantEditor({
               min={0}
               className="variant-editor-stock-input"
               value={row.stock}
+              onFocus={(e) => {
+                if (e.currentTarget.value === "0") e.currentTarget.select();
+              }}
               onChange={(e) => updateRow(row.rowId, "stock", e.target.value)}
               placeholder="재고"
             />

@@ -84,6 +84,7 @@ export const ProductCard = memo(function ProductCard({
   const [memoDraft1, setMemoDraft1] = useState("");
   const [memoDraft2, setMemoDraft2] = useState("");
   const [memoPending, setMemoPending] = useState(false);
+  const [showAllMemos, setShowAllMemos] = useState(true);
   const safeVariants = Array.isArray(variants) ? variants : [];
 
   const { src: imgSrc, onError: onImgError, dead: imgDead } = useProductImageSrc(
@@ -134,6 +135,10 @@ export const ProductCard = memo(function ProductCard({
   }, [sortedVariants]);
 
   const hasVariants = sortedVariants.length > 0;
+  const hasAnyMemo = useMemo(() => {
+    if ((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) return true;
+    return sortedVariants.some((v) => (v.memo ?? "").trim() || (v.memo2 ?? "").trim());
+  }, [product?.memo, product?.memo2, sortedVariants]);
 
   /** CSV·현재 스키마는 가격이 variants에만 있고 products 가격은 비는 경우가 많음 → 상단은 상품값 우선, 없으면 정렬된 첫 variant */
   const headerPrices = useMemo(() => {
@@ -306,7 +311,22 @@ export const ProductCard = memo(function ProductCard({
           </span>
         </div>
 
-        <div className="product-card__stocks">
+        <div
+          className={`product-card__stocks${hasAnyMemo ? " product-card__stocks--with-memo-toggle" : ""}${
+            showAllMemos ? " product-card__stocks--memo-expanded" : ""
+          }`}
+        >
+          {hasAnyMemo ? (
+            <button
+              type="button"
+              className={`product-card__memo-visibility-toggle${showAllMemos ? " is-active" : ""}`}
+              onClick={() => setShowAllMemos((v) => !v)}
+              aria-pressed={showAllMemos}
+              title={showAllMemos ? "메모 전체보기 끄기" : "메모 전체보기 켜기"}
+            >
+              메모
+            </button>
+          ) : null}
           {showNoVisibleOptionsHint ? (
             <div
               className="product-card__option-list product-card__option-list--novis"
@@ -345,18 +365,14 @@ export const ProductCard = memo(function ProductCard({
                           {variantSaving ? (
                             <span className="stock-adjust-pending" aria-label="저장 중" />
                           ) : null}
-                          {variantMemoText ? (
-                            variantOptionLabelsOverlap ? (
+                          {variantMemoText && showAllMemos ? (
                               <span
-                                className="product-card__memo-has"
-                                title={variantMemoText}
-                                aria-label={`메모: ${variantMemoText}`}
-                              />
-                            ) : (
-                              <span className="product-card__memo product-card__memo--filled product-card__memo--by-qty">
+                                className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
+                                  showAllMemos ? " product-card__memo--expanded" : ""
+                                }`}
+                              >
                                 {variantMemoText}
                               </span>
-                            )
                           ) : null}
                         </div>
                         <button
@@ -440,8 +456,12 @@ export const ProductCard = memo(function ProductCard({
                       {productStockSaving ? (
                         <span className="stock-adjust-pending" aria-label="저장 중" />
                       ) : null}
-                      {(product?.memo ?? "").trim() || (product?.memo2 ?? "").trim() ? (
-                        <span className="product-card__memo product-card__memo--filled product-card__memo--by-qty">
+                      {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) && showAllMemos ? (
+                        <span
+                          className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
+                            showAllMemos ? " product-card__memo--expanded" : ""
+                          }`}
+                        >
                           {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
                         </span>
                       ) : null}

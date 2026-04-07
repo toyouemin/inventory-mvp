@@ -15,6 +15,13 @@ function parsePriceInput(value: string): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
+function formatPriceInput(value: number | null | undefined): string {
+  if (value == null) return "";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "";
+  return Math.trunc(n).toLocaleString("ko-KR");
+}
+
 function emptyVariantRow(stock = "0"): VariantRow {
   return {
     rowId: generateRowId(),
@@ -38,10 +45,10 @@ function variantToRow(v: ProductVariant): VariantRow {
     gender: v.gender ?? "",
     size: v.size ?? "",
     stock: String(v.stock ?? 0),
-    wholesalePrice: v.wholesalePrice != null ? String(v.wholesalePrice) : "",
-    msrpPrice: v.msrpPrice != null ? String(v.msrpPrice) : "",
-    salePrice: v.salePrice != null ? String(v.salePrice) : "",
-    extraPrice: v.extraPrice != null ? String(v.extraPrice) : "",
+    wholesalePrice: formatPriceInput(v.wholesalePrice),
+    msrpPrice: formatPriceInput(v.msrpPrice),
+    salePrice: formatPriceInput(v.salePrice),
+    extraPrice: formatPriceInput(v.extraPrice),
     memo: (v.memo ?? "").trim(),
     memo2: (v.memo2 ?? "").trim(),
     variantId: v.id,

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fitCategorySelectWidth } from "@/app/products/fitCategorySelectWidth";
 
@@ -138,7 +139,9 @@ export function StatusClient({
                     <td className="status-stock-table__category">
                       {(r.category ?? "").trim() || "—"}
                     </td>
-                    <td className="status-stock-table__name">{r.name}</td>
+                    <td className="status-stock-table__name">
+                      <Link href={`/products?jumpProductId=${encodeURIComponent(r.id)}`}>{r.name}</Link>
+                    </td>
                     <td className="status-stock-table__stock">
                       <strong>{Number(r.stock).toLocaleString()}</strong>
                     </td>

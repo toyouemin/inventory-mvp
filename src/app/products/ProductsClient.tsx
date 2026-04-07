@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Product, ProductVariant, ProductRow } from "./types";
 import { diagnoseSockSortVariant, formatGenderSizeDisplay, sortVariantsForDisplay, tryParseSockCombinedLabel } from "./variantOptions";
 import { useProductImageSrc } from "./useProductImageSrc";
@@ -594,6 +594,9 @@ export function ProductsClient({
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const jumpProductId = (searchParams.get("jumpProductId") ?? "").trim();
+  const hasJumpedToProductRef = useRef(false);
   const [uploading, setUploading] = useState(false);
   /** CSV 업로드 버튼 색상 피드백(성공 녹색 / 실패 빨간색, 6초) */
   const [csvUploadHighlight, setCsvUploadHighlight] = useState<"success" | "error" | null>(null);
@@ -1346,6 +1349,23 @@ export function ProductsClient({
     }
     return rows;
   }, [skuDisplayGroupsForView, hideZeroStock]);
+
+  useEffect(() => {
+    if (!jumpProductId) {
+      hasJumpedToProductRef.current = false;
+      return;
+    }
+    if (viewMode !== "card") {
+      setViewMode("card");
+      return;
+    }
+    if (hasJumpedToProductRef.current) return;
+    const selector = `[data-product-id="${jumpProductId.replace(/"/g, '\\"')}"]`;
+    const target = document.querySelector(selector) as HTMLElement | null;
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    hasJumpedToProductRef.current = true;
+  }, [jumpProductId, viewMode, skuDisplayGroupsForView.length]);
 
   async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];

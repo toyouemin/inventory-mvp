@@ -1,3 +1,5 @@
+import { createHash } from "crypto";
+
 import { supabaseServer } from "@/lib/supabaseClient";
 import { normalizeCategoryLabel } from "./categoryNormalize";
 import { getLocalImageHrefBySkuLower } from "./localProductImages.server";
@@ -63,6 +65,46 @@ function mapVariant(row: Record<string, unknown>): ProductVariant {
 const VARIANT_SELECT =
   "id, product_id, sku, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, created_at";
 
+/** PostgREST 기본 행 상한(보통 1000)을 넘기면 `.select()` 한 번에 잘림 → 일부 product의 variant가 통째로 빠질 수 있음 */
+const PRODUCT_VARIANTS_PAGE_SIZE = 1000;
+
+async function fetchAllProductVariantRowsForProductIds(
+  productIds: string[]
+): Promise<{ rows: Record<string, unknown>[]; error: { message: string } | null }> {
+  if (productIds.length === 0) return { rows: [], error: null };
+  const out: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += PRODUCT_VARIANTS_PAGE_SIZE) {
+    const { data, error } = await supabaseServer
+      .from("product_variants")
+      .select(VARIANT_SELECT)
+      .in("product_id", productIds)
+      .order("id", { ascending: true })
+      .range(offset, offset + PRODUCT_VARIANTS_PAGE_SIZE - 1);
+    if (error) return { rows: [], error };
+    const chunk = data ?? [];
+    out.push(...chunk);
+    if (chunk.length < PRODUCT_VARIANTS_PAGE_SIZE) break;
+  }
+  return { rows: out, error: null };
+}
+
+/** `variantsSyncDigest`용 — id만이 아니라 행 내용 변경(재고·가격·옵션·메모)에도 digest가 바뀌게 함 */
+function variantRowSyncFingerprint(v: ProductVariant): string {
+  return [
+    v.id,
+    v.productId,
+    normalizeSkuForMatch(v.sku),
+    variantCompositeKey(v.color, v.gender, v.size),
+    v.stock,
+    v.wholesalePrice ?? "",
+    v.msrpPrice ?? "",
+    v.salePrice ?? "",
+    v.extraPrice ?? "",
+    (v.memo ?? "").trim(),
+    (v.memo2 ?? "").trim(),
+  ].join("\x1f");
+}
+
 function dedupeProductsById(products: Product[]): Product[] {
   const seen = new Set<string>();
   const out: Product[] = [];
@@ -80,6 +122,9 @@ const DEBUG_VARIANT_SKU_MIX_QUERY = "debugVariantSkuMix";
 const DEBUG_DISPLAY_GROUPS_QUERY = "debugDisplayGroups";
 const DEBUG_TARGET_SKUS_QUERY = "debugTargetSkus";
 const DEBUG_CATEGORY_ORDER_QUERY = "debugCategoryOrder";
+const DEBUG_VARIANT_TRACE_QUERY = "debugVariantTrace";
+/** `?debugVariantSync=1` — 서버 digest + 클라 snapshot 동기화 useEffect(브라우저 콘솔) 로그 */
+const DEBUG_VARIANT_SYNC_QUERY = "debugVariantSync";
 
 function pickSearchParam(
   searchParams: Record<string, string | string[] | undefined> | undefined,
@@ -100,6 +145,9 @@ export default async function ProductsPage({
   const debugDisplayGroups = searchParams?.[DEBUG_DISPLAY_GROUPS_QUERY] === "1";
   const debugTargetSkus = searchParams?.[DEBUG_TARGET_SKUS_QUERY] === "1";
   const debugCategoryOrder = searchParams?.[DEBUG_CATEGORY_ORDER_QUERY] === "1";
+  const debugVariantTrace = searchParams?.[DEBUG_VARIANT_TRACE_QUERY] === "1";
+  const debugVariantSync = searchParams?.[DEBUG_VARIANT_SYNC_QUERY] === "1";
+  const traceProductId = pickSearchParam(searchParams, "traceProductId");
   const focusSku = pickSearchParam(searchParams, "focusSku");
   if (!supabaseServer) {
     return (
@@ -167,12 +215,9 @@ export default async function ProductsPage({
   let flatVariantsFromDb: ProductVariant[] = [];
   let variantsByProductId: Record<string, ProductVariant[]> = {};
   if (productIds.length > 0) {
-    const { data: variantsData, error: variantsError } = await supabaseServer
-      .from("product_variants")
-      .select(VARIANT_SELECT)
-      .in("product_id", productIds);
+    const { rows: variantRows, error: variantsError } = await fetchAllProductVariantRowsForProductIds(productIds);
     if (!variantsError) {
-      flatVariantsFromDb = (variantsData ?? []).map((r: Record<string, unknown>) => mapVariant(r));
+      flatVariantsFromDb = variantRows.map((r) => mapVariant(r));
       flatVariantsFromDb.forEach((v) => {
         if (!variantsByProductId[v.productId]) variantsByProductId[v.productId] = [];
         const bucket = variantsByProductId[v.productId]!;
@@ -180,6 +225,36 @@ export default async function ProductsPage({
         bucket.push(v);
       });
     }
+  }
+
+  const variantsSyncDigest =
+    flatVariantsFromDb.length === 0
+      ? "0"
+      : createHash("sha256")
+          .update([...flatVariantsFromDb].map(variantRowSyncFingerprint).sort().join("\0"))
+          .digest("hex");
+
+  if (debugVariantSync && typeof console !== "undefined" && console.info) {
+    const tracePid = traceProductId.trim();
+    const traceBucket = tracePid ? (variantsByProductId[tracePid] ?? []) : [];
+    console.info("[productsPipeline][server][debugVariantSync] 렌더 시점", {
+      variantsSyncDigest,
+      flatVariantRowCount: flatVariantsFromDb.length,
+      productBucketKeys: Object.keys(variantsByProductId).length,
+      traceProductId: tracePid || "(없음)",
+      traceBucketLength: traceBucket.length,
+      trace남120: traceBucket.filter((v) => (v.gender ?? "").trim() === "남" && (v.size ?? "").trim() === "120"),
+    });
+  }
+
+  if (debugVariantTrace && traceProductId && typeof console !== "undefined" && console.info) {
+    const bucket = variantsByProductId[traceProductId] ?? [];
+    console.info("[productsPipeline][server] traceProductId → variantsByProductId 버킷", {
+      traceProductId,
+      variantCount: bucket.length,
+      ids: bucket.map((v) => v.id),
+      남120: bucket.filter((v) => (v.gender ?? "").trim() === "남" && (v.size ?? "").trim() === "120"),
+    });
   }
 
   const categoriesRaw = Array.from(
@@ -315,15 +390,21 @@ export default async function ProductsPage({
   }
 
   return (
+    /* digest 변경 시 ProductsClient 리마운트 — router.refresh()만으로는 props가 안 붙는 경우에도 로컬 state가 서버와 맞춰짐(검색·필터 등 클라 전용 상태는 초기화될 수 있음). */
     <ProductsClient
+      key={variantsSyncDigest}
       products={products}
       categories={categories}
       categoryOrder={categoryOrder}
       localImageHrefBySkuLower={localImageHrefBySkuLower}
       variantsByProductId={variantsByProductId}
+      variantsSyncDigest={variantsSyncDigest}
       debugProductsDupes={debugProductsDupes}
       debugVariantSkuMix={debugVariantSkuMix}
       debugDisplayGroups={debugDisplayGroups}
+      debugVariantTrace={debugVariantTrace}
+      debugVariantSync={debugVariantSync}
+      traceProductId={traceProductId}
       focusSku={focusSku}
       debugTargetSkus={debugTargetSkus}
       debugCategoryOrder={debugCategoryOrder}

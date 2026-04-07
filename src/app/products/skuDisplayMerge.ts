@@ -1,5 +1,10 @@
 import type { Product, ProductVariant } from "./types";
-import { productNormSku, productNormSkuSource, variantMatchesNormSku } from "./skuNormalize";
+import {
+  explainVariantMatchesNormSku,
+  productNormSku,
+  productNormSkuSource,
+  variantMatchesNormSku,
+} from "./skuNormalize";
 import { sortVariantsForDisplay, variantCompositeKey } from "./variantOptions";
 
 export type SkuDisplayGroupTrace = {
@@ -32,6 +37,8 @@ export type SkuDisplayGroup = {
 export type BuildSkuDisplayGroupsOptions = {
   /** true면 `trace` 채움 + `products.sku` 빈 행 normSku 출처 콘솔 로그 */
   debugDisplayGroups?: boolean;
+  /** `?debugVariantTrace=1&traceProductId=...` — 해당 product 버킷·카드 병합·SKU 필터 단계 로그 */
+  traceProductId?: string;
 };
 
 /**
@@ -100,6 +107,22 @@ export function buildSkuDisplayGroups(
   options?: BuildSkuDisplayGroupsOptions
 ): SkuDisplayGroup[] {
   const debugDisplayGroups = options?.debugDisplayGroups === true;
+  const traceProductId = (options?.traceProductId ?? "").trim();
+
+  if (traceProductId && typeof console !== "undefined" && console.info) {
+    const bucket = variantsByProductId[traceProductId] ?? [];
+    console.info("[buildSkuDisplayGroups][trace] 입력 variantsByProductId 버킷", {
+      traceProductId,
+      variantCount: bucket.length,
+      rows: bucket.map((v) => ({
+        id: v.id,
+        sku: v.sku,
+        gender: (v.gender ?? "").trim(),
+        size: (v.size ?? "").trim(),
+        composite: variantCompositeKey(v.color, v.gender, v.size),
+      })),
+    });
+  }
 
   if (debugDisplayGroups && typeof console !== "undefined" && console.info) {
     const seenPid = new Set<string>();
@@ -153,13 +176,39 @@ export function buildSkuDisplayGroups(
     if (!group?.length) continue;
     const canonical = canonicalProductForSku(k, productsPassingFilter, variantsByProductId) ?? group[0]!;
     const raw: ProductVariant[] = [];
+    const traceThisCard = Boolean(traceProductId && group.some((p) => p.id === traceProductId));
+    if (traceThisCard && typeof console !== "undefined" && console.info) {
+      console.info("[buildSkuDisplayGroups][trace] 동일 카드 그룹", {
+        cardNormSku: k,
+        groupProductIds: group.map((p) => p.id),
+      });
+    }
     for (const p of group) {
       for (const v of variantsByProductId[p.id] ?? []) {
+        if (traceThisCard && v.productId === traceProductId && typeof console !== "undefined") {
+          const ex = explainVariantMatchesNormSku(v, k);
+          if (!ex.ok) {
+            console.warn("[buildSkuDisplayGroups][trace] variantMatchesNormSku=false", {
+              variantId: v.id,
+              rawSku: v.sku,
+              ...ex,
+            });
+          }
+        }
         if (!variantMatchesNormSku(v, k)) continue;
         raw.push(v);
       }
     }
     const variants = mergeVariantsForSameCompositeKey(raw, canonical.id, k);
+    if (traceThisCard && typeof console !== "undefined" && console.info) {
+      const 남120 = variants.filter((v) => (v.gender ?? "").trim() === "남" && (v.size ?? "").trim() === "120");
+      console.info("[buildSkuDisplayGroups][trace] 카드 병합 후 variants", {
+        cardNormSku: k,
+        variantCount: variants.length,
+        남120Count: 남120.length,
+        남120Ids: 남120.map((v) => v.id),
+      });
+    }
     const repSrc = productNormSkuSource(canonical, variantsByProductId);
     const productsInGroup = group.map((p) => {
       const src = productNormSkuSource(p, variantsByProductId);

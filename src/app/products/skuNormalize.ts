@@ -99,3 +99,28 @@ export function variantMatchesNormSku(v: ProductVariant, groupNormSku: string): 
   if (!vn) return true;
   return vn === groupNormSku;
 }
+
+/** 디버그: `variantMatchesNormSku`가 false인 이유(정규화 값) */
+export function explainVariantMatchesNormSku(
+  v: ProductVariant,
+  groupNormSku: string
+): { ok: boolean; variantNormSku: string; groupNormSku: string; reason: string } {
+  const vn = normalizeSkuForMatch(v.sku);
+  if (!vn) {
+    return {
+      ok: true,
+      variantNormSku: "",
+      groupNormSku,
+      reason: "variant.sku가 비어 있거나 정규화 후 빈 문자열 → 그룹에 항상 포함",
+    };
+  }
+  const ok = vn === groupNormSku;
+  return {
+    ok,
+    variantNormSku: vn,
+    groupNormSku,
+    reason: ok
+      ? "정규화 variant.sku === groupNormSku"
+      : `불일치: variantNormSku="${vn}" !== groupNormSku="${groupNormSku}"`,
+  };
+}

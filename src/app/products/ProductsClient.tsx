@@ -346,9 +346,13 @@ export function ProductsClient({
   categoryOrder = {},
   localImageHrefBySkuLower,
   variantsByProductId = {},
+  variantsSyncDigest = "0",
   debugProductsDupes = false,
   debugVariantSkuMix = false,
   debugDisplayGroups = false,
+  debugVariantTrace = false,
+  debugVariantSync = false,
+  traceProductId = "",
   focusSku = "",
   debugTargetSkus = false,
   debugCategoryOrder = false,
@@ -359,12 +363,23 @@ export function ProductsClient({
   /** `getLocalImageHrefBySkuLower()` — 키는 `normalizeSkuForMatch`(파일명 stem·상품 SKU 공통) */
   localImageHrefBySkuLower: Record<string, string>;
   variantsByProductId?: Record<string, ProductVariant[]>;
+  /**
+   * 서버에서 모든 variant 행의 id·옵션·재고·가격·메모 등을 묶어 만든 SHA-256 digest.
+   * `router.refresh()` 후 `variantsByProductId` 참조가 같아도, 행 추가/삭제/수정 시 digest가 바뀌어
+   * `localVariantsByProductId`가 반드시 갱신된다.
+   */
+  variantsSyncDigest?: string;
   /** `?debugProductsDupes=1` — 파이프라인·카드 렌더 단계 로그 */
   debugProductsDupes?: boolean;
   /** `?debugVariantSkuMix=1` — 카드별 variant의 product_id·variant_sku·normSku 로그 */
   debugVariantSkuMix?: boolean;
   /** `?debugDisplayGroups=1` — 카드 그룹 trace·빈 product sku → normSku 로그 */
   debugDisplayGroups?: boolean;
+  /** `?debugVariantTrace=1&traceProductId=<uuid>` — 옵션 파이프라인 추적 */
+  debugVariantTrace?: boolean;
+  /** `?debugVariantSync=1` — `variantsSyncDigest`·동기화 effect·버킷 요약(콘솔) */
+  debugVariantSync?: boolean;
+  traceProductId?: string;
   /** `?focusSku=T25KT1033BL` — 위 디버그 시 해당 문자열/정규화 SKU와 맞는 카드끼리 cardNormSku 비교 */
   focusSku?: string;
   /** `?debugTargetSkus=1` — 대상 SKU들의 skuDisplayGroups·variant 개수(서버 로그와 대조) */
@@ -735,12 +750,51 @@ export function ProductsClient({
     };
   }, [uploadOpen, updateUploadMenuPosition]);
 
+  const variantSyncEffectRunRef = useRef(0);
   useEffect(() => {
+    variantSyncEffectRunRef.current += 1;
     setLocalProducts(dedupeProductsById(products));
-  }, [products]);
-  useEffect(() => {
     setLocalVariantsByProductId(variantsByProductId);
-  }, [variantsByProductId]);
+    if (debugVariantSync && typeof console !== "undefined" && console.info) {
+      const tid = traceProductId.trim();
+      const traceBucket = tid ? (variantsByProductId[tid] ?? []) : [];
+      const flatCount = Object.values(variantsByProductId).reduce((s, arr) => s + arr.length, 0);
+      console.info("[ProductsClient][debugVariantSync] useEffect([products, variantsByProductId, variantsSyncDigest]) 실행", {
+        runCount: variantSyncEffectRunRef.current,
+        variantsSyncDigest,
+        productsLength: products.length,
+        variantBuckets: Object.keys(variantsByProductId).length,
+        flatVariantCount: flatCount,
+        traceProductId: tid || "(없음)",
+        traceBucketLength: traceBucket.length,
+        trace남120Ids: traceBucket
+          .filter((v) => (v.gender ?? "").trim() === "남" && (v.size ?? "").trim() === "120")
+          .map((v) => v.id),
+      });
+    }
+  }, [products, variantsByProductId, variantsSyncDigest, debugVariantSync, traceProductId]);
+
+  useEffect(() => {
+    if (!debugVariantTrace || !traceProductId.trim()) return;
+    if (typeof console === "undefined" || !console.info) return;
+    const tid = traceProductId.trim();
+    const fromProps = variantsByProductId[tid] ?? [];
+    const fromLocal = localVariantsByProductId[tid] ?? [];
+    console.info("[ProductsClient][trace] props vs local 버킷", {
+      traceProductId: tid,
+      variantsSyncDigest,
+      propsCount: fromProps.length,
+      localCount: fromLocal.length,
+      props남120: fromProps.filter((v) => (v.gender ?? "").trim() === "남" && (v.size ?? "").trim() === "120").map((v) => v.id),
+      local남120: fromLocal.filter((v) => (v.gender ?? "").trim() === "남" && (v.size ?? "").trim() === "120").map((v) => v.id),
+    });
+  }, [
+    debugVariantTrace,
+    traceProductId,
+    variantsByProductId,
+    localVariantsByProductId,
+    variantsSyncDigest,
+  ]);
 
   /**
    * 목록 순서: 서버가 넘긴 `categoryOrder`(= mergeCategoryOrderMapForDisplay 단일 결과)만 사용.
@@ -815,8 +869,17 @@ export function ProductsClient({
     () =>
       buildSkuDisplayGroups(filtered, orderedAfterCategory, localVariantsByProductId, {
         debugDisplayGroups,
+        traceProductId:
+          debugVariantTrace && traceProductId.trim() ? traceProductId.trim() : undefined,
       }),
-    [filtered, orderedAfterCategory, localVariantsByProductId, debugDisplayGroups]
+    [
+      filtered,
+      orderedAfterCategory,
+      localVariantsByProductId,
+      debugDisplayGroups,
+      debugVariantTrace,
+      traceProductId,
+    ]
   );
 
   useEffect(() => {

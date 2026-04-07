@@ -200,6 +200,10 @@ export function EditProductModal({
       }
       await updateProduct(product.id, updatePayload);
       router.refresh();
+      /* Flight가 서버 액션 직후 RSC 페이로드를 한 박자 늦게 붙이는 경우 대비 */
+      queueMicrotask(() => {
+        router.refresh();
+      });
       onSaved?.({
         productId: product.id,
         memo: memo.trim() || null,

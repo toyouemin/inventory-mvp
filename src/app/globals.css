@@ -2195,27 +2195,31 @@ label {
   .products-mobile-top-nav {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
+    justify-content: flex-start;
+    gap: 16px;
     flex-wrap: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     margin: 0 0 6px;
-    padding-bottom: 2px;
+    padding: 0 0 2px;
   }
 
   .products-mobile-top-nav a {
     flex: 0 0 auto;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.2;
-    font-weight: 700;
+    font-weight: 600;
     text-decoration: none;
     color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--card);
-    padding: 4px 6px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  .products-mobile-top-nav a:hover {
+    color: var(--accent);
   }
 
   .products-toolbar--sticky {

@@ -225,8 +225,8 @@ button:hover {
   margin-bottom: 6px;
 }
 
-.products-mobile-top-title,
-.products-mobile-top-nav {
+.products-sticky-dup-header,
+.products-sticky-dup-nav {
   display: none;
 }
 
@@ -2179,47 +2179,27 @@ label {
     border-bottom: 1px solid var(--border);
   }
 
-  .products-mobile-top-title {
+  .products-sticky-dup-header {
     display: block;
-    margin: 0 0 4px;
-  }
-
-  .products-mobile-top-title__text {
     margin: 0;
-    text-align: center;
-    font-size: 18px;
-    line-height: 1.2;
-    font-weight: 800;
   }
 
-  .products-mobile-top-nav {
+  .products-sticky-dup-header .app-site-header {
+    max-width: none;
+    margin: 0;
+    padding: 12px 0 6px;
+  }
+
+  .products-sticky-dup-nav {
     display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 16px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
     margin: 0 0 6px;
-    padding: 0 0 2px;
   }
 
-  .products-mobile-top-nav a {
-    flex: 0 0 auto;
-    white-space: nowrap;
-    font-size: 14px;
-    line-height: 1.2;
-    font-weight: 600;
-    text-decoration: none;
-    color: var(--text);
-    border: none;
-    border-radius: 0;
-    background: transparent;
-    padding: 0;
-  }
-
-  .products-mobile-top-nav a:hover {
-    color: var(--accent);
+  .products-sticky-dup-nav nav {
+    position: static;
+    width: 100%;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
   }
 
   .products-toolbar--sticky {

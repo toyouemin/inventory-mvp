@@ -708,20 +708,12 @@ export function ProductsClient({
     const mq = window.matchMedia("(max-width: 768px)");
 
     const update = () => {
-      if (!mq.matches) {
-        setMobileLayoutVars((prev) =>
-          prev.stickyTop === 0 && prev.topBarHeight === 0 && prev.bottomBarHeight === 0
-            ? prev
-            : { stickyTop: 0, topBarHeight: 0, bottomBarHeight: 0 }
-        );
-        return;
-      }
       const headerEl = document.querySelector(".app-global-header .app-site-header") as HTMLElement | null;
       const navEl = document.querySelector(".app-global-header nav") as HTMLElement | null;
       const stickyTop =
         (headerEl?.offsetHeight ?? 0) + (navEl?.offsetHeight ?? 0);
-      const topBarHeight = stickyControlsRef.current?.offsetHeight ?? 0;
-      const bottomBarHeight = bottomBarRef.current?.offsetHeight ?? 0;
+      const topBarHeight = mq.matches ? (stickyControlsRef.current?.offsetHeight ?? 0) : 0;
+      const bottomBarHeight = mq.matches ? (bottomBarRef.current?.offsetHeight ?? 0) : 0;
       setMobileLayoutVars((prev) =>
         prev.stickyTop === stickyTop &&
         prev.topBarHeight === topBarHeight &&
@@ -1742,7 +1734,7 @@ export function ProductsClient({
           <div className="products-count-bar__count">
             <p className="products-count products-count--bar">
               {skuDisplayGroupsForView.length}개 상품
-              {search && ` (전체 ${localProducts.length}개 중)`}
+              {search && ` (총${localProducts.length})`}
             </p>
           </div>
           <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--soldout">
@@ -1774,22 +1766,21 @@ export function ProductsClient({
             </label>
           </div>
           </div>
+
+          <div className="toolbar-actions toolbar-actions-desktop">
+            <div className="toolbar-scroll">
+              {renderToolbarActions(
+                downloadWrapDesktopRef,
+                downloadButtonDesktopRef,
+                uploadWrapDesktopRef,
+                uploadButtonDesktopRef
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="products-content-container">
-        {/* 데스크톱 전용: 카드/리스트/다운로드/업로드(CSV·이미지)/추가 */}
-        <div className="toolbar-actions toolbar-actions-desktop">
-          <div className="toolbar-scroll">
-            {renderToolbarActions(
-              downloadWrapDesktopRef,
-              downloadButtonDesktopRef,
-              uploadWrapDesktopRef,
-              uploadButtonDesktopRef
-            )}
-          </div>
-        </div>
-
       {/* 모바일 전용: 하단 고정 액션 바 */}
       <div className="toolbar-bottom-bar" aria-hidden="true" ref={bottomBarRef}>
         {renderToolbarActions(

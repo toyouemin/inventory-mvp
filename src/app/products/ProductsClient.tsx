@@ -1855,7 +1855,7 @@ export function ProductsClient({
             <span className="products-hide-zero__track" aria-hidden />
           </label>
           <label className="products-hide-zero">
-            <span className="products-hide-zero__label">옵션 재고 0 숨기기</span>
+            <span className="products-hide-zero__label">옵션0 숨기기</span>
             <input
               type="checkbox"
               className="products-hide-zero__input"

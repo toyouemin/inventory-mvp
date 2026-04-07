@@ -1367,14 +1367,14 @@ label {
   color: var(--muted);
 }
 
-/* 상품 개수 + 필터 토글(한 줄 우선, 좁으면 얇게 2줄) */
+/* 상품 개수(좌) + 토글 묶음(우, nowrap). 좁으면 토글 묶음만 다음 줄. */
 .products-count-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   column-gap: 12px;
-  row-gap: 4px;
+  row-gap: 6px;
   margin: 0 0 10px;
   padding: 0;
   width: 100%;
@@ -1383,18 +1383,18 @@ label {
 }
 
 .products-count-bar__count {
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
+  max-width: 100%;
 }
 
 .products-count-bar__toggles {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: flex-end;
-  column-gap: 10px;
-  row-gap: 4px;
-  flex: 1 1 160px;
+  gap: 12px;
+  flex: 0 0 auto;
+  margin-left: auto;
   min-width: 0;
 }
 
@@ -1414,7 +1414,7 @@ label {
 .products-hide-zero {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   cursor: pointer;
   flex-shrink: 0;
   user-select: none;
@@ -1472,21 +1472,15 @@ label {
   .products-count-bar {
     margin-bottom: 8px;
     column-gap: 8px;
+    row-gap: 4px;
   }
 
-  .products-hide-zero__track {
-    width: 30px;
-    height: 16px;
-    border-radius: 8px;
+  .products-count--bar {
+    font-size: 13px;
   }
 
-  .products-hide-zero__track::after {
-    width: 12px;
-    height: 12px;
-  }
-
-  .products-hide-zero__input:checked + .products-hide-zero__track::after {
-    transform: translateX(14px);
+  .products-hide-zero {
+    font-size: 12px;
   }
 }
 

@@ -71,7 +71,7 @@ main {
 nav {
   display: flex;
   gap: 16px;
-  padding: 16px;
+  padding: 12px;
   background: var(--card);
   border-bottom: none;
   position: static;
@@ -190,7 +190,15 @@ button:hover {
 /* ========== TOOLBAR ========== */
 .products-page {
   position: relative;
-  padding: 0 8px;
+  padding: 0;
+}
+
+.products-content-container {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
 /* CSV 업로드 버튼: 성공(녹)·실패(적) 6초 하이라이트 */
@@ -2108,8 +2116,21 @@ label {
   }
 
   body > nav {
-    padding-top: 12px;
-    padding-bottom: 12px;
+    min-height: 0;
+    height: 30px;
+    padding-top: 0;
+    padding-bottom: 0;
+    align-items: center;
+    box-sizing: border-box;
+  }
+
+  body > nav a {
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
   }
 
   /* Compact header/toolbar: ~20% smaller */
@@ -2180,7 +2201,8 @@ label {
   }
 
   .products-toolbar--sticky {
-    margin-bottom: 4px;
+    margin-top: 4px;
+    margin-bottom: 6px;
   }
 
   .products-toolbar--compact .toolbar-actions-desktop {
@@ -2190,6 +2212,11 @@ label {
   .products-page {
     padding-top: calc(var(--products-mobile-topbar-h, 0px) + 8px);
     padding-bottom: calc(var(--products-mobile-bottombar-h, 0px) + env(safe-area-inset-bottom) + 12px);
+  }
+
+  .products-content-container {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 
   .product-card__option-list {

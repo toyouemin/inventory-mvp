@@ -1680,7 +1680,8 @@ export function ProductsClient({
       }
     >
       <div className="products-sticky-controls" ref={stickyControlsRef}>
-        <div className="products-toolbar products-toolbar--compact products-toolbar--sticky">
+        <div className="products-content-container">
+          <div className="products-toolbar products-toolbar--compact products-toolbar--sticky">
           {/* 1줄: 검색 + 검색버튼 + 카테고리 */}
           <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">
             <input
@@ -1715,9 +1716,9 @@ export function ProductsClient({
               </select>
             </div>
           </div>
-        </div>
+          </div>
 
-        <div className="products-count-bar">
+          <div className="products-count-bar">
           <div className="products-count-bar__count">
             <p className="products-count products-count--bar">
               {skuDisplayGroupsForView.length}개 상품
@@ -1752,20 +1753,22 @@ export function ProductsClient({
               <span className="products-hide-zero__track" aria-hidden />
             </label>
           </div>
+          </div>
         </div>
       </div>
 
-      {/* 데스크톱 전용: 카드/리스트/다운로드/업로드(CSV·이미지)/추가 */}
-      <div className="toolbar-actions toolbar-actions-desktop">
-        <div className="toolbar-scroll">
-          {renderToolbarActions(
-            downloadWrapDesktopRef,
-            downloadButtonDesktopRef,
-            uploadWrapDesktopRef,
-            uploadButtonDesktopRef
-          )}
+      <div className="products-content-container">
+        {/* 데스크톱 전용: 카드/리스트/다운로드/업로드(CSV·이미지)/추가 */}
+        <div className="toolbar-actions toolbar-actions-desktop">
+          <div className="toolbar-scroll">
+            {renderToolbarActions(
+              downloadWrapDesktopRef,
+              downloadButtonDesktopRef,
+              uploadWrapDesktopRef,
+              uploadButtonDesktopRef
+            )}
+          </div>
         </div>
-      </div>
 
       {/* 모바일 전용: 하단 고정 액션 바 */}
       <div className="toolbar-bottom-bar" aria-hidden="true" ref={bottomBarRef}>
@@ -1872,7 +1875,7 @@ export function ProductsClient({
           )
         : null}
 
-      {(orphanResult || orphanNotice) && (
+        {(orphanResult || orphanNotice) && (
         <section className="orphan-cleanup-panel" aria-live="polite">
           <div className="orphan-cleanup-panel__head">
             <strong>스토리지 고아 이미지 점검 결과</strong>
@@ -1939,9 +1942,9 @@ export function ProductsClient({
             </>
           ) : null}
         </section>
-      )}
+        )}
 
-      {viewMode === "card" ? (
+        {viewMode === "card" ? (
         <div className="products-grid">
           {skuDisplayGroupsForView.length === 0 ? (
             <div>
@@ -1983,7 +1986,7 @@ export function ProductsClient({
             })
           )}
         </div>
-      ) : (
+        ) : (
         <div className="table-wrap">
           {skuDisplayGroupsForView.length === 0 ? (
             <div>
@@ -2040,7 +2043,8 @@ export function ProductsClient({
             </table>
           )}
         </div>
-      )}
+        )}
+      </div>
 
       <input
         ref={csvFileInputRef}

@@ -1611,52 +1611,91 @@ export function ProductsClient({
 
   return (
     <div className="products-page">
-      <div className="products-toolbar products-toolbar--compact">
-        {/* 1줄: 검색 + 검색버튼 + 카테고리 */}
-        <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">
-          <input
-            type="search"
-            placeholder="품목·품명·카테고리·메모"
-            title="SKU·상품명·카테고리·비고1·비고2(옵션 포함) 검색"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") runSearch();
-            }}
-            className="products-search"
-          />
-          <button type="button" className="btn btn-primary btn-compact" onClick={runSearch}>
-            검색
-          </button>
-          <div className="products-category-select-wrap">
-            <select
-              ref={categorySelectRef}
-              className="btn btn-secondary btn-compact products-category-select"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              aria-label="카테고리 필터"
-              title={categorySelectDisplayedLabel}
-            >
-              <option value="">전체</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+      <div className="products-sticky-controls">
+        <div className="products-toolbar products-toolbar--compact products-toolbar--sticky">
+          {/* 1줄: 검색 + 검색버튼 + 카테고리 */}
+          <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">
+            <input
+              type="search"
+              placeholder="품목·품명·카테고리·메모"
+              title="SKU·상품명·카테고리·비고1·비고2(옵션 포함) 검색"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") runSearch();
+              }}
+              className="products-search"
+            />
+            <button type="button" className="btn btn-primary btn-compact" onClick={runSearch}>
+              검색
+            </button>
+            <div className="products-category-select-wrap">
+              <select
+                ref={categorySelectRef}
+                className="btn btn-secondary btn-compact products-category-select"
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                aria-label="카테고리 필터"
+                title={categorySelectDisplayedLabel}
+              >
+                <option value="">전체</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        {/* 데스크톱 전용: 카드/리스트/다운로드/업로드(CSV·이미지)/추가 */}
-        <div className="toolbar-actions toolbar-actions-desktop">
-          <div className="toolbar-scroll">
-            {renderToolbarActions(
-              downloadWrapDesktopRef,
-              downloadButtonDesktopRef,
-              uploadWrapDesktopRef,
-              uploadButtonDesktopRef
-            )}
+        <div className="products-count-bar">
+          <div className="products-count-bar__count">
+            <p className="products-count products-count--bar">
+              {skuDisplayGroupsForView.length}개 상품
+              {search && ` (전체 ${localProducts.length}개 중)`}
+            </p>
           </div>
+          <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--soldout">
+            <label className="products-hide-zero">
+              <span className="products-hide-zero__label">품절 숨기기</span>
+              <input
+                type="checkbox"
+                className="products-hide-zero__input"
+                role="switch"
+                checked={showInStockOnly}
+                onChange={(e) => setShowInStockOnly(e.target.checked)}
+                aria-checked={showInStockOnly}
+              />
+              <span className="products-hide-zero__track" aria-hidden />
+            </label>
+          </div>
+          <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--option0">
+            <label className="products-hide-zero">
+              <span className="products-hide-zero__label">옵션0 숨기기</span>
+              <input
+                type="checkbox"
+                className="products-hide-zero__input"
+                role="switch"
+                checked={hideZeroStock}
+                onChange={(e) => setHideZeroStock(e.target.checked)}
+                aria-checked={hideZeroStock}
+              />
+              <span className="products-hide-zero__track" aria-hidden />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* 데스크톱 전용: 카드/리스트/다운로드/업로드(CSV·이미지)/추가 */}
+      <div className="toolbar-actions toolbar-actions-desktop">
+        <div className="toolbar-scroll">
+          {renderToolbarActions(
+            downloadWrapDesktopRef,
+            downloadButtonDesktopRef,
+            uploadWrapDesktopRef,
+            uploadButtonDesktopRef
+          )}
         </div>
       </div>
 
@@ -1833,45 +1872,6 @@ export function ProductsClient({
           ) : null}
         </section>
       )}
-
-      <div className="products-count-sticky">
-        <div className="products-count-bar">
-          <div className="products-count-bar__count">
-            <p className="products-count products-count--bar">
-              {skuDisplayGroupsForView.length}개 상품
-              {search && ` (전체 ${localProducts.length}개 중)`}
-            </p>
-          </div>
-          <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--soldout">
-            <label className="products-hide-zero">
-              <span className="products-hide-zero__label">품절 숨기기</span>
-              <input
-                type="checkbox"
-                className="products-hide-zero__input"
-                role="switch"
-                checked={showInStockOnly}
-                onChange={(e) => setShowInStockOnly(e.target.checked)}
-                aria-checked={showInStockOnly}
-              />
-              <span className="products-hide-zero__track" aria-hidden />
-            </label>
-          </div>
-          <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--option0">
-            <label className="products-hide-zero">
-              <span className="products-hide-zero__label">옵션0 숨기기</span>
-              <input
-                type="checkbox"
-                className="products-hide-zero__input"
-                role="switch"
-                checked={hideZeroStock}
-                onChange={(e) => setHideZeroStock(e.target.checked)}
-                aria-checked={hideZeroStock}
-              />
-              <span className="products-hide-zero__track" aria-hidden />
-            </label>
-          </div>
-        </div>
-      </div>
 
       {viewMode === "card" ? (
         <div className="products-grid">

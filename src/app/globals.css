@@ -1367,28 +1367,35 @@ label {
   color: var(--muted);
 }
 
-.products-count-row {
+/* 상품 개수 + 필터 토글(한 줄 우선, 좁으면 얇게 2줄) */
+.products-count-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
-  margin-bottom: 16px;
+  column-gap: 12px;
+  row-gap: 4px;
+  margin: 0 0 10px;
+  padding: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
-.products-count-row .products-count {
-  margin: 0;
-  flex: 1 1 auto;
+.products-count-bar__count {
+  flex: 0 1 auto;
   min-width: 0;
 }
 
-.products-count-row__toggles {
+.products-count-bar__toggles {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px 18px;
-  max-width: 100%;
+  column-gap: 10px;
+  row-gap: 4px;
+  flex: 1 1 160px;
+  min-width: 0;
 }
 
 .products-count {
@@ -1397,14 +1404,22 @@ label {
   margin-bottom: 16px;
 }
 
+.products-count--bar {
+  margin: 0;
+  padding: 0;
+  line-height: 18px;
+  font-size: 14px;
+}
+
 .products-hide-zero {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   cursor: pointer;
   flex-shrink: 0;
   user-select: none;
   font-size: 13px;
+  line-height: 18px;
   color: var(--muted);
   position: relative;
 }
@@ -1419,19 +1434,17 @@ label {
 
 .products-hide-zero__label {
   white-space: nowrap;
-  order: 2;
 }
 
 .products-hide-zero__track {
   position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: 10px;
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
   background: var(--border);
   transition: background 0.15s ease;
   flex-shrink: 0;
   box-sizing: border-box;
-  order: 1;
 }
 
 .products-hide-zero__track::after {
@@ -1439,8 +1452,8 @@ label {
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: var(--card);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
@@ -1452,7 +1465,29 @@ label {
 }
 
 .products-hide-zero__input:checked + .products-hide-zero__track::after {
-  transform: translateX(16px);
+  transform: translateX(14px);
+}
+
+@media (max-width: 480px) {
+  .products-count-bar {
+    margin-bottom: 8px;
+    column-gap: 8px;
+  }
+
+  .products-hide-zero__track {
+    width: 30px;
+    height: 16px;
+    border-radius: 8px;
+  }
+
+  .products-hide-zero__track::after {
+    width: 12px;
+    height: 12px;
+  }
+
+  .products-hide-zero__input:checked + .products-hide-zero__track::after {
+    transform: translateX(14px);
+  }
 }
 
 .products-hide-zero__input:focus-visible + .products-hide-zero__track {

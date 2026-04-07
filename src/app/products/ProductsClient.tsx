@@ -1834,14 +1834,16 @@ export function ProductsClient({
         </section>
       )}
 
-      <div className="products-count-row">
-        <p className="products-count">
-          {skuDisplayGroupsForView.length}개 상품
-          {search && ` (전체 ${localProducts.length}개 중)`}
-        </p>
-        <div className="products-count-row__toggles">
+      <div className="products-count-bar">
+        <div className="products-count-bar__count">
+          <p className="products-count products-count--bar">
+            {skuDisplayGroupsForView.length}개 상품
+            {search && ` (전체 ${localProducts.length}개 중)`}
+          </p>
+        </div>
+        <div className="products-count-bar__toggles">
           <label className="products-hide-zero">
-            <span className="products-hide-zero__label">품절상품 숨기기</span>
+            <span className="products-hide-zero__label">품절 숨기기</span>
             <input
               type="checkbox"
               className="products-hide-zero__input"
@@ -1853,7 +1855,7 @@ export function ProductsClient({
             <span className="products-hide-zero__track" aria-hidden />
           </label>
           <label className="products-hide-zero">
-            <span className="products-hide-zero__label">옵션 재고0 숨기기</span>
+            <span className="products-hide-zero__label">옵션 재고 0 숨기기</span>
             <input
               type="checkbox"
               className="products-hide-zero__input"

@@ -1841,6 +1841,7 @@ export function ProductsClient({
         </p>
         <div className="products-count-row__toggles">
           <label className="products-hide-zero">
+            <span className="products-hide-zero__label">품절상품 숨기기</span>
             <input
               type="checkbox"
               className="products-hide-zero__input"
@@ -1850,9 +1851,9 @@ export function ProductsClient({
               aria-checked={showInStockOnly}
             />
             <span className="products-hide-zero__track" aria-hidden />
-            <span className="products-hide-zero__label">재고 있는 상품만 보기</span>
           </label>
           <label className="products-hide-zero">
+            <span className="products-hide-zero__label">옵션 재고0 숨기기</span>
             <input
               type="checkbox"
               className="products-hide-zero__input"
@@ -1862,7 +1863,6 @@ export function ProductsClient({
               aria-checked={hideZeroStock}
             />
             <span className="products-hide-zero__track" aria-hidden />
-            <span className="products-hide-zero__label">재고 0 숨기기</span>
           </label>
         </div>
       </div>

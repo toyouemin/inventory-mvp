@@ -1417,6 +1417,11 @@ label {
   margin: 0;
 }
 
+.products-hide-zero__label {
+  white-space: nowrap;
+  order: 2;
+}
+
 .products-hide-zero__track {
   position: relative;
   width: 36px;
@@ -1426,6 +1431,7 @@ label {
   transition: background 0.15s ease;
   flex-shrink: 0;
   box-sizing: border-box;
+  order: 1;
 }
 
 .products-hide-zero__track::after {
@@ -1452,10 +1458,6 @@ label {
 .products-hide-zero__input:focus-visible + .products-hide-zero__track {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-}
-
-.products-hide-zero__label {
-  white-space: nowrap;
 }
 
 .product-card__option-list--novis {

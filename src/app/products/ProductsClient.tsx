@@ -1834,38 +1834,42 @@ export function ProductsClient({
         </section>
       )}
 
-      <div className="products-count-bar">
-        <div className="products-count-bar__count">
-          <p className="products-count products-count--bar">
-            {skuDisplayGroupsForView.length}개 상품
-            {search && ` (전체 ${localProducts.length}개 중)`}
-          </p>
-        </div>
-        <div className="products-count-bar__toggles">
-          <label className="products-hide-zero">
-            <span className="products-hide-zero__label">품절 숨기기</span>
-            <input
-              type="checkbox"
-              className="products-hide-zero__input"
-              role="switch"
-              checked={showInStockOnly}
-              onChange={(e) => setShowInStockOnly(e.target.checked)}
-              aria-checked={showInStockOnly}
-            />
-            <span className="products-hide-zero__track" aria-hidden />
-          </label>
-          <label className="products-hide-zero">
-            <span className="products-hide-zero__label">옵션0 숨기기</span>
-            <input
-              type="checkbox"
-              className="products-hide-zero__input"
-              role="switch"
-              checked={hideZeroStock}
-              onChange={(e) => setHideZeroStock(e.target.checked)}
-              aria-checked={hideZeroStock}
-            />
-            <span className="products-hide-zero__track" aria-hidden />
-          </label>
+      <div className="products-count-sticky">
+        <div className="products-count-bar">
+          <div className="products-count-bar__count">
+            <p className="products-count products-count--bar">
+              {skuDisplayGroupsForView.length}개 상품
+              {search && ` (전체 ${localProducts.length}개 중)`}
+            </p>
+          </div>
+          <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--soldout">
+            <label className="products-hide-zero">
+              <span className="products-hide-zero__label">품절 숨기기</span>
+              <input
+                type="checkbox"
+                className="products-hide-zero__input"
+                role="switch"
+                checked={showInStockOnly}
+                onChange={(e) => setShowInStockOnly(e.target.checked)}
+                aria-checked={showInStockOnly}
+              />
+              <span className="products-hide-zero__track" aria-hidden />
+            </label>
+          </div>
+          <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--option0">
+            <label className="products-hide-zero">
+              <span className="products-hide-zero__label">옵션0 숨기기</span>
+              <input
+                type="checkbox"
+                className="products-hide-zero__input"
+                role="switch"
+                checked={hideZeroStock}
+                onChange={(e) => setHideZeroStock(e.target.checked)}
+                aria-checked={hideZeroStock}
+              />
+              <span className="products-hide-zero__track" aria-hidden />
+            </label>
+          </div>
         </div>
       </div>
 

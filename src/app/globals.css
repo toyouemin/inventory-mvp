@@ -73,7 +73,7 @@ nav {
   gap: 16px;
   padding: 16px;
   background: var(--card);
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
   position: static;
 }
 

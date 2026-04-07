@@ -54,7 +54,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               이카운트
             </a>
           </nav>
-          <hr />
         </div>
         {children}
       </body>

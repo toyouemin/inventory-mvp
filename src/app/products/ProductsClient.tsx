@@ -715,9 +715,8 @@ export function ProductsClient({
       }
       const headerEl = document.querySelector(".app-global-header .app-site-header") as HTMLElement | null;
       const navEl = document.querySelector(".app-global-header nav") as HTMLElement | null;
-      const hrEl = document.querySelector(".app-global-header hr") as HTMLElement | null;
       const stickyTop =
-        (headerEl?.offsetHeight ?? 0) + (navEl?.offsetHeight ?? 0) + (hrEl?.offsetHeight ?? 0);
+        (headerEl?.offsetHeight ?? 0) + (navEl?.offsetHeight ?? 0);
       const topBarHeight = stickyControlsRef.current?.offsetHeight ?? 0;
       const bottomBarHeight = bottomBarRef.current?.offsetHeight ?? 0;
       setMobileLayoutVars((prev) =>
@@ -740,10 +739,8 @@ export function ProductsClient({
     if (bottomBarRef.current && ro) ro.observe(bottomBarRef.current);
     const headerEl = document.querySelector(".app-global-header .app-site-header");
     const navEl = document.querySelector(".app-global-header nav");
-    const hrEl = document.querySelector(".app-global-header hr");
     if (headerEl && ro) ro.observe(headerEl);
     if (navEl && ro) ro.observe(navEl);
-    if (hrEl && ro) ro.observe(hrEl);
     window.addEventListener("resize", update);
     if (typeof mq.addEventListener === "function") mq.addEventListener("change", update);
     else mq.addListener(update);

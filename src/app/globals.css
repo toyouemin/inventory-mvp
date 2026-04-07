@@ -47,6 +47,13 @@ body {
   text-align: center;
 }
 
+.app-global-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--bg);
+}
+
 .app-site-title {
   margin: 0;
   font-size: clamp(1.125rem, 2.5vw + 0.75rem, 1.75rem);
@@ -67,9 +74,7 @@ nav {
   padding: 16px;
   background: var(--card);
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  position: static;
 }
 
 nav a {

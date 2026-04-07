@@ -713,9 +713,9 @@ export function ProductsClient({
         );
         return;
       }
-      const headerEl = document.querySelector(".app-site-header") as HTMLElement | null;
-      const navEl = document.querySelector("body > nav") as HTMLElement | null;
-      const hrEl = document.querySelector("body > hr") as HTMLElement | null;
+      const headerEl = document.querySelector(".app-global-header .app-site-header") as HTMLElement | null;
+      const navEl = document.querySelector(".app-global-header nav") as HTMLElement | null;
+      const hrEl = document.querySelector(".app-global-header hr") as HTMLElement | null;
       const stickyTop =
         (headerEl?.offsetHeight ?? 0) + (navEl?.offsetHeight ?? 0) + (hrEl?.offsetHeight ?? 0);
       const topBarHeight = stickyControlsRef.current?.offsetHeight ?? 0;
@@ -738,9 +738,9 @@ export function ProductsClient({
         : null;
     if (stickyControlsRef.current && ro) ro.observe(stickyControlsRef.current);
     if (bottomBarRef.current && ro) ro.observe(bottomBarRef.current);
-    const headerEl = document.querySelector(".app-site-header");
-    const navEl = document.querySelector("body > nav");
-    const hrEl = document.querySelector("body > hr");
+    const headerEl = document.querySelector(".app-global-header .app-site-header");
+    const navEl = document.querySelector(".app-global-header nav");
+    const hrEl = document.querySelector(".app-global-header hr");
     if (headerEl && ro) ro.observe(headerEl);
     if (navEl && ro) ro.observe(navEl);
     if (hrEl && ro) ro.observe(hrEl);

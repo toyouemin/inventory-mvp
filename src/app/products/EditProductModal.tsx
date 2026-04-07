@@ -168,7 +168,7 @@ export function EditProductModal({
         const { url } = await uploadProductImage(fd);
         finalImageUrl = url;
       }
-      await updateProduct(product.id, {
+      const updatePayload = {
         sku: sku.trim(),
         category: category.trim() || null,
         name: name.trim(),
@@ -177,7 +177,28 @@ export function EditProductModal({
         memo2: memo2.trim() || null,
         variants: { updates, deleteIds },
         stock: stockForSingle,
-      });
+      };
+      if (
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("debugProductSave") === "1"
+      ) {
+        console.log("[EditProductModal] 저장 직전 updateProduct payload", {
+          productId: product.id,
+          deleteIds,
+          variantUpdates: updates.map((u) => ({
+            id: u.id ?? "(신규)",
+            color: u.color,
+            gender: u.gender,
+            size: u.size,
+            stock: u.stock,
+            wholesalePrice: u.wholesalePrice,
+            msrpPrice: u.msrpPrice,
+            salePrice: u.salePrice,
+            extraPrice: u.extraPrice,
+          })),
+        });
+      }
+      await updateProduct(product.id, updatePayload);
       router.refresh();
       onSaved?.({
         productId: product.id,

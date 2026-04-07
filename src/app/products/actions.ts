@@ -19,6 +19,8 @@ import {
 const LOG_MOVES = process.env.LOG_MOVES === "1";
 /** CSV 업로드 행별 재고 디버그: .env에 LOG_CSV_STOCK=1 */
 const LOG_CSV_STOCK = process.env.LOG_CSV_STOCK === "1";
+/** 상품 수정·옵션 저장 분기: .env에 LOG_PRODUCT_UPDATE=1 */
+const LOG_PRODUCT_UPDATE = process.env.LOG_PRODUCT_UPDATE === "1";
 
 function resolveProductImageUrl(sku: string, imageUrl: string | null | undefined): string | null {
   const explicit = (imageUrl ?? "").trim();
@@ -210,17 +212,38 @@ export async function updateProduct(
   }
 
   const { data: prodRow } = await supabaseServer.from("products").select("sku").eq("id", productId).maybeSingle();
-  const productSku = String((prodRow?.sku as string | undefined) ?? "").trim();
+  const skuFromDb = normalizeSkuForMatch(String((prodRow?.sku as string | undefined) ?? ""));
+  const skuFromRequest = data.sku !== undefined ? normalizeSkuForMatch(data.sku) : "";
+  const productSku = skuFromDb || skuFromRequest;
 
   if (data.variants) {
     const { updates, deleteIds } = data.variants;
+    const withId = updates.filter((u) => u.id);
+    const withoutId = updates.filter((u) => !u.id);
+
+    if (LOG_PRODUCT_UPDATE) {
+      console.info("[updateProduct][variants]", {
+        productId,
+        productSku,
+        skuFromDb,
+        skuFromRequest,
+        deleteIdsCount: deleteIds.filter(Boolean).length,
+        updateWithIdCount: withId.length,
+        insertWithoutIdCount: withoutId.length,
+        withoutIdPreview: withoutId.map((u) => ({
+          color: (u.color ?? "").trim(),
+          gender: (u.gender ?? "").trim(),
+          size: (u.size ?? "").trim(),
+          stock: u.stock,
+        })),
+      });
+    }
+
     for (const id of deleteIds) {
       if (id) {
         await supabaseServer.from("product_variants").delete().eq("id", id);
       }
     }
-    const withId = updates.filter((u) => u.id);
-    const withoutId = updates.filter((u) => !u.id);
 
     for (const u of withId) {
       const stock = Number.isFinite(Number(u.stock)) ? Math.max(0, Number(u.stock)) : 0;
@@ -265,6 +288,12 @@ export async function updateProduct(
         .from("product_variants")
         .upsert(newRows, { onConflict: PRODUCT_VARIANTS_ON_CONFLICT });
       if (upErr) throw new Error(upErr.message);
+      if (LOG_PRODUCT_UPDATE) {
+        console.info("[updateProduct][variants] upsert 신규 행 완료", {
+          productId,
+          rowCount: newRows.length,
+        });
+      }
     }
 
     await syncProductsStockFromVariantSums([productId]);

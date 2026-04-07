@@ -1745,7 +1745,6 @@ export function ProductsClient({
           setEditingProduct((prev) =>
             prev && prev.id === productId ? { ...prev, memo, memo2 } : prev
           );
-          setLocalVariantsByProductId((prev) => ({ ...prev }));
         }}
         onClose={() => {
           setEditOpen(false);

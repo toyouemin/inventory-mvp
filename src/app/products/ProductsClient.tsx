@@ -637,6 +637,13 @@ export function ProductsClient({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadMenuDirection, setUploadMenuDirection] = useState<DownloadMenuDirection>("down");
   const [uploadMenuStyle, setUploadMenuStyle] = useState<CSSProperties>({});
+  const stickyControlsRef = useRef<HTMLDivElement | null>(null);
+  const bottomBarRef = useRef<HTMLDivElement | null>(null);
+  const [mobileLayoutVars, setMobileLayoutVars] = useState(() => ({
+    stickyTop: 0,
+    topBarHeight: 0,
+    bottomBarHeight: 0,
+  }));
   const [adjustingStockKeys, setAdjustingStockKeys] = useState(() => new Set<string>());
 
   const [bulkImageModalOpen, setBulkImageModalOpen] = useState(false);
@@ -692,6 +699,54 @@ export function ProductsClient({
       console.log("[ProductsClient] unmount (useEffect)", { instanceId: id });
     };
   }, [debugClientLifecycle]);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+
+    const update = () => {
+      if (!mq.matches) {
+        setMobileLayoutVars((prev) =>
+          prev.stickyTop === 0 && prev.topBarHeight === 0 && prev.bottomBarHeight === 0
+            ? prev
+            : { stickyTop: 0, topBarHeight: 0, bottomBarHeight: 0 }
+        );
+        return;
+      }
+      const headerEl = document.querySelector(".app-site-header") as HTMLElement | null;
+      const stickyTop = headerEl?.offsetHeight ?? 0;
+      const topBarHeight = stickyControlsRef.current?.offsetHeight ?? 0;
+      const bottomBarHeight = bottomBarRef.current?.offsetHeight ?? 0;
+      setMobileLayoutVars((prev) =>
+        prev.stickyTop === stickyTop &&
+        prev.topBarHeight === topBarHeight &&
+        prev.bottomBarHeight === bottomBarHeight
+          ? prev
+          : { stickyTop, topBarHeight, bottomBarHeight }
+      );
+    };
+
+    update();
+    const ro =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => {
+            requestAnimationFrame(update);
+          })
+        : null;
+    if (stickyControlsRef.current && ro) ro.observe(stickyControlsRef.current);
+    if (bottomBarRef.current && ro) ro.observe(bottomBarRef.current);
+    const headerEl = document.querySelector(".app-site-header");
+    if (headerEl && ro) ro.observe(headerEl);
+    window.addEventListener("resize", update);
+    if (typeof mq.addEventListener === "function") mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", update);
+      if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
+  }, []);
 
   function showUploadHighlight(kind: "success" | "error") {
     if (csvUploadHighlightTimerRef.current) clearTimeout(csvUploadHighlightTimerRef.current);
@@ -1610,8 +1665,17 @@ export function ProductsClient({
     : null;
 
   return (
-    <div className="products-page">
-      <div className="products-sticky-controls">
+    <div
+      className="products-page"
+      style={
+        {
+          "--products-mobile-sticky-top": `${mobileLayoutVars.stickyTop}px`,
+          "--products-mobile-topbar-h": `${mobileLayoutVars.topBarHeight}px`,
+          "--products-mobile-bottombar-h": `${mobileLayoutVars.bottomBarHeight}px`,
+        } as CSSProperties
+      }
+    >
+      <div className="products-sticky-controls" ref={stickyControlsRef}>
         <div className="products-toolbar products-toolbar--compact products-toolbar--sticky">
           {/* 1줄: 검색 + 검색버튼 + 카테고리 */}
           <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">
@@ -1700,7 +1764,7 @@ export function ProductsClient({
       </div>
 
       {/* 모바일 전용: 하단 고정 액션 바 */}
-      <div className="toolbar-bottom-bar" aria-hidden="true">
+      <div className="toolbar-bottom-bar" aria-hidden="true" ref={bottomBarRef}>
         {renderToolbarActions(
           downloadWrapMobileRef,
           downloadButtonMobileRef,

@@ -1371,15 +1371,15 @@ label {
   color: var(--muted);
 }
 
-/* 검색행 + 상품개수/토글행 통합 sticky */
+/* 검색행 + 상품개수/토글행 통합 wrapper (모바일에서 fixed) */
 .products-sticky-controls {
-  position: sticky;
-  top: 0;
-  z-index: 35;
+  position: static;
+  top: auto;
+  z-index: auto;
   background: var(--bg);
   margin: 0 0 8px;
   padding: 6px 0 8px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: none;
 }
 
 .products-count-bar {
@@ -2156,16 +2156,29 @@ label {
     font-size: 13px;
   }
 
-  /* Top toolbar hidden on mobile when bottom bar is used; only search row visible */
-  .products-toolbar--compact .toolbar-actions-desktop {
-    display: none;
+  .products-sticky-controls {
+    position: fixed;
+    top: var(--products-mobile-sticky-top, 0px);
+    left: 0;
+    right: 0;
+    z-index: 35;
+    margin: 0;
+    padding: 6px 8px 8px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
   }
 
-  /* Bottom sticky bar: prevent last product/card from being covered */
-  .products-page,
-  .products-grid,
-  .table-wrap {
-    padding-bottom: 90px;
+  .products-toolbar--sticky {
+    margin-bottom: 6px;
+  }
+
+  .products-toolbar--compact .toolbar-actions-desktop {
+    display: none !important;
+  }
+
+  .products-page {
+    padding-top: calc(var(--products-mobile-sticky-top, 0px) + var(--products-mobile-topbar-h, 0px) + 8px);
+    padding-bottom: calc(var(--products-mobile-bottombar-h, 0px) + env(safe-area-inset-bottom) + 12px);
   }
 
   .product-card__option-list {
@@ -2312,13 +2325,13 @@ label {
   }
 }
 
-/* Mobile: bottom sticky action bar */
+/* Mobile: bottom fixed action bar */
 .toolbar-bottom-bar {
   display: none;
 }
 
-  @media (max-width: 768px) {
-   .toolbar-bottom-bar {
+@media (max-width: 768px) {
+  .toolbar-bottom-bar {
     display: flex;  
     position: fixed;
     bottom: 0;
@@ -2327,7 +2340,7 @@ label {
     z-index: 20;
     background: var(--card);
     border-top: 1px solid var(--border);
-    padding: 8px 10px;
+    padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
     gap: 8px;
     align-items: center;
     overflow-x: auto;
@@ -2343,9 +2356,7 @@ label {
   }
 
   .toolbar-actions-desktop {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: none !important;
   }
 }
 

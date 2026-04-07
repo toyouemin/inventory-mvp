@@ -225,6 +225,11 @@ button:hover {
   margin-bottom: 6px;
 }
 
+.products-mobile-top-title,
+.products-mobile-top-nav {
+  display: none;
+}
+
 .products-search {
   flex: 1;
   min-width: 200px;
@@ -2156,9 +2161,15 @@ label {
     font-size: 13px;
   }
 
+  body[data-products-mobile-sticky="1"] .app-site-header,
+  body[data-products-mobile-sticky="1"] > nav,
+  body[data-products-mobile-sticky="1"] > hr {
+    display: none;
+  }
+
   .products-sticky-controls {
     position: fixed;
-    top: var(--products-mobile-sticky-top, 0px);
+    top: 0;
     left: 0;
     right: 0;
     z-index: 35;
@@ -2166,6 +2177,45 @@ label {
     padding: 6px 8px 8px;
     background: var(--bg);
     border-bottom: 1px solid var(--border);
+  }
+
+  .products-mobile-top-title {
+    display: block;
+    margin: 0 0 4px;
+  }
+
+  .products-mobile-top-title__text {
+    margin: 0;
+    text-align: center;
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 800;
+  }
+
+  .products-mobile-top-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 0 6px;
+    padding-bottom: 2px;
+  }
+
+  .products-mobile-top-nav a {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-size: 13px;
+    line-height: 1.2;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    padding: 4px 6px;
   }
 
   .products-toolbar--sticky {
@@ -2177,7 +2227,7 @@ label {
   }
 
   .products-page {
-    padding-top: calc(var(--products-mobile-sticky-top, 0px) + var(--products-mobile-topbar-h, 0px) + 8px);
+    padding-top: calc(var(--products-mobile-topbar-h, 0px) + 8px);
     padding-bottom: calc(var(--products-mobile-bottombar-h, 0px) + env(safe-area-inset-bottom) + 12px);
   }
 

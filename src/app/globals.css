@@ -2411,6 +2411,12 @@ label {
 
   .product-card__opt-chip {
     font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 2px 8px;
+    line-height: 1.2;
   }
 
   .product-card__option-right {

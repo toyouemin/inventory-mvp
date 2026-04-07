@@ -2428,7 +2428,7 @@ label {
   }
 
   .product-card__option-qty strong {
-    font-size: calc(14px + 1pt);
+    font-size: calc(16px + 1pt);
     display: inline-flex;
     align-items: center;
     line-height: 1;

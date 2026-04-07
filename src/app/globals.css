@@ -225,10 +225,6 @@ button:hover {
   margin-bottom: 6px;
 }
 
-.products-sticky-dup-header,
-.products-sticky-dup-nav {
-  display: none;
-}
 
 .products-search {
   flex: 1;
@@ -2161,15 +2157,9 @@ label {
     font-size: 13px;
   }
 
-  body[data-products-mobile-sticky="1"] .app-site-header,
-  body[data-products-mobile-sticky="1"] > nav,
-  body[data-products-mobile-sticky="1"] > hr {
-    display: none;
-  }
-
   .products-sticky-controls {
     position: fixed;
-    top: 0;
+    top: var(--products-mobile-sticky-top, 0px);
     left: 0;
     right: 0;
     z-index: 35;
@@ -2177,16 +2167,6 @@ label {
     padding: 0;
     background: var(--bg);
     border-bottom: none;
-  }
-
-  .products-sticky-dup-header {
-    display: block;
-    margin: 0;
-  }
-
-  .products-sticky-dup-nav {
-    display: block;
-    margin: 0;
   }
 
   .products-toolbar--sticky {

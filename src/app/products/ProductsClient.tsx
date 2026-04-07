@@ -5,7 +5,6 @@ import type { CSSProperties, Ref } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import type { Product, ProductVariant, ProductRow } from "./types";
-import { AdaptiveHomepageLink } from "../AdaptiveHomepageLink";
 import { diagnoseSockSortVariant, formatGenderSizeDisplay, sortVariantsForDisplay, tryParseSockCombinedLabel } from "./variantOptions";
 import { useProductImageSrc } from "./useProductImageSrc";
 import { ProductCard } from "./ProductCard";
@@ -714,7 +713,11 @@ export function ProductsClient({
         );
         return;
       }
-      const stickyTop = 0;
+      const headerEl = document.querySelector(".app-site-header") as HTMLElement | null;
+      const navEl = document.querySelector("body > nav") as HTMLElement | null;
+      const hrEl = document.querySelector("body > hr") as HTMLElement | null;
+      const stickyTop =
+        (headerEl?.offsetHeight ?? 0) + (navEl?.offsetHeight ?? 0) + (hrEl?.offsetHeight ?? 0);
       const topBarHeight = stickyControlsRef.current?.offsetHeight ?? 0;
       const bottomBarHeight = bottomBarRef.current?.offsetHeight ?? 0;
       setMobileLayoutVars((prev) =>
@@ -735,6 +738,12 @@ export function ProductsClient({
         : null;
     if (stickyControlsRef.current && ro) ro.observe(stickyControlsRef.current);
     if (bottomBarRef.current && ro) ro.observe(bottomBarRef.current);
+    const headerEl = document.querySelector(".app-site-header");
+    const navEl = document.querySelector("body > nav");
+    const hrEl = document.querySelector("body > hr");
+    if (headerEl && ro) ro.observe(headerEl);
+    if (navEl && ro) ro.observe(navEl);
+    if (hrEl && ro) ro.observe(hrEl);
     window.addEventListener("resize", update);
     if (typeof mq.addEventListener === "function") mq.addEventListener("change", update);
     else mq.addListener(update);
@@ -743,14 +752,6 @@ export function ProductsClient({
       window.removeEventListener("resize", update);
       if (typeof mq.removeEventListener === "function") mq.removeEventListener("change", update);
       else mq.removeListener(update);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    document.body.dataset.productsMobileSticky = "1";
-    return () => {
-      delete document.body.dataset.productsMobileSticky;
     };
   }, []);
 
@@ -1682,28 +1683,6 @@ export function ProductsClient({
       }
     >
       <div className="products-sticky-controls" ref={stickyControlsRef}>
-        <div className="products-sticky-dup-header" aria-hidden="true">
-          <header className="app-site-header">
-            <h1 className="app-site-title">재고관리 프로그램</h1>
-          </header>
-        </div>
-        <div className="products-sticky-dup-nav">
-          <nav aria-label="모바일 상단 메뉴">
-            <a href="/products">상품</a>
-            <a href="/status">재고 현황</a>
-            <AdaptiveHomepageLink />
-            <a
-              href="https://tagosports.cafe24.com/intro/member.html?returnUrl=%2Findex.html"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              도매몰
-            </a>
-            <a href="https://login.ecount.com/Login/" target="_blank" rel="noopener noreferrer">
-              이카운트
-            </a>
-          </nav>
-        </div>
         <div className="products-toolbar products-toolbar--compact products-toolbar--sticky">
           {/* 1줄: 검색 + 검색버튼 + 카테고리 */}
           <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">

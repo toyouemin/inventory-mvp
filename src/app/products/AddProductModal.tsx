@@ -149,13 +149,15 @@ export function AddProductModal({
       <div className="modal add-product-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header-add-product">
           <h3>상품 추가</h3>
-          <button type="button" className="modal-header-cancel" onClick={onClose}>
-            취소
-          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="modal-form add-product-modal-form">
-          <label>품목코드 (SKU) *</label>
+          <div className="edit-product-modal__sku-row">
+            <label>품목코드 (SKU) *</label>
+            <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
+              취소
+            </button>
+          </div>
           <input
             value={sku}
             onChange={(e) => setSku(e.target.value)}

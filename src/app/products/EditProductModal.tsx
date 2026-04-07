@@ -226,7 +226,7 @@ export function EditProductModal({
 
   return (
     <div className="modal-overlay add-product-modal-overlay" onClick={onClose}>
-      <div className="modal add-product-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal add-product-modal edit-product-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header-add-product">
           <h3>상품 수정</h3>
           <button type="button" className="modal-header-cancel" onClick={onClose}>
@@ -239,7 +239,12 @@ export function EditProductModal({
               마지막 수정: {new Date(product.updatedAt).toLocaleString("ko-KR")}
             </div>
           )}
-          <label>품목코드 (SKU) *</label>
+          <div className="edit-product-modal__sku-row">
+            <label>품목코드 (SKU) *</label>
+            <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
+              취소
+            </button>
+          </div>
           <input value={sku} onChange={(e) => setSku(e.target.value)} required />
 
           <label>카테고리</label>

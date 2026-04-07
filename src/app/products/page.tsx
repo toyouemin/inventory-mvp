@@ -58,12 +58,12 @@ function mapVariant(row: Record<string, unknown>): ProductVariant {
     extraPrice: row.extra_price != null ? Number(row.extra_price) : null,
     memo: (row.memo as string) ?? null,
     memo2: (row.memo2 as string) ?? null,
-    createdAt: (row.created_at as string) ?? null,
   };
 }
 
+/** 목록·병합·카드에 불필요한 `created_at` 제외(페이로드·지문 계산 부담 감소) */
 const VARIANT_SELECT =
-  "id, product_id, sku, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, created_at";
+  "id, product_id, sku, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2";
 
 /** PostgREST 기본 행 상한(보통 1000)을 넘기면 `.select()` 한 번에 잘림 → 일부 product의 variant가 통째로 빠질 수 있음 */
 const PRODUCT_VARIANTS_PAGE_SIZE = 1000;
@@ -125,6 +125,8 @@ const DEBUG_CATEGORY_ORDER_QUERY = "debugCategoryOrder";
 const DEBUG_VARIANT_TRACE_QUERY = "debugVariantTrace";
 /** `?debugVariantSync=1` — 서버 digest + 클라 snapshot 동기화 useEffect(브라우저 콘솔) 로그 */
 const DEBUG_VARIANT_SYNC_QUERY = "debugVariantSync";
+/** `?debugProductsPerf=1` — 서버 단계별 소요(ms) 로그(제품/카테고리/로컬이미지맵/variants/후처리) */
+const DEBUG_PRODUCTS_PERF_QUERY = "debugProductsPerf";
 
 function pickSearchParam(
   searchParams: Record<string, string | string[] | undefined> | undefined,
@@ -147,8 +149,10 @@ export default async function ProductsPage({
   const debugCategoryOrder = searchParams?.[DEBUG_CATEGORY_ORDER_QUERY] === "1";
   const debugVariantTrace = searchParams?.[DEBUG_VARIANT_TRACE_QUERY] === "1";
   const debugVariantSync = searchParams?.[DEBUG_VARIANT_SYNC_QUERY] === "1";
+  const debugProductsPerf = searchParams?.[DEBUG_PRODUCTS_PERF_QUERY] === "1";
   const traceProductId = pickSearchParam(searchParams, "traceProductId");
   const focusSku = pickSearchParam(searchParams, "focusSku");
+  const perfT0 = debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;
   if (!supabaseServer) {
     return (
       <div style={{ padding: 24, color: "crimson" }}>
@@ -165,6 +169,9 @@ export default async function ProductsPage({
     .order("sku", { ascending: true })
     .order("created_at", { ascending: false });
 
+  const perfAfterProducts =
+    debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;
+
   if (error) {
     return (
       <div style={{ padding: 24 }}>
@@ -175,8 +182,14 @@ export default async function ProductsPage({
   }
 
   const categoryOrderFromDb = await fetchCategoryOrderMap();
+  const perfAfterCategoryOrder =
+    debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;
+
   /** `public/images` 파일명 stem ↔ `normalizeSkuForMatch`로 매칭 (jpg>jpeg>png>webp) */
   const localImageHrefBySkuLower = getLocalImageHrefBySkuLower();
+  const perfAfterLocalImageMap =
+    debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;
+
   const products: Product[] = dedupeProductsById(
     (data ?? []).map((row: Record<string, unknown>) => mapProduct(row))
   );
@@ -210,6 +223,9 @@ export default async function ProductsPage({
   }
 
   products.sort((a, b) => compareProductsByCategoryOrder(a, b, categoryOrder));
+  const perfAfterProductCpu =
+    debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;
+
   const productIds = products.map((p) => p.id);
 
   let flatVariantsFromDb: ProductVariant[] = [];
@@ -227,12 +243,38 @@ export default async function ProductsPage({
     }
   }
 
+  const perfAfterVariants =
+    debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;
+
   const variantsSyncDigest =
     flatVariantsFromDb.length === 0
       ? "0"
       : createHash("sha256")
           .update([...flatVariantsFromDb].map(variantRowSyncFingerprint).sort().join("\0"))
           .digest("hex");
+
+  const perfEnd =
+    debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;
+
+  if (debugProductsPerf && typeof console !== "undefined" && console.info) {
+    const ms = (t1: number, t0: number) => Math.round((t1 - t0) * 10) / 10;
+    const stages = [
+      { name: "1_products_query", ms: ms(perfAfterProducts, perfT0) },
+      { name: "2_category_sort_order", ms: ms(perfAfterCategoryOrder, perfAfterProducts) },
+      { name: "3_local_images_fs_scan", ms: ms(perfAfterLocalImageMap, perfAfterCategoryOrder) },
+      { name: "4_products_map_sort_cpu", ms: ms(perfAfterProductCpu, perfAfterLocalImageMap) },
+      { name: "5_product_variants_fetch+bucket", ms: ms(perfAfterVariants, perfAfterProductCpu) },
+      { name: "6_digest_and_rest_cpu", ms: ms(perfEnd, perfAfterVariants) },
+    ];
+    const sorted = [...stages].sort((a, b) => b.ms - a.ms);
+    console.info("[productsPipeline][server][debugProductsPerf] 단계(ms)", {
+      productRowCount: products.length,
+      variantRowCount: flatVariantsFromDb.length,
+      stages,
+      slowest123: sorted.slice(0, 3).map((s) => `${s.name}:${s.ms}ms`),
+      totalMs: ms(perfEnd, perfT0),
+    });
+  }
 
   if (debugVariantSync && typeof console !== "undefined" && console.info) {
     const tracePid = traceProductId.trim();

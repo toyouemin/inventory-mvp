@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -33,6 +33,8 @@ type DownloadMenuDirection = "up" | "down";
 type CsvUploadMode = "merge" | "reset";
 
 const CSV_UPLOAD_HIGHLIGHT_MS = 6000;
+/** 검색어 반영 지연 — 타이핑 중 필터·병합·리스트 재계산 횟수 감소 */
+const SEARCH_DEBOUNCE_MS = 300;
 
 type StorageOrphanCleanupResult = {
   bucket: string;
@@ -318,12 +320,135 @@ function ProductsTableThumbCell({
           onClick={() => onOpenPreview(src, alt)}
           aria-label="상품 이미지 확대"
         >
-          <img className="thumb-small" src={src} alt="" loading="lazy" decoding="async" onError={onError} />
+          <img
+            className="thumb-small"
+            src={src}
+            alt=""
+            width={48}
+            height={48}
+            loading="lazy"
+            decoding="async"
+            onError={onError}
+          />
         </button>
       )}
     </div>
   );
 }
+
+const ProductsTableRow = memo(function ProductsTableRow({
+  row,
+  rowSaving,
+  localImageHrefBySkuLower,
+  onOpenPreview,
+  onStockDelta,
+  onEdit,
+  onDelete,
+}: {
+  row: ProductRow;
+  rowSaving: boolean;
+  localImageHrefBySkuLower: Record<string, string>;
+  onOpenPreview: (url: string, altText: string) => void;
+  onStockDelta: (row: ProductRow, delta: number) => void;
+  onEdit: (productId: string) => void;
+  onDelete: (productId: string) => void;
+}) {
+  const qty = row.variantStock;
+  return (
+    <tr>
+      <td>
+        <ProductsTableThumbCell
+          sku={row.sku}
+          imageUrl={row.imageUrl}
+          updatedAt={row.updatedAt}
+          alt={(row.name ?? row.sku ?? "").toString()}
+          onOpenPreview={onOpenPreview}
+          localImageHrefBySkuLower={localImageHrefBySkuLower}
+        />
+      </td>
+      <td className="products-table__td-name">{row.name}</td>
+      <td className="products-table__td-tight">{row.color?.trim() ? row.color : ""}</td>
+      <td className="products-table__td-tight">{row.size?.trim() ? row.size : ""}</td>
+      <td className="products-table__td-stock">
+        <div className="stock-cell">
+          <span className="stock-cell__qty">
+            <span className="stock-cell__qty-label-mobile" aria-hidden="true">
+              재고
+            </span>
+            <strong>{qty}</strong>
+            {rowSaving ? <span className="stock-adjust-pending" aria-label="저장 중" /> : null}
+          </span>
+          <div className="stock-buttons">
+            <button
+              type="button"
+              className="btn-mini"
+              disabled={qty < 1 || rowSaving}
+              onClick={() => {
+                void onStockDelta(row, -1);
+              }}
+            >
+              -1
+            </button>
+            <button
+              type="button"
+              className="btn-mini"
+              disabled={rowSaving}
+              onClick={() => {
+                void onStockDelta(row, 1);
+              }}
+            >
+              +1
+            </button>
+          </div>
+        </div>
+      </td>
+      <td>
+        {(row.variantId ? row.variantWholesalePrice : row.wholesalePrice) != null
+          ? `${Number(row.variantId ? row.variantWholesalePrice : row.wholesalePrice).toLocaleString()}원`
+          : "-"}
+      </td>
+      <td>
+        {(row.variantId ? row.variantMsrpPrice : row.msrpPrice) != null
+          ? `${Number(row.variantId ? row.variantMsrpPrice : row.msrpPrice).toLocaleString()}원`
+          : "-"}
+      </td>
+      <td>
+        {(row.variantId ? row.variantSalePrice : row.salePrice) != null
+          ? `${Number(row.variantId ? row.variantSalePrice : row.salePrice).toLocaleString()}원`
+          : "-"}
+      </td>
+      <td>
+        {(row.variantId ? row.variantExtraPrice : row.extraPrice) != null
+          ? `${Number(row.variantId ? row.variantExtraPrice : row.extraPrice).toLocaleString()}원`
+          : "-"}
+      </td>
+      <td>
+        {row.memo?.trim() ? (
+          <span className="products-table__memo products-table__memo--filled">{row.memo}</span>
+        ) : (
+          "-"
+        )}
+      </td>
+      <td>
+        {row.memo2?.trim() ? (
+          <span className="products-table__memo products-table__memo--filled">{row.memo2}</span>
+        ) : (
+          "-"
+        )}
+      </td>
+      <td>
+        <div className="row-actions">
+          <button type="button" className="btn btn-secondary btn-row" onClick={() => onEdit(row.id)}>
+            수정
+          </button>
+          <button type="button" className="btn btn-danger btn-row" onClick={() => void onDelete(row.id)}>
+            삭제
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+});
 
 function variantSavingKeyForProduct(adjustingKeys: Set<string>, variants: ProductVariant[]): string {
   if (!variants.length) return "";
@@ -399,6 +524,7 @@ export function ProductsClient({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
   const [uploading, setUploading] = useState(false);
@@ -476,6 +602,20 @@ export function ProductsClient({
       if (csvUploadHighlightTimerRef.current) clearTimeout(csvUploadHighlightTimerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      searchDebounceRef.current = null;
+      setSearch(searchInput.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+        searchDebounceRef.current = null;
+      }
+    };
+  }, [searchInput]);
 
   useEffect(() => {
     if (!debugClientLifecycle) return;
@@ -824,23 +964,22 @@ export function ProductsClient({
     return list;
   }, [orderedProducts, categoryFilter]);
 
-  const productsByNormSku = useMemo(() => {
-    const m = new Map<string, Product[]>();
-    for (const p of orderedAfterCategory) {
-      const k = productNormSku(p, localVariantsByProductId);
-      if (!k) continue;
-      const arr = m.get(k) ?? [];
-      arr.push(p);
-      m.set(k, arr);
-    }
-    return m;
-  }, [orderedAfterCategory, localVariantsByProductId]);
-
   // 검색 + 카테고리: orderedProducts 기준 필터링(순서 유지). variant 메모는 같은 SKU 전체 product의 옵션을 합쳐 검색
   const filtered = useMemo(() => {
     const list = orderedAfterCategory;
-    if (!search.trim()) return list;
-    const q = search.trim().toLowerCase();
+    const qRaw = search.trim();
+    if (!qRaw) return list;
+    const q = qRaw.toLowerCase();
+
+    const productsByNormSku = new Map<string, Product[]>();
+    for (const p of orderedAfterCategory) {
+      const k = productNormSku(p, localVariantsByProductId);
+      if (!k) continue;
+      const arr = productsByNormSku.get(k) ?? [];
+      arr.push(p);
+      productsByNormSku.set(k, arr);
+    }
+
     const textHas = (s: string | null | undefined) => (s ?? "").toLowerCase().includes(q);
     const skuMatches = (p: Product) => {
       if ((p.sku ?? "").toLowerCase().includes(q)) return true;
@@ -862,7 +1001,7 @@ export function ProductsClient({
       const allVars = group.flatMap((gp) => localVariantsByProductId[gp.id] ?? []);
       return allVars.some((v) => textHas(v.memo) || textHas(v.memo2));
     });
-  }, [orderedAfterCategory, search, productsByNormSku, localVariantsByProductId]);
+  }, [orderedAfterCategory, search, localVariantsByProductId]);
 
   /** 화면: 정규화 SKU당 1카드/1그룹 — DB에 동일 SKU product가 여러 개여도 합쳐서 표시 */
   const skuDisplayGroups = useMemo(
@@ -1236,8 +1375,16 @@ export function ProductsClient({
     orphanResult.orphanCount === 0 ||
     orphanResult.parseFailures.length > 0;
 
+  const onListThumbPreview = useCallback((url: string, altText: string) => {
+    setListImagePreview({ url, alt: altText });
+  }, []);
+
   function runSearch() {
-    setSearch(searchInput);
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+      searchDebounceRef.current = null;
+    }
+    setSearch(searchInput.trim());
   }
 
   function renderToolbarActions(
@@ -1669,112 +1816,19 @@ export function ProductsClient({
               </thead>
               <tbody>
                 {listRows.map((row) => {
-                  const qty = row.variantStock;
                   const rowKey = listRowAdjustKey(row);
                   const rowSaving = adjustingStockKeys.has(rowKey);
                   return (
-                    <tr key={row.variantId ? `${row.id}-${row.variantId}` : row.id}>
-                      <td>
-                        <ProductsTableThumbCell
-                          sku={row.sku}
-                          imageUrl={row.imageUrl}
-                          updatedAt={row.updatedAt}
-                          alt={(row.name ?? row.sku ?? "").toString()}
-                          onOpenPreview={(url, altText) => setListImagePreview({ url, alt: altText })}
-                          localImageHrefBySkuLower={localImageHrefBySkuLower}
-                        />
-                      </td>
-                      <td className="products-table__td-name">{row.name}</td>
-                      <td className="products-table__td-tight">{row.color?.trim() ? row.color : ""}</td>
-                      <td className="products-table__td-tight">{row.size?.trim() ? row.size : ""}</td>
-                      <td className="products-table__td-stock">
-                        <div className="stock-cell">
-                          <span className="stock-cell__qty">
-                            <span className="stock-cell__qty-label-mobile" aria-hidden="true">
-                              재고
-                            </span>
-                            <strong>{qty}</strong>
-                            {rowSaving ? (
-                              <span className="stock-adjust-pending" aria-label="저장 중" />
-                            ) : null}
-                          </span>
-                          <div className="stock-buttons">
-                            <button
-                              type="button"
-                              className="btn-mini"
-                              disabled={qty < 1 || rowSaving}
-                              onClick={() => {
-                                void onListRowStockDelta(row, -1);
-                              }}
-                            >
-                              -1
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-mini"
-                              disabled={rowSaving}
-                              onClick={() => {
-                                void onListRowStockDelta(row, 1);
-                              }}
-                            >
-                              +1
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        {(row.variantId ? row.variantWholesalePrice : row.wholesalePrice) != null
-                          ? `${Number(row.variantId ? row.variantWholesalePrice : row.wholesalePrice).toLocaleString()}원`
-                          : "-"}
-                      </td>
-                      <td>
-                        {(row.variantId ? row.variantMsrpPrice : row.msrpPrice) != null
-                          ? `${Number(row.variantId ? row.variantMsrpPrice : row.msrpPrice).toLocaleString()}원`
-                          : "-"}
-                      </td>
-                      <td>
-                        {(row.variantId ? row.variantSalePrice : row.salePrice) != null
-                          ? `${Number(row.variantId ? row.variantSalePrice : row.salePrice).toLocaleString()}원`
-                          : "-"}
-                      </td>
-                      <td>
-                        {(row.variantId ? row.variantExtraPrice : row.extraPrice) != null
-                          ? `${Number(row.variantId ? row.variantExtraPrice : row.extraPrice).toLocaleString()}원`
-                          : "-"}
-                      </td>
-                      <td>
-                        {row.memo?.trim() ? (
-                          <span className="products-table__memo products-table__memo--filled">{row.memo}</span>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td>
-                        {row.memo2?.trim() ? (
-                          <span className="products-table__memo products-table__memo--filled">{row.memo2}</span>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                      <td>
-                        <div className="row-actions">
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-row"
-                            onClick={() => openEditById(row.id)}
-                          >
-                            수정
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-danger btn-row"
-                            onClick={() => void requestDeleteProduct(row.id)}
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <ProductsTableRow
+                      key={row.variantId ? `${row.id}-${row.variantId}` : row.id}
+                      row={row}
+                      rowSaving={rowSaving}
+                      localImageHrefBySkuLower={localImageHrefBySkuLower}
+                      onOpenPreview={onListThumbPreview}
+                      onStockDelta={onListRowStockDelta}
+                      onEdit={openEditById}
+                      onDelete={requestDeleteProduct}
+                    />
                   );
                 })}
               </tbody>

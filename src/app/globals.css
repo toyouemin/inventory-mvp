@@ -2107,6 +2107,11 @@ label {
     max-width: 100%;
   }
 
+  body > nav {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
   /* Compact header/toolbar: ~20% smaller */
   .products-toolbar {
     position: sticky;
@@ -2175,7 +2180,7 @@ label {
   }
 
   .products-toolbar--sticky {
-    margin-bottom: 6px;
+    margin-bottom: 4px;
   }
 
   .products-toolbar--compact .toolbar-actions-desktop {

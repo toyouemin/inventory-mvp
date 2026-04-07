@@ -1367,10 +1367,115 @@ label {
   color: var(--muted);
 }
 
+.products-count-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 16px;
+}
+
+.products-count-row .products-count {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.products-count-row__toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 18px;
+  max-width: 100%;
+}
+
 .products-count {
   font-size: 14px;
   color: var(--muted);
   margin-bottom: 16px;
+}
+
+.products-hide-zero {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  font-size: 13px;
+  color: var(--muted);
+  position: relative;
+}
+
+.products-hide-zero__input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.products-hide-zero__track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--border);
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.products-hide-zero__track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--card);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease;
+}
+
+.products-hide-zero__input:checked + .products-hide-zero__track {
+  background: var(--accent);
+}
+
+.products-hide-zero__input:checked + .products-hide-zero__track::after {
+  transform: translateX(16px);
+}
+
+.products-hide-zero__input:focus-visible + .products-hide-zero__track {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.products-hide-zero__label {
+  white-space: nowrap;
+}
+
+.product-card__option-list--novis {
+  padding: 10px 0 4px;
+}
+
+.product-card__no-visible-options {
+  margin: 0;
+  font-size: 13px;
+}
+
+.products-table__td-novis-msg {
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.products-table__tr-novis .btn-mini:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* ========== MODALS ========== */

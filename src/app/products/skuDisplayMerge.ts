@@ -34,6 +34,20 @@ export type SkuDisplayGroup = {
   trace?: SkuDisplayGroupTrace;
 };
 
+/** 카드/그룹 단위 총재고 — 옵션 있으면 병합된 variant 재고 합, 없으면 `product.stock` (병합 로직과 동일한 음수·비유한값 처리) */
+export function totalStockForSkuDisplayGroup(group: SkuDisplayGroup): number {
+  if (group.variants.length > 0) {
+    let sum = 0;
+    for (const v of group.variants) {
+      const x = Number(v.stock);
+      sum += Number.isFinite(x) ? Math.max(0, Math.trunc(x)) : 0;
+    }
+    return sum;
+  }
+  const ps = Number(group.product.stock);
+  return Number.isFinite(ps) ? Math.max(0, Math.trunc(ps)) : 0;
+}
+
 export type BuildSkuDisplayGroupsOptions = {
   /** true면 `trace` 채움 + `products.sku` 빈 행 normSku 출처 콘솔 로그 */
   debugDisplayGroups?: boolean;

@@ -54,6 +54,8 @@ export type ProductCardProps = {
   displayGroupNormSku?: string;
   /** `?debugVariantSkuMix=1` — 카드에 붙은 각 variant의 product_id·sku·normSku 로그 */
   debugVariantSkuMix?: boolean;
+  /** 재고 0 숨김 ON인데 옵션이 모두 0일 때 안내 */
+  showNoVisibleOptionsHint?: boolean;
 };
 
 export const ProductCard = memo(function ProductCard({
@@ -69,6 +71,7 @@ export const ProductCard = memo(function ProductCard({
   debugProductsDupes = false,
   displayGroupNormSku = "",
   debugVariantSkuMix = false,
+  showNoVisibleOptionsHint = false,
 }: ProductCardProps) {
   const debugInstanceId = useRef(
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -304,7 +307,15 @@ export const ProductCard = memo(function ProductCard({
         </div>
 
         <div className="product-card__stocks">
-          {hasVariants ? (
+          {showNoVisibleOptionsHint ? (
+            <div
+              className="product-card__option-list product-card__option-list--novis"
+              role="status"
+              aria-live="polite"
+            >
+              <p className="product-card__no-visible-options muted">표시할 옵션 없음</p>
+            </div>
+          ) : hasVariants ? (
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               {sortedVariants.map((variant) => {
                 const qty = variant?.stock ?? 0;

@@ -47,4 +47,6 @@ export type ProductRow = Product & {
   variantExtraPrice?: number | null;
   /** variant 행일 때 실제 소유 product_id(±재고 API). 없으면 `id`(대표 상품) 사용 */
   variantOwnerProductId?: string;
+  /** 리스트: 재고 0 숨김 ON일 때 표시할 옵션이 없을 때의 안내 행 */
+  isListNoVisibleOptionsRow?: boolean;
 };

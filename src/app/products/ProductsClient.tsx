@@ -22,7 +22,11 @@ import { normalizeCategoryLabel } from "./categoryNormalize";
 import { compareProductsByCategoryOrder } from "./categorySortOrder.utils";
 import { EditProductModal } from "./EditProductModal";
 import { normalizeSkuForMatch, productNormSku } from "./skuNormalize";
-import { buildSkuDisplayGroups, type SkuDisplayGroup } from "./skuDisplayMerge";
+import {
+  buildSkuDisplayGroups,
+  totalStockForSkuDisplayGroup,
+  type SkuDisplayGroup,
+} from "./skuDisplayMerge";
 import { VARIANT_AUDIT_TARGET_SKUS } from "./variantAuditTargets";
 import { fitCategorySelectWidth } from "./fitCategorySelectWidth";
 
@@ -35,6 +39,11 @@ type CsvUploadMode = "merge" | "reset";
 const CSV_UPLOAD_HIGHLIGHT_MS = 6000;
 /** 검색어 반영 지연 — 타이핑 중 필터·병합·리스트 재계산 횟수 감소 */
 const SEARCH_DEBOUNCE_MS = 300;
+
+function variantsAfterZeroStockFilter(variants: ProductVariant[], hideZeroStock: boolean): ProductVariant[] {
+  if (!hideZeroStock) return variants;
+  return variants.filter((v) => Number(v.stock ?? 0) > 0);
+}
 
 type StorageOrphanCleanupResult = {
   bucket: string;
@@ -354,6 +363,61 @@ const ProductsTableRow = memo(function ProductsTableRow({
   onDelete: (productId: string) => void;
 }) {
   const qty = row.variantStock;
+  if (row.isListNoVisibleOptionsRow) {
+    return (
+      <tr className="products-table__tr-novis">
+        <td>
+          <ProductsTableThumbCell
+            sku={row.sku}
+            imageUrl={row.imageUrl}
+            updatedAt={row.updatedAt}
+            alt={(row.name ?? row.sku ?? "").toString()}
+            onOpenPreview={onOpenPreview}
+            localImageHrefBySkuLower={localImageHrefBySkuLower}
+          />
+        </td>
+        <td className="products-table__td-name">{row.name}</td>
+        <td className="products-table__td-tight muted">—</td>
+        <td className="products-table__td-tight products-table__td-novis-msg">표시할 옵션 없음</td>
+        <td className="products-table__td-stock">
+          <div className="stock-cell">
+            <span className="stock-cell__qty">
+              <span className="stock-cell__qty-label-mobile" aria-hidden="true">
+                재고
+              </span>
+              <span className="muted">—</span>
+            </span>
+            <div className="stock-buttons">
+              <button type="button" className="btn-mini" disabled title="표시된 옵션이 없어 조정할 수 없습니다">
+                -1
+              </button>
+              <button type="button" className="btn-mini" disabled title="표시된 옵션이 없어 조정할 수 없습니다">
+                +1
+              </button>
+            </div>
+          </div>
+        </td>
+        <td>
+          {row.wholesalePrice != null ? `${Number(row.wholesalePrice).toLocaleString()}원` : "-"}
+        </td>
+        <td>{row.msrpPrice != null ? `${Number(row.msrpPrice).toLocaleString()}원` : "-"}</td>
+        <td>{row.salePrice != null ? `${Number(row.salePrice).toLocaleString()}원` : "-"}</td>
+        <td>{row.extraPrice != null ? `${Number(row.extraPrice).toLocaleString()}원` : "-"}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>
+          <div className="row-actions">
+            <button type="button" className="btn btn-secondary btn-row" onClick={() => onEdit(row.id)}>
+              수정
+            </button>
+            <button type="button" className="btn btn-danger btn-row" onClick={() => void onDelete(row.id)}>
+              삭제
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
   return (
     <tr>
       <td>
@@ -462,6 +526,7 @@ function variantSavingKeyForProduct(adjustingKeys: Set<string>, variants: Produc
 }
 
 function listRowAdjustKey(row: ProductRow): string {
+  if (row.isListNoVisibleOptionsRow) return `novis:${row.id}`;
   return row.variantId ? `v:${row.variantId}` : `p:${row.id}`;
 }
 
@@ -524,6 +589,8 @@ export function ProductsClient({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
+  const [hideZeroStock, setHideZeroStock] = useState(false);
+  const [showInStockOnly, setShowInStockOnly] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
@@ -1021,6 +1088,12 @@ export function ProductsClient({
     ]
   );
 
+  /** 검색·카테고리·병합 후 → 총재고 0 그룹 제외(옵션 합 또는 단일 상품 stock) */
+  const skuDisplayGroupsForView = useMemo(() => {
+    if (!showInStockOnly) return skuDisplayGroups;
+    return skuDisplayGroups.filter((g) => totalStockForSkuDisplayGroup(g) > 0);
+  }, [skuDisplayGroups, showInStockOnly]);
+
   useEffect(() => {
     if (!debugCategoryOrder || typeof console === "undefined" || !console.info) return;
     console.info(
@@ -1160,22 +1233,41 @@ export function ProductsClient({
   /** List view: SKU 병합 후 (product, variant) 행 */
   const listRows = useMemo((): ProductRow[] => {
     const rows: ProductRow[] = [];
-    for (const { product: p, variants } of skuDisplayGroups) {
+    for (const { product: p, variants } of skuDisplayGroupsForView) {
       if (variants.length > 0) {
-        for (const v of sortVariantsForDisplay(variants)) {
+        const visible = variantsAfterZeroStockFilter(variants, hideZeroStock);
+        if (visible.length > 0) {
+          for (const v of sortVariantsForDisplay(visible)) {
+            rows.push({
+              ...p,
+              variantOwnerProductId: v.productId,
+              variantId: v.id,
+              color: (v.color ?? "").trim(),
+              size: formatGenderSizeDisplay(v.gender, v.size),
+              variantStock: v.stock,
+              memo: v.memo ?? null,
+              memo2: v.memo2 ?? null,
+              variantWholesalePrice: v.wholesalePrice ?? null,
+              variantMsrpPrice: v.msrpPrice ?? null,
+              variantSalePrice: v.salePrice ?? null,
+              variantExtraPrice: v.extraPrice ?? null,
+            });
+          }
+        } else if (hideZeroStock) {
           rows.push({
             ...p,
-            variantOwnerProductId: v.productId,
-            variantId: v.id,
-            color: (v.color ?? "").trim(),
-            size: formatGenderSizeDisplay(v.gender, v.size),
-            variantStock: v.stock,
-            memo: v.memo ?? null,
-            memo2: v.memo2 ?? null,
-            variantWholesalePrice: v.wholesalePrice ?? null,
-            variantMsrpPrice: v.msrpPrice ?? null,
-            variantSalePrice: v.salePrice ?? null,
-            variantExtraPrice: v.extraPrice ?? null,
+            isListNoVisibleOptionsRow: true,
+            variantOwnerProductId: undefined,
+            variantId: "",
+            color: "",
+            size: "",
+            variantStock: 0,
+            memo: null,
+            memo2: null,
+            variantWholesalePrice: null,
+            variantMsrpPrice: null,
+            variantSalePrice: null,
+            variantExtraPrice: null,
           });
         }
       } else {
@@ -1194,7 +1286,7 @@ export function ProductsClient({
       }
     }
     return rows;
-  }, [skuDisplayGroups]);
+  }, [skuDisplayGroupsForView, hideZeroStock]);
 
   async function handleProductsCsv(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -1742,14 +1834,42 @@ export function ProductsClient({
         </section>
       )}
 
-      <p className="products-count">
-        {skuDisplayGroups.length}개 상품
-        {search && ` (전체 ${localProducts.length}개 중)`}
-      </p>
+      <div className="products-count-row">
+        <p className="products-count">
+          {skuDisplayGroupsForView.length}개 상품
+          {search && ` (전체 ${localProducts.length}개 중)`}
+        </p>
+        <div className="products-count-row__toggles">
+          <label className="products-hide-zero">
+            <input
+              type="checkbox"
+              className="products-hide-zero__input"
+              role="switch"
+              checked={showInStockOnly}
+              onChange={(e) => setShowInStockOnly(e.target.checked)}
+              aria-checked={showInStockOnly}
+            />
+            <span className="products-hide-zero__track" aria-hidden />
+            <span className="products-hide-zero__label">재고 있는 상품만 보기</span>
+          </label>
+          <label className="products-hide-zero">
+            <input
+              type="checkbox"
+              className="products-hide-zero__input"
+              role="switch"
+              checked={hideZeroStock}
+              onChange={(e) => setHideZeroStock(e.target.checked)}
+              aria-checked={hideZeroStock}
+            />
+            <span className="products-hide-zero__track" aria-hidden />
+            <span className="products-hide-zero__label">재고 0 숨기기</span>
+          </label>
+        </div>
+      </div>
 
       {viewMode === "card" ? (
         <div className="products-grid">
-          {skuDisplayGroups.length === 0 ? (
+          {skuDisplayGroupsForView.length === 0 ? (
             <div>
               <p className="muted">검색 결과가 없습니다.</p>
 
@@ -1765,28 +1885,33 @@ export function ProductsClient({
               )}
             </div>
           ) : (
-            skuDisplayGroups.map(({ normSku, product: p, variants: vars }) => (
-              <ProductCard
-                key={normSku}
-                product={p}
-                displayGroupNormSku={normSku}
-                localImageHrefBySkuLower={localImageHrefBySkuLower}
-                variants={vars}
-                onEditClick={openEditById}
-                onDeleteClick={requestDeleteProduct}
-                onProductStockDelta={onProductStockDelta}
-                onVariantStockDelta={onVariantStockDelta}
-                productStockSaving={adjustingStockKeys.has(`p:${p.id}`)}
-                savingVariantIdsKey={variantSavingKeyForProduct(adjustingStockKeys, vars)}
-                debugProductsDupes={debugProductsDupes}
-                debugVariantSkuMix={debugVariantSkuMix}
-              />
-            ))
+            skuDisplayGroupsForView.map(({ normSku, product: p, variants: vars }) => {
+              const displayVars = variantsAfterZeroStockFilter(vars, hideZeroStock);
+              const showNoVisibleOptionsHint = hideZeroStock && vars.length > 0 && displayVars.length === 0;
+              return (
+                <ProductCard
+                  key={normSku}
+                  product={p}
+                  displayGroupNormSku={normSku}
+                  localImageHrefBySkuLower={localImageHrefBySkuLower}
+                  variants={displayVars}
+                  showNoVisibleOptionsHint={showNoVisibleOptionsHint}
+                  onEditClick={openEditById}
+                  onDeleteClick={requestDeleteProduct}
+                  onProductStockDelta={onProductStockDelta}
+                  onVariantStockDelta={onVariantStockDelta}
+                  productStockSaving={adjustingStockKeys.has(`p:${p.id}`)}
+                  savingVariantIdsKey={variantSavingKeyForProduct(adjustingStockKeys, vars)}
+                  debugProductsDupes={debugProductsDupes}
+                  debugVariantSkuMix={debugVariantSkuMix}
+                />
+              );
+            })
           )}
         </div>
       ) : (
         <div className="table-wrap">
-          {skuDisplayGroups.length === 0 ? (
+          {skuDisplayGroupsForView.length === 0 ? (
             <div>
               <p className="muted">검색 결과가 없습니다.</p>
 
@@ -1820,7 +1945,13 @@ export function ProductsClient({
                   const rowSaving = adjustingStockKeys.has(rowKey);
                   return (
                     <ProductsTableRow
-                      key={row.variantId ? `${row.id}-${row.variantId}` : row.id}
+                      key={
+                        row.isListNoVisibleOptionsRow
+                          ? `${row.id}-novis`
+                          : row.variantId
+                            ? `${row.id}-${row.variantId}`
+                            : row.id
+                      }
                       row={row}
                       rowSaving={rowSaving}
                       localImageHrefBySkuLower={localImageHrefBySkuLower}

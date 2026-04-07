@@ -2414,8 +2414,8 @@ label {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 24px;
-    padding: 2px 8px;
+    min-height: 26px;
+    padding: 3px 8px;
     line-height: 1.2;
   }
 
@@ -2429,6 +2429,9 @@ label {
 
   .product-card__option-qty strong {
     font-size: calc(14px + 1pt);
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
   }
 
   .product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty {

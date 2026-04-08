@@ -1043,6 +1043,7 @@ label {
 .products-table th,
 .products-table td {
   vertical-align: middle;
+  text-align: center;
 }
 
 /* 리스트 모드: 상단 헤더(이미지/품명/컬러/사이즈...) 고정 */
@@ -1051,6 +1052,12 @@ label {
   top: 0;
   z-index: 6;
   background: var(--bg);
+  padding: 8px 6px 12px;
+  font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: center;
 }
 
 @media (max-width: 768px) {
@@ -1067,6 +1074,7 @@ label {
 .products-table__td-name {
   min-width: 0;
   padding-right: 6px;
+  text-align: center;
 }
 
 .products-table__th-tight,
@@ -1462,6 +1470,42 @@ label {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.products-table .row-actions {
+  justify-content: center;
+}
+
+.products-table .stock-cell {
+  justify-content: center;
+}
+
+/* PC 풀사이즈: 앞쪽 컬럼(이미지/품명/카테고리) 간격·정렬 보정 */
+@media (min-width: 1024px) {
+  .products-table th:nth-child(1),
+  .products-table td:nth-child(1) {
+    width: 72px;
+    min-width: 72px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .products-table th:nth-child(2),
+  .products-table td:nth-child(2) {
+    min-width: 150px;
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+
+  .products-table th:nth-child(3),
+  .products-table td:nth-child(3) {
+    min-width: 50px;
+    padding-left: 0;
+    padding-right: 6px;
+    text-align: left;
+    vertical-align: middle;
+    line-height: 1.2;
+  }
 }
 
 .btn-row {

@@ -377,6 +377,7 @@ const ProductsTableRow = memo(function ProductsTableRow({
           />
         </td>
         <td className="products-table__td-name">{row.name}</td>
+        <td className="products-table__td-tight">{row.category?.trim() ? row.category : ""}</td>
         <td className="products-table__td-tight muted">—</td>
         <td className="products-table__td-tight products-table__td-novis-msg">표시할 옵션 없음</td>
         <td className="products-table__td-stock">
@@ -431,6 +432,7 @@ const ProductsTableRow = memo(function ProductsTableRow({
         />
       </td>
       <td className="products-table__td-name">{row.name}</td>
+      <td className="products-table__td-tight">{row.category?.trim() ? row.category : ""}</td>
       <td className="products-table__td-tight">{row.color?.trim() ? row.color : ""}</td>
       <td className="products-table__td-tight">{row.size?.trim() ? row.size : ""}</td>
       <td className="products-table__td-stock">
@@ -2043,6 +2045,7 @@ export function ProductsClient({
                 <tr>
                   <th>이미지</th>
                   <th className="products-table__th-name">품명</th>
+                  <th className="products-table__th-tight">카테고리</th>
                   <th className="products-table__th-tight">컬러</th>
                   <th className="products-table__th-tight">사이즈</th>
                   <th className="products-table__th-stock">재고</th>

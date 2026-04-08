@@ -1515,7 +1515,7 @@ label {
 
 .products-count-bar__toggle-slot--soldout {
   justify-self: start;
-  margin-left: 90px;
+  margin-left: 20px;
 }
 
 .products-count-bar__toggle-slot--option0 {

@@ -56,6 +56,9 @@ export type ProductCardProps = {
   debugVariantSkuMix?: boolean;
   /** 재고 0 숨김 ON인데 옵션이 모두 0일 때 안내 */
   showNoVisibleOptionsHint?: boolean;
+  /** 툴바·카드 공통: 메모 본문 전체 표시 여부 */
+  memoShowAll: boolean;
+  onMemoShowAllChange: (next: boolean) => void;
 };
 
 export const ProductCard = memo(function ProductCard({
@@ -72,6 +75,8 @@ export const ProductCard = memo(function ProductCard({
   displayGroupNormSku = "",
   debugVariantSkuMix = false,
   showNoVisibleOptionsHint = false,
+  memoShowAll,
+  onMemoShowAllChange,
 }: ProductCardProps) {
   const debugInstanceId = useRef(
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -84,7 +89,6 @@ export const ProductCard = memo(function ProductCard({
   const [memoDraft1, setMemoDraft1] = useState("");
   const [memoDraft2, setMemoDraft2] = useState("");
   const [memoPending, setMemoPending] = useState(false);
-  const [showAllMemos, setShowAllMemos] = useState(true);
   const safeVariants = Array.isArray(variants) ? variants : [];
 
   const { src: imgSrc, onError: onImgError, dead: imgDead } = useProductImageSrc(
@@ -313,16 +317,16 @@ export const ProductCard = memo(function ProductCard({
 
         <div
           className={`product-card__stocks${hasAnyMemo ? " product-card__stocks--with-memo-toggle" : ""}${
-            showAllMemos ? " product-card__stocks--memo-expanded" : ""
+            memoShowAll ? " product-card__stocks--memo-expanded" : ""
           }`}
         >
           {hasAnyMemo ? (
             <button
               type="button"
-              className={`product-card__memo-visibility-toggle${showAllMemos ? " is-active" : ""}`}
-              onClick={() => setShowAllMemos((v) => !v)}
-              aria-pressed={showAllMemos}
-              title={showAllMemos ? "메모 전체보기 끄기" : "메모 전체보기 켜기"}
+              className={`product-card__memo-visibility-toggle${memoShowAll ? " is-active" : ""}`}
+              onClick={() => onMemoShowAllChange(!memoShowAll)}
+              aria-pressed={memoShowAll}
+              title={memoShowAll ? "메모 전체 끄기(모든 카드)" : "메모 전체 켜기(모든 카드)"}
             >
               메모
             </button>
@@ -365,10 +369,10 @@ export const ProductCard = memo(function ProductCard({
                           {variantSaving ? (
                             <span className="stock-adjust-pending" aria-label="저장 중" />
                           ) : null}
-                          {variantMemoText && showAllMemos ? (
+                          {variantMemoText && memoShowAll ? (
                               <span
                                 className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
-                                  showAllMemos ? " product-card__memo--expanded" : ""
+                                  memoShowAll ? " product-card__memo--expanded" : ""
                                 }`}
                               >
                                 {variantMemoText}
@@ -456,10 +460,10 @@ export const ProductCard = memo(function ProductCard({
                       {productStockSaving ? (
                         <span className="stock-adjust-pending" aria-label="저장 중" />
                       ) : null}
-                      {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) && showAllMemos ? (
+                      {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) && memoShowAll ? (
                         <span
                           className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
-                            showAllMemos ? " product-card__memo--expanded" : ""
+                            memoShowAll ? " product-card__memo--expanded" : ""
                           }`}
                         >
                           {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}

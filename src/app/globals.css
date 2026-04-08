@@ -1488,7 +1488,7 @@ label {
 
 .products-count-bar {
   display: grid;
-  grid-template-columns: max-content max-content max-content;
+  grid-template-columns: max-content max-content max-content max-content;
   align-items: center;
   justify-content: start;
   column-gap: 8px;
@@ -1507,7 +1507,7 @@ label {
 .products-count-bar__toggle-slot {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   min-width: 0;
   max-width: 100%;
   transform: translateY(3px);
@@ -1515,10 +1515,13 @@ label {
 
 .products-count-bar__toggle-slot--soldout {
   justify-self: start;
-  margin-left: 20px;
 }
 
 .products-count-bar__toggle-slot--option0 {
+  justify-self: start;
+}
+
+.products-count-bar__toggle-slot--memo {
   justify-self: start;
 }
 

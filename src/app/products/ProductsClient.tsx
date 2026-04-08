@@ -591,6 +591,8 @@ export function ProductsClient({
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [hideZeroStock, setHideZeroStock] = useState(false);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
+  /** 카드 메모 본문 전역 표시(툴바 메모ON·카드 메모 버튼 공유). PC는 마운트 후 OFF로 시작 */
+  const [cardsMemoVisible, setCardsMemoVisible] = useState(true);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
@@ -693,6 +695,13 @@ export function ProductsClient({
       }
     };
   }, [searchInput]);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(min-width: 769px)").matches) {
+      setCardsMemoVisible(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!debugClientLifecycle) return;
@@ -1739,7 +1748,7 @@ export function ProductsClient({
           </div>
           <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--soldout">
             <label className="products-hide-zero">
-              <span className="products-hide-zero__label">품절 숨기기</span>
+              <span className="products-hide-zero__label">품절</span>
               <input
                 type="checkbox"
                 className="products-hide-zero__input"
@@ -1747,13 +1756,14 @@ export function ProductsClient({
                 checked={showInStockOnly}
                 onChange={(e) => setShowInStockOnly(e.target.checked)}
                 aria-checked={showInStockOnly}
+                aria-label="품절 숨기기"
               />
               <span className="products-hide-zero__track" aria-hidden />
             </label>
           </div>
           <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--option0">
             <label className="products-hide-zero">
-              <span className="products-hide-zero__label">옵션0 숨기기</span>
+              <span className="products-hide-zero__label">재고0</span>
               <input
                 type="checkbox"
                 className="products-hide-zero__input"
@@ -1761,6 +1771,22 @@ export function ProductsClient({
                 checked={hideZeroStock}
                 onChange={(e) => setHideZeroStock(e.target.checked)}
                 aria-checked={hideZeroStock}
+                aria-label="재고 0 옵션 숨기기"
+              />
+              <span className="products-hide-zero__track" aria-hidden />
+            </label>
+          </div>
+          <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--memo">
+            <label className="products-hide-zero">
+              <span className="products-hide-zero__label">메모ON</span>
+              <input
+                type="checkbox"
+                className="products-hide-zero__input"
+                role="switch"
+                checked={cardsMemoVisible}
+                onChange={(e) => setCardsMemoVisible(e.target.checked)}
+                aria-checked={cardsMemoVisible}
+                aria-label="카드 메모 전체 표시"
               />
               <span className="products-hide-zero__track" aria-hidden />
             </label>
@@ -1984,6 +2010,8 @@ export function ProductsClient({
                   localImageHrefBySkuLower={localImageHrefBySkuLower}
                   variants={displayVars}
                   showNoVisibleOptionsHint={showNoVisibleOptionsHint}
+                  memoShowAll={cardsMemoVisible}
+                  onMemoShowAllChange={setCardsMemoVisible}
                   onEditClick={openEditById}
                   onDeleteClick={requestDeleteProduct}
                   onProductStockDelta={onProductStockDelta}

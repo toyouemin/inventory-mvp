@@ -2364,15 +2364,10 @@ label {
     padding-right: 10px;
   }
 
-  /* 상품 개수는 왼쪽, 품절·재고0·메모ON 토글은 행 오른쪽 끝(컨테이너 패딩 상쇄로 메모 옆 빈 여백 축소) */
+  /* 상품 개수는 왼쪽, 토글 3개는 콘텐츠 영역(카드·목록과 동일한 패딩 안쪽) 오른쪽 끝에 정렬 */
   .products-sticky-controls .products-count-bar {
     grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
     column-gap: 6px;
-    width: calc(100% + 10px);
-    max-width: none;
-    margin-right: -10px;
-    padding-right: max(0px, env(safe-area-inset-right, 0px));
-    box-sizing: border-box;
   }
 
   .product-card__option-list {

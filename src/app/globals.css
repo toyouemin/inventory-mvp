@@ -1646,8 +1646,8 @@ label {
 }
 
 .product-card__option-list--novis {
-  /* 옵션 행(.product-card__option-row)과 동일한 좌우 10px · 위는 살짝 올림 */
-  padding: 4px 10px 6px;
+  /* 옵션 행(.product-card__option-row)과 동일한 좌우 10px */
+  padding: 5px 10px 5px;
 }
 
 .product-card__no-visible-options {

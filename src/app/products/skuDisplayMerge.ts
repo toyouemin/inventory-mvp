@@ -214,6 +214,12 @@ export function buildSkuDisplayGroups(
       }
     }
     const variants = mergeVariantsForSameCompositeKey(raw, canonical.id, k);
+    // 옵션이 없는 SKU 그룹은 대표 행 하나의 stock만 보면 누락될 수 있어,
+    // 같은 normSku 그룹의 product.stock을 합산해 화면 재고를 안정화한다.
+    const aggregatedGroupProductStock = group.reduce((sum, gp) => {
+      const n = Number(gp.stock);
+      return sum + (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0);
+    }, 0);
     if (traceThisCard && typeof console !== "undefined" && console.info) {
       const 남120 = variants.filter((v) => (v.gender ?? "").trim() === "남" && (v.size ?? "").trim() === "120");
       console.info("[buildSkuDisplayGroups][trace] 카드 병합 후 variants", {
@@ -248,7 +254,11 @@ export function buildSkuDisplayGroups(
 
     out.push({
       normSku: k,
-      product: { ...canonical, sku: k },
+      product: {
+        ...canonical,
+        sku: k,
+        stock: variants.length > 0 ? canonical.stock : aggregatedGroupProductStock,
+      },
       variants,
       trace,
     });

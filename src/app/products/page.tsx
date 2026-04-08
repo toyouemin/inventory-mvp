@@ -67,6 +67,7 @@ const VARIANT_SELECT =
 
 /** PostgREST 기본 행 상한(보통 1000)을 넘기면 `.select()` 한 번에 잘림 → 일부 product의 variant가 통째로 빠질 수 있음 */
 const PRODUCT_VARIANTS_PAGE_SIZE = 1000;
+const PRODUCTS_PAGE_SIZE = 1000;
 
 async function fetchAllProductVariantRowsForProductIds(
   productIds: string[]
@@ -84,6 +85,25 @@ async function fetchAllProductVariantRowsForProductIds(
     const chunk = data ?? [];
     out.push(...chunk);
     if (chunk.length < PRODUCT_VARIANTS_PAGE_SIZE) break;
+  }
+  return { rows: out, error: null };
+}
+
+async function fetchAllProductRows(): Promise<{ rows: Record<string, unknown>[]; error: { message: string } | null }> {
+  const out: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += PRODUCTS_PAGE_SIZE) {
+    const { data, error } = await supabaseServer
+      .from("products")
+      .select(
+        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at"
+      )
+      .order("sku", { ascending: true })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);
+    if (error) return { rows: [], error };
+    const chunk = data ?? [];
+    out.push(...chunk);
+    if (chunk.length < PRODUCTS_PAGE_SIZE) break;
   }
   return { rows: out, error: null };
 }
@@ -161,13 +181,7 @@ export default async function ProductsPage({
     );
   }
 
-  const { data, error } = await supabaseServer
-    .from("products")
-    .select(
-      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at"
-    )
-    .order("sku", { ascending: true })
-    .order("created_at", { ascending: false });
+  const { rows: data, error } = await fetchAllProductRows();
 
   const perfAfterProducts =
     debugProductsPerf && typeof performance !== "undefined" ? performance.now() : 0;

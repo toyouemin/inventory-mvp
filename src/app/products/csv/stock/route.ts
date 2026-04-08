@@ -44,6 +44,26 @@ type VariantRow = {
   memo2: string | null;
 };
 
+const PRODUCTS_PAGE_SIZE = 1000;
+
+async function fetchAllProductRows(): Promise<{ rows: ProductRow[]; error: { message: string } | null }> {
+  const out: ProductRow[] = [];
+  for (let offset = 0; ; offset += PRODUCTS_PAGE_SIZE) {
+    const { data, error } = await supabaseServer
+      .from("products")
+      .select(
+        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at"
+      )
+      .order("sku", { ascending: true })
+      .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);
+    if (error) return { rows: [], error };
+    const chunk = (data ?? []) as ProductRow[];
+    out.push(...chunk);
+    if (chunk.length < PRODUCTS_PAGE_SIZE) break;
+  }
+  return { rows: out, error: null };
+}
+
 export async function GET() {
   if (!supabaseServer) {
     return new Response("Supabase server client not ready. Check env vars.", { status: 500 });
@@ -51,12 +71,7 @@ export async function GET() {
 
   const categoryOrderFromDb = await fetchCategoryOrderMap();
 
-  const { data: products, error: productsErr } = await supabaseServer
-    .from("products")
-    .select(
-      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at"
-    )
-    .order("sku", { ascending: true });
+  const { rows: products, error: productsErr } = await fetchAllProductRows();
 
   if (productsErr) {
     return new Response(`Supabase error: ${productsErr.message}`, { status: 500 });

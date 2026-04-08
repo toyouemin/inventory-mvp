@@ -1044,6 +1044,14 @@ label {
   vertical-align: middle;
 }
 
+/* 리스트 모드: 상단 헤더(이미지/품명/컬러/사이즈...) 고정 */
+.products-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg);
+}
+
 /* 리스트: 컬러·사이즈 폭 최소화 → 품명과 재고 열이 시각적으로 가깝게 */
 .products-table__th-name,
 .products-table__td-name {

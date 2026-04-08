@@ -589,7 +589,7 @@ export function ProductsClient({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [hideZeroStock, setHideZeroStock] = useState(true);
+  const [hideZeroStock, setHideZeroStock] = useState(false);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   /** 카드 메모 본문 전역 표시(툴바 메모ON·카드 메모 버튼 공유). PC는 마운트 후 OFF로 시작 */
   const [cardsMemoVisible, setCardsMemoVisible] = useState(true);

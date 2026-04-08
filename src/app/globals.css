@@ -1646,12 +1646,14 @@ label {
 }
 
 .product-card__option-list--novis {
-  padding: 10px 0 4px;
+  /* 옵션 행(.product-card__option-row)과 동일한 좌우 10px · 위는 살짝 올림 */
+  padding: 4px 10px 6px;
 }
 
 .product-card__no-visible-options {
   margin: 0;
   font-size: 13px;
+  line-height: 1.35;
 }
 
 .products-table__td-novis-msg {

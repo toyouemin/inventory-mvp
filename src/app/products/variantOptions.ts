@@ -239,13 +239,17 @@ export function compareVariantDisplay(
   const colorB = normColorForSort(b.color);
   if (colorA !== colorB) return colorA.localeCompare(colorB, "ko");
 
+  // 성별이 명확한(여/남) 데이터는 성별 우선 정렬: 여 -> 남
+  const genderA = (a.gender ?? "").trim();
+  const genderB = (b.gender ?? "").trim();
+  const gr = sockGenderRank(genderA) - sockGenderRank(genderB);
+  if (gr !== 0) return gr;
+
   const la = formatGenderSizeDisplay(a.gender, a.size);
   const lb = formatGenderSizeDisplay(b.gender, b.size);
   const wear = compareWearSize(la, lb);
   if (wear !== 0) return wear;
 
-  const genderA = (a.gender ?? "").trim();
-  const genderB = (b.gender ?? "").trim();
   if (genderA !== genderB) return genderA.localeCompare(genderB, "ko");
 
   const sza = (a.size ?? "").trim();

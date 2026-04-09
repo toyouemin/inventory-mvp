@@ -384,16 +384,16 @@ export const ProductCard = memo(function ProductCard({
                           {variantSaving ? (
                             <span className="stock-adjust-pending" aria-label="저장 중" />
                           ) : null}
-                          {variantMemoText && memoShowAll ? (
-                              <span
-                                className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
-                                  memoShowAll ? " product-card__memo--expanded" : ""
-                                }`}
-                              >
-                                {variantMemoText}
-                              </span>
-                          ) : null}
                         </div>
+                        {variantMemoText && memoShowAll ? (
+                          <span
+                            className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
+                              memoShowAll ? " product-card__memo--expanded" : ""
+                            }`}
+                          >
+                            {variantMemoText}
+                          </span>
+                        ) : null}
                         <button
                           type="button"
                           className={`product-card__memo-btn${variantMemoText ? " product-card__memo-btn--filled" : ""}`}
@@ -475,16 +475,16 @@ export const ProductCard = memo(function ProductCard({
                       {productStockSaving ? (
                         <span className="stock-adjust-pending" aria-label="저장 중" />
                       ) : null}
-                      {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) && memoShowAll ? (
-                        <span
-                          className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
-                            memoShowAll ? " product-card__memo--expanded" : ""
-                          }`}
-                        >
-                          {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
-                        </span>
-                      ) : null}
                     </div>
+                    {((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) && memoShowAll ? (
+                      <span
+                        className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
+                          memoShowAll ? " product-card__memo--expanded" : ""
+                        }`}
+                      >
+                        {[(product?.memo ?? "").trim(), (product?.memo2 ?? "").trim()].filter(Boolean).join(" / ")}
+                      </span>
+                    ) : null}
                     <button
                       type="button"
                       className={`product-card__memo-btn${

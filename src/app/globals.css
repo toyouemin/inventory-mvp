@@ -646,10 +646,11 @@ button.download-dropdown__item:disabled {
   vertical-align: middle;
 }
 
-.product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty {
+.product-card__option-right > .product-card__memo--filled.product-card__memo--by-qty {
+  flex: 1 1 auto;
+  min-width: 0;
   max-width: clamp(56px, 18vw, 96px);
   flex-shrink: 1;
-  min-width: 0;
   text-align: left;
   white-space: nowrap;
   overflow-x: auto;
@@ -659,7 +660,7 @@ button.download-dropdown__item:disabled {
   scrollbar-width: none;
 }
 
-.product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty.product-card__memo--expanded {
+.product-card__option-right > .product-card__memo--filled.product-card__memo--by-qty.product-card__memo--expanded {
   max-width: clamp(64px, 20vw, 104px);
   white-space: nowrap;
   overflow-x: auto;
@@ -667,7 +668,7 @@ button.download-dropdown__item:disabled {
   text-overflow: clip;
 }
 
-.product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty::-webkit-scrollbar {
+.product-card__option-right > .product-card__memo--filled.product-card__memo--by-qty::-webkit-scrollbar {
   display: none;
 }
 
@@ -903,8 +904,8 @@ button.download-dropdown__item:disabled {
   align-items: center;
   gap: 4px;
   flex-wrap: nowrap;
-  min-width: 0;
-  max-width: 100%;
+  flex-shrink: 0;
+  min-width: fit-content;
 }
 
 .product-card__option-qty strong {
@@ -2518,6 +2519,7 @@ label {
 
   .product-card__option-chips-scroll {
     width: auto;
+    max-width: min(210px, 46%);
   }
 
   .product-card__head-actions {
@@ -2576,7 +2578,7 @@ label {
     line-height: 1;
   }
 
-  .product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty {
+  .product-card__option-right > .product-card__memo--filled.product-card__memo--by-qty {
     max-width: clamp(48px, 20vw, 88px);
     padding: 2px 6px;
     font-size: 10px;
@@ -2584,7 +2586,7 @@ label {
     border-radius: 5px;
   }
 
-  .product-card__option-qty .product-card__memo--filled.product-card__memo--by-qty.product-card__memo--expanded {
+  .product-card__option-right > .product-card__memo--filled.product-card__memo--by-qty.product-card__memo--expanded {
     max-width: min(220px, 44vw);
   }
 
@@ -2719,7 +2721,7 @@ label {
 
   .product-card__option-chips-scroll {
     min-width: 0;
-    max-width: 100%;
+    max-width: min(320px, 58%);
   }
 
   .product-card__option-name--chips {
@@ -2738,7 +2740,8 @@ label {
   }
 
   .product-card__option-qty {
-    min-width: 0;
+    flex-shrink: 0;
+    min-width: fit-content;
   }
 
   .product-card__option-right .product-card__adjust {

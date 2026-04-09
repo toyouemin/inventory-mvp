@@ -573,6 +573,12 @@ button.download-dropdown__item:disabled {
   min-height: 2.6em;
 }
 
+.product-card__name-total {
+  font-size: calc(12px + 1pt);
+  font-weight: normal;
+  color: var(--muted);
+}
+
 /* 헤더 블록: 제품명 ↔ 수정·삭제 사이 여유 */
 .product-card__head-text .product-card__name {
   margin-top: 2px;
@@ -961,6 +967,8 @@ button.download-dropdown__item:disabled {
 }
 
 .product-image-modal__img {
+  width: 96vw;
+  height: 88vh;
   max-width: 96vw;
   max-height: 88vh;
   object-fit: contain;

@@ -139,9 +139,10 @@ export const ProductCard = memo(function ProductCard({
   }, [sortedVariants]);
 
   const hasVariants = sortedVariants.length > 0;
-  /** 카드에 넘어온 표시용 옵션들의 재고 합(옵션 없으면 사용 안 함) */
+  /** 품명 옆 총재고: 옵션이 2개 이상일 때만 표시 */
+  const showNameTotalStock = sortedVariants.length >= 2;
   const totalVariantStock = useMemo(() => {
-    if (sortedVariants.length === 0) return 0;
+    if (sortedVariants.length < 2) return 0;
     return sortedVariants.reduce((sum, v) => {
       const n = Number(v.stock);
       return sum + (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0);
@@ -269,7 +270,7 @@ export const ProductCard = memo(function ProductCard({
             </div>
             <h3 className="product-card__name">
               {displayName}
-              {hasVariants ? (
+              {showNameTotalStock ? (
                 <span className="product-card__name-total"> (총 {totalVariantStock.toLocaleString()})</span>
               ) : null}
             </h3>

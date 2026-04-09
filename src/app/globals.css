@@ -2518,8 +2518,9 @@ label {
   }
 
   .product-card__option-chips-scroll {
+    flex: 0 1 auto;
     width: auto;
-    max-width: min(210px, 46%);
+    max-width: min(118px, 30vw);
   }
 
   .product-card__head-actions {
@@ -2561,9 +2562,9 @@ label {
   }
 
   .product-card__option-right {
+    flex: 0 0 auto;
     min-width: 0;
     max-width: 100%;
-    flex: 0 1 auto;
     justify-content: flex-end;
   }
 
@@ -2721,7 +2722,7 @@ label {
 
   .product-card__option-chips-scroll {
     min-width: 0;
-    max-width: min(320px, 58%);
+    max-width: min(200px, 42%);
   }
 
   .product-card__option-name--chips {

@@ -1667,25 +1667,6 @@ export function ProductsClient({
         >
           상품 엑셀
         </a>
-        <div className="download-dropdown__divider" role="separator" />
-        <a
-          role="menuitem"
-          href="/products/csv/stock"
-          download="stock.csv"
-          className="download-dropdown__item"
-          onClick={() => setDownloadOpen(false)}
-        >
-          재고 CSV
-        </a>
-        <a
-          role="menuitem"
-          href="/products/xlsx/stock"
-          download="stock.xlsx"
-          className="download-dropdown__item"
-          onClick={() => setDownloadOpen(false)}
-        >
-          재고 엑셀
-        </a>
       </div>,
       document.body
     )

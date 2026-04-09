@@ -2565,6 +2565,7 @@ label {
     flex: 0 0 auto;
     min-width: 0;
     max-width: 100%;
+    margin-left: auto;
     justify-content: flex-end;
   }
 

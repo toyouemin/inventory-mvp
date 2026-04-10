@@ -936,8 +936,12 @@ export function ProductsClient({
               x.id === productId
                 ? {
                     ...x,
-                    stock: saved.productStock,
-                    stockUpdatedAt: saved.productUpdatedAt ?? x.stockUpdatedAt ?? null,
+                    stock: saved.productRow?.stock ?? saved.productStock,
+                    stockUpdatedAt:
+                      saved.productRow?.stock_updated_at ??
+                      saved.productUpdatedAt ??
+                      x.stockUpdatedAt ??
+                      null,
                   }
                 : x
             )

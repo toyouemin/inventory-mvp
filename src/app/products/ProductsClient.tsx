@@ -1669,7 +1669,7 @@ export function ProductsClient({
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
-          가격 다운
+          가격표
         </a>
         <a
           role="menuitem"

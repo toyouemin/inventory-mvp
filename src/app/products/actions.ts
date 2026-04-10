@@ -190,6 +190,10 @@ export async function updateProduct(
   if (data.stock !== undefined)
     updateData.stock = Number.isFinite(Number(data.stock)) ? Math.max(0, Number(data.stock)) : 0;
   if (data.variants && data.variants.updates.length > 0) updateData.stock = 0;
+  if (Object.keys(updateData).length > 0) {
+    // 화면/엑셀의 최종수정일 기준은 products.updated_at 한 곳으로 통일
+    updateData.updated_at = new Date().toISOString();
+  }
 
   const { error } = await supabaseServer.from("products").update(updateData).eq("id", productId);
   if (error) throw new Error(error.message);
@@ -582,7 +586,11 @@ export async function adjustStock(productId: string, delta: number, note?: strin
   const actualDelta = next - prev;
   if (actualDelta === 0) return;
 
-  const { error: upErr } = await supabaseServer.from("products").update({ stock: next }).eq("id", productId);
+  const touchedAt = new Date().toISOString();
+  const { error: upErr } = await supabaseServer
+    .from("products")
+    .update({ stock: next, updated_at: touchedAt })
+    .eq("id", productId);
   if (upErr) throw new Error(upErr.message);
 
   if (LOG_MOVES) {
@@ -599,6 +607,7 @@ export async function adjustStock(productId: string, delta: number, note?: strin
 
   /** `/products`는 RSC 재검증 시 `variantsSyncDigest`·클라 state가 뒤틀리거나 리마운트될 수 있어 ±조정에서는 생략(낙관적 UI는 클라가 유지). */
   revalidatePath("/status");
+  return { productId, stock: next, updatedAt: touchedAt };
 }
 
 /** `adjustStock`과 동일 — 옵션 없는 상품만 가능 (`addMove` → `adjustStock`). */
@@ -642,7 +651,20 @@ export async function adjustVariantStock(
   if (upErr) throw new Error(upErr.message);
 
   const productId = String((row as { product_id?: string }).product_id ?? "").trim();
-  if (productId) await syncProductsStockFromVariantSums([productId]);
+  let productStock = 0;
+  let productUpdatedAt: string | null = null;
+  if (productId) {
+    const touchedAt = new Date().toISOString();
+    await syncProductsStockFromVariantSums([productId], touchedAt);
+    const { data: productRow, error: productReadErr } = await supabaseServer
+      .from("products")
+      .select("stock, updated_at")
+      .eq("id", productId)
+      .maybeSingle();
+    if (productReadErr) throw new Error(productReadErr.message);
+    productStock = Number(productRow?.stock ?? 0);
+    productUpdatedAt = (productRow?.updated_at as string | null) ?? touchedAt;
+  }
 
   if (LOG_MOVES) {
     if (productId) {
@@ -657,6 +679,7 @@ export async function adjustVariantStock(
   }
 
   revalidatePath("/status");
+  return { variantId, variantStock: next, productId, productStock, productUpdatedAt };
 }
 
 export async function updateVariantMemo(
@@ -905,10 +928,14 @@ async function deleteByIdChunks(table: string, ids: string[], chunkSize = 500): 
 }
 
 /** product_variants.stock 합계를 products.stock에 반영(총재고 캐시). */
-async function syncProductsStockFromVariantSums(productIds: string[]): Promise<void> {
+async function syncProductsStockFromVariantSums(
+  productIds: string[],
+  touchedAt?: string
+): Promise<void> {
   const unique = [...new Set(productIds.filter(Boolean))];
   if (unique.length === 0) return;
 
+  const nextTouchedAt = touchedAt ?? new Date().toISOString();
   for (const idChunk of chunkArray(unique, 200)) {
     const { data: rows, error } = await supabaseServer
       .from("product_variants")
@@ -926,7 +953,10 @@ async function syncProductsStockFromVariantSums(productIds: string[]): Promise<v
     }
 
     for (const [productId, total] of sumByProduct) {
-      const { error: upErr } = await supabaseServer.from("products").update({ stock: total }).eq("id", productId);
+      const { error: upErr } = await supabaseServer
+        .from("products")
+        .update({ stock: total, updated_at: nextTouchedAt })
+        .eq("id", productId);
       if (upErr) throw new Error(upErr.message);
     }
   }

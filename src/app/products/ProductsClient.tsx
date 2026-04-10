@@ -851,7 +851,16 @@ export function ProductsClient({
 
       patchAdjusting((s) => new Set(s).add(key));
       try {
-        await adjustStock(productId, delta);
+        const saved = await adjustStock(productId, delta);
+        if (saved) {
+          setLocalProducts((prev) =>
+            prev.map((x) =>
+              x.id === productId
+                ? { ...x, stock: saved.stock, updatedAt: saved.updatedAt }
+                : x
+            )
+          );
+        }
       } catch (err) {
         const old = rollback.current;
         if (old !== null) {
@@ -902,7 +911,30 @@ export function ProductsClient({
 
       patchAdjusting((s) => new Set(s).add(key));
       try {
-        await adjustVariantStock(variantId, delta);
+        const saved = await adjustVariantStock(variantId, delta);
+        if (saved) {
+          setLocalVariantsByProductId((prev) => {
+            const list = prev[productId];
+            if (!list) return prev;
+            return {
+              ...prev,
+              [productId]: list.map((v) =>
+                v.id === variantId ? { ...v, stock: saved.variantStock } : v
+              ),
+            };
+          });
+          setLocalProducts((prev) =>
+            prev.map((x) =>
+              x.id === productId
+                ? {
+                    ...x,
+                    stock: saved.productStock,
+                    updatedAt: saved.productUpdatedAt ?? x.updatedAt ?? null,
+                  }
+                : x
+            )
+          );
+        }
       } catch (err) {
         const old = rollback.current;
         if (old !== null) {

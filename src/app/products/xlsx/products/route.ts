@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 import * as XLSX from "xlsx";
+import { unstable_noStore as noStore } from "next/cache";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
 
@@ -76,6 +77,7 @@ type VariantRow = {
 };
 
 export async function GET() {
+  noStore();
   const categoryOrderFromDb = await fetchCategoryOrderMap();
 
   const { data: products, error: productsErr } = await supabaseServer

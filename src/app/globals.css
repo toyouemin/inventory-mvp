@@ -200,6 +200,23 @@ button:hover {
   padding: 0;
 }
 
+.products-stock-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 10050;
+  max-width: min(92vw, 420px);
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #5c1a1a;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
 .products-content-container {
   width: 100%;
   max-width: 960px;
@@ -1070,11 +1087,19 @@ label {
 }
 
 @media (max-width: 768px) {
-  .table-wrap {
+  /* 상품 리스트만: 스크롤 영역 = 뷰포트 − 상단고정 − 툴바 − 하단바(JS 측정, safe-area는 바 박스에 포함) */
+  .products-list-table-wrap {
     max-height: calc(
       100vh - var(--products-mobile-sticky-top, 0px) - var(--products-mobile-topbar-h, 0px) -
-        var(--products-mobile-bottombar-h, 0px) - 56px
+        var(--products-mobile-bottombar-h, 0px)
     );
+    padding-bottom: 0;
+    margin-bottom: 0;
+    box-sizing: border-box;
+  }
+
+  .table-wrap:not(.products-list-table-wrap) {
+    max-height: calc(100vh - 220px);
   }
 }
 
@@ -2429,7 +2454,8 @@ label {
 
   .products-page {
     padding-top: calc(var(--products-mobile-topbar-h, 0px) + 8px);
-    padding-bottom: calc(var(--products-mobile-bottombar-h, 0px) + env(safe-area-inset-bottom) + 12px);
+    /* 하단 `.toolbar-bottom-bar`와 겹치지 않게: 높이만큼만(바는 padding-bottom에 env(safe-area-inset-bottom) 포함 → 이중 합산 금지) */
+    padding-bottom: var(--products-mobile-bottombar-h, 0px);
   }
 
   .products-content-container {
@@ -2637,6 +2663,10 @@ label {
 }
 
 @media (max-width: 768px) {
+  /*
+   * 하단 고정 액션 바 높이(대략): border-top 1px + padding-top 8 + 버튼 36px + padding-bottom 8 + env(safe-area-inset-bottom)
+   * → 약 53px + safe-area. 실제 픽셀은 ProductsClient에서 offsetHeight로 --products-mobile-bottombar-h에 설정.
+   */
   .toolbar-bottom-bar {
     display: flex;  
     position: fixed;
@@ -2646,7 +2676,7 @@ label {
     z-index: 20;
     background: var(--card);
     border-top: 1px solid var(--border);
-    padding: 8px 10px calc(env(safe-area-inset-bottom) + 8px);
+    padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 8px);
     gap: 8px;
     align-items: center;
     overflow-x: auto;

@@ -557,8 +557,7 @@ export function ProductsClient({
   variantsByProductId?: Record<string, ProductVariant[]>;
   /**
    * 서버에서 모든 variant 행의 id·옵션·재고·가격·메모 등을 묶어 만든 SHA-256 digest.
-   * `router.refresh()` 후 `variantsByProductId` 참조가 같아도, 행 추가/삭제/수정 시 digest가 바뀌어
-   * `localVariantsByProductId`가 반드시 갱신된다.
+   * props·digest 변경 시 `useEffect`로 `localProducts` / `localVariantsByProductId`를 서버 스냅샷에 맞춤(CSV·이미지 등 `router.refresh()` 후 동기화).
    */
   variantsSyncDigest?: string;
   /** `?debugProductsDupes=1` — 파이프라인·카드 렌더 단계 로그 */
@@ -652,6 +651,8 @@ export function ProductsClient({
     bottomBarHeight: 0,
   }));
   const [adjustingStockKeys, setAdjustingStockKeys] = useState(() => new Set<string>());
+  const [stockErrorToast, setStockErrorToast] = useState<string | null>(null);
+  const stockErrorToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [bulkImageModalOpen, setBulkImageModalOpen] = useState(false);
   const [bulkOnlyEmptyImage, setBulkOnlyEmptyImage] = useState(false);
@@ -681,6 +682,7 @@ export function ProductsClient({
   useEffect(() => {
     return () => {
       if (csvUploadHighlightTimerRef.current) clearTimeout(csvUploadHighlightTimerRef.current);
+      if (stockErrorToastTimerRef.current) clearTimeout(stockErrorToastTimerRef.current);
     };
   }, []);
 
@@ -798,6 +800,18 @@ export function ProductsClient({
     setAdjustingStockKeys((prev) => updater(new Set(prev)));
   }, []);
 
+  const showStockErrorToast = useCallback((message: string) => {
+    if (stockErrorToastTimerRef.current) {
+      clearTimeout(stockErrorToastTimerRef.current);
+      stockErrorToastTimerRef.current = null;
+    }
+    setStockErrorToast(message);
+    stockErrorToastTimerRef.current = setTimeout(() => {
+      setStockErrorToast(null);
+      stockErrorToastTimerRef.current = null;
+    }, 5000);
+  }, []);
+
   const onProductStockDelta = useCallback(
     async (productId: string, delta: number) => {
       const key = `p:${productId}`;
@@ -832,7 +846,7 @@ export function ProductsClient({
             prev.map((x) => (x.id === productId ? { ...x, stock: old } : x))
           );
         }
-        alert(err instanceof Error ? err.message : String(err));
+        showStockErrorToast(err instanceof Error ? err.message : String(err));
       } finally {
         adjustLocksRef.current.delete(key);
         patchAdjusting((s) => {
@@ -842,7 +856,7 @@ export function ProductsClient({
         });
       }
     },
-    [patchAdjusting]
+    [patchAdjusting, showStockErrorToast]
   );
 
   const onVariantStockDelta = useCallback(
@@ -888,7 +902,7 @@ export function ProductsClient({
             };
           });
         }
-        alert(err instanceof Error ? err.message : String(err));
+        showStockErrorToast(err instanceof Error ? err.message : String(err));
       } finally {
         adjustLocksRef.current.delete(key);
         patchAdjusting((s) => {
@@ -898,7 +912,7 @@ export function ProductsClient({
         });
       }
     },
-    [patchAdjusting]
+    [patchAdjusting, showStockErrorToast]
   );
 
   const onListRowStockDelta = useCallback(
@@ -2009,7 +2023,7 @@ export function ProductsClient({
           )}
         </div>
         ) : (
-        <div className="table-wrap">
+        <div className="table-wrap products-list-table-wrap">
           {skuDisplayGroupsForView.length === 0 ? (
             <div>
               <p className="muted">검색 결과가 없습니다.</p>
@@ -2233,6 +2247,12 @@ export function ProductsClient({
             alt={listImagePreview.alt}
             onError={() => setListImagePreview(null)}
           />
+        </div>
+      ) : null}
+
+      {stockErrorToast ? (
+        <div className="products-stock-toast" role="status">
+          {stockErrorToast}
         </div>
       ) : null}
     </div>

@@ -446,9 +446,8 @@ export default async function ProductsPage({
   }
 
   return (
-    /* digest 변경 시 ProductsClient 리마운트 — router.refresh()만으로는 props가 안 붙는 경우에도 로컬 state가 서버와 맞춰짐(검색·필터 등 클라 전용 상태는 초기화될 수 있음). */
+    /* `variantsSyncDigest`를 key로 쓰면 재고 ±1마다 digest가 바뀌어 전체 리마운트 → 검색·스크롤·필터·보기모드가 초기화됨. 동기화는 ProductsClient의 useEffect(products, variantsByProductId, digest)로 처리. */
     <ProductsClient
-      key={variantsSyncDigest}
       products={products}
       categories={categories}
       categoryOrder={categoryOrder}

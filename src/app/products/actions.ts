@@ -593,7 +593,7 @@ export async function adjustStock(productId: string, delta: number, note?: strin
     revalidatePath("/moves");
   }
 
-  revalidatePath("/products");
+  /** `/products`는 RSC 재검증 시 `variantsSyncDigest`·클라 state가 뒤틀리거나 리마운트될 수 있어 ±조정에서는 생략(낙관적 UI는 클라가 유지). */
   revalidatePath("/status");
 }
 
@@ -652,7 +652,6 @@ export async function adjustVariantStock(
     revalidatePath("/moves");
   }
 
-  revalidatePath("/products");
   revalidatePath("/status");
 }
 

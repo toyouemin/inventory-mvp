@@ -2020,12 +2020,29 @@ label {
   margin: 0;
 }
 
-.edit-product-modal__sku-cancel {
+.edit-product-modal__sku-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.edit-product-modal__sku-row .modal-header-cancel {
   flex: 0 0 auto;
   width: auto;
   min-width: 62px;
   padding: 4px 8px;
   font-size: 13px;
+  background: #e8e4de;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.edit-product-modal__sku-row .edit-product-modal__sku-save {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
 }
 
 .modal-header-add-product {
@@ -2098,7 +2115,8 @@ label {
 }
 
 .modal-overlay.add-product-modal-overlay {
-  padding: 12px 14px;
+  align-items: flex-start;
+  padding: 35px 14px 12px;
 }
 
 /* VariantEditor: 줄바꿈·넘침 방지, 입력 폭 약간 축소 */

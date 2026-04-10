@@ -313,24 +313,27 @@ export function EditProductModal({
       <div className="modal add-product-modal edit-product-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header-add-product">
           <h3>상품 수정</h3>
-          <button type="button" className="modal-header-cancel" onClick={onClose}>
-            취소
-          </button>
         </div>
-        <form onSubmit={handleSave} className="modal-form add-product-modal-form">
+        <form id="edit-product-form" onSubmit={handleSave} className="modal-form add-product-modal-form">
           {product.updatedAt && (
             <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
               마지막 수정: {new Date(product.updatedAt).toLocaleString("ko-KR")}
             </div>
           )}
           <div className="edit-product-modal__sku-row">
-            <label>품목코드 (SKU) *</label>
-            <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
-              취소
-            </button>
+            <label>
+              품목코드 (SKU) * <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>수정불가</span>
+            </label>
+            <div className="edit-product-modal__sku-actions">
+              <button type="submit" className="modal-header-cancel edit-product-modal__sku-save" disabled={pending}>
+                저장
+              </button>
+              <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
+                취소
+              </button>
+            </div>
           </div>
-          <input value={sku} onChange={(e) => setSku(e.target.value)} required />
-
+          <input value={sku} onChange={(e) => setSku(e.target.value)} required readOnly />
           <label>카테고리</label>
           <input
             value={category}

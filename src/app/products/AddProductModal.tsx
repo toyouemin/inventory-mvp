@@ -151,12 +151,17 @@ export function AddProductModal({
           <h3>상품 추가</h3>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form add-product-modal-form">
+        <form id="add-product-form" onSubmit={handleSubmit} className="modal-form add-product-modal-form">
           <div className="edit-product-modal__sku-row">
             <label>품목코드 (SKU) *</label>
-            <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
-              취소
-            </button>
+            <div className="edit-product-modal__sku-actions">
+              <button type="submit" className="modal-header-cancel edit-product-modal__sku-save" disabled={pending}>
+                추가
+              </button>
+              <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
+                취소
+              </button>
+            </div>
           </div>
           <input
             value={sku}

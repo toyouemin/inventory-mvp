@@ -1596,18 +1596,8 @@ label {
 }
 
 .products-count-bar__count {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
-}
-
-.products-price-list-btn {
-  flex-shrink: 0;
-  text-decoration: none;
   white-space: nowrap;
-  box-sizing: border-box;
 }
 
 .products-count-bar__toggle-slot {

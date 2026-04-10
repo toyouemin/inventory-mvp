@@ -1665,6 +1665,14 @@ export function ProductsClient({
       >
         <a
           role="menuitem"
+          href="/products/xlsx/price-list"
+          className="download-dropdown__item"
+          onClick={() => setDownloadOpen(false)}
+        >
+          가격 다운
+        </a>
+        <a
+          role="menuitem"
           href="/products/csv/products"
           download="products.csv"
           className="download-dropdown__item"
@@ -1742,12 +1750,6 @@ export function ProductsClient({
               {skuDisplayGroupsForView.length}개 상품
               {search && ` (총${localProducts.length})`}
             </p>
-            <a
-              className="btn btn-secondary btn-compact products-price-list-btn"
-              href="/products/xlsx/price-list"
-            >
-              가격표 다운로드
-            </a>
           </div>
           <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--soldout">
             <label className="products-hide-zero">

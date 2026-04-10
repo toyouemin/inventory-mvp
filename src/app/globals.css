@@ -1148,7 +1148,7 @@ label {
 }
 
 .products-table__td-updated--recent .products-table__updated-text {
-  color: #ff6b00;
+  color: var(--accent);
 }
 
 .products-table__th-stock,

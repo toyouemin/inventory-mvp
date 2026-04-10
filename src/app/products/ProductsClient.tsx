@@ -364,8 +364,8 @@ const ProductsTableRow = memo(function ProductsTableRow({
   onDelete: (productId: string) => void;
 }) {
   const qty = row.variantStock;
-  const updatedAtText = row.updatedAt ? dayjs(row.updatedAt).format("YY/MM/DD HH:mm") : "-";
-  const isRecent = !!row.updatedAt && dayjs().diff(dayjs(row.updatedAt), "day") < 1;
+  const stockUpdatedAtText = row.stockUpdatedAt ? dayjs(row.stockUpdatedAt).format("YY/MM/DD HH:mm") : "-";
+  const isRecent = !!row.stockUpdatedAt && dayjs().diff(dayjs(row.stockUpdatedAt), "day") < 1;
   if (row.isListNoVisibleOptionsRow) {
     return (
       <tr className="products-table__tr-novis">
@@ -410,8 +410,8 @@ const ProductsTableRow = memo(function ProductsTableRow({
         <td>—</td>
         <td>—</td>
         <td className={`products-table__td-updated${isRecent ? " products-table__td-updated--recent" : ""}`}>
-          <span className="products-table__updated-text" title={updatedAtText}>
-            {updatedAtText}
+          <span className="products-table__updated-text" title={stockUpdatedAtText}>
+            {stockUpdatedAtText}
           </span>
         </td>
         <td>
@@ -511,8 +511,8 @@ const ProductsTableRow = memo(function ProductsTableRow({
         )}
       </td>
       <td className={`products-table__td-updated${isRecent ? " products-table__td-updated--recent" : ""}`}>
-        <span className="products-table__updated-text" title={updatedAtText}>
-          {updatedAtText}
+        <span className="products-table__updated-text" title={stockUpdatedAtText}>
+          {stockUpdatedAtText}
         </span>
       </td>
       <td>
@@ -856,7 +856,7 @@ export function ProductsClient({
           setLocalProducts((prev) =>
             prev.map((x) =>
               x.id === productId
-                ? { ...x, stock: saved.stock, updatedAt: saved.updatedAt }
+                ? { ...x, stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt }
                 : x
             )
           );
@@ -929,7 +929,7 @@ export function ProductsClient({
                 ? {
                     ...x,
                     stock: saved.productStock,
-                    updatedAt: saved.productUpdatedAt ?? x.updatedAt ?? null,
+                    stockUpdatedAt: saved.productUpdatedAt ?? x.stockUpdatedAt ?? null,
                   }
                 : x
             )
@@ -2103,7 +2103,7 @@ export function ProductsClient({
                   <th>매장</th>
                   <th>비고1</th>
                   <th>비고2</th>
-                  <th className="products-table__th-updated">최종 수정일</th>
+                  <th className="products-table__th-updated">수량변경일</th>
                   <th>작업</th>
                 </tr>
               </thead>

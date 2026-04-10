@@ -10,6 +10,7 @@ export type Product = {
   stock?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  stockUpdatedAt?: string | null;
   wholesalePrice?: number | null;
   msrpPrice?: number | null;
   salePrice?: number | null;

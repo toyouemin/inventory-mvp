@@ -40,6 +40,7 @@ function mapProduct(row: Record<string, unknown>): Product {
     stock: row.stock != null ? Number(row.stock) : 0,
     createdAt: row.created_at as string | null,
     updatedAt: row.updated_at as string | null,
+    stockUpdatedAt: row.stock_updated_at as string | null,
   };
 }
 
@@ -95,7 +96,7 @@ async function fetchAllProductRows(): Promise<{ rows: Record<string, unknown>[];
     const { data, error } = await supabaseServer
       .from("products")
       .select(
-        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at"
+        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
       )
       .order("sku", { ascending: true })
       .order("created_at", { ascending: false })

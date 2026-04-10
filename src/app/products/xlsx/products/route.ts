@@ -30,19 +30,19 @@ const HEADER = [
   "extraPrice",
   "memo",
   "memo2",
-  "최종수정일",
+  "수량변경일",
 ];
 
 function formatUpdatedAt(value: string | null | undefined): string {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  const yyyy = d.getFullYear();
+  const yy = String(d.getFullYear()).slice(-2);
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   const hh = String(d.getHours()).padStart(2, "0");
   const min = String(d.getMinutes()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+  return `${yy}/${mm}/${dd} ${hh}:${min}`;
 }
 
 type ProductRow = {
@@ -60,6 +60,7 @@ type ProductRow = {
   stock: number | null;
   created_at: string | null;
   updated_at: string | null;
+  stock_updated_at: string | null;
 };
 
 type VariantRow = {
@@ -83,7 +84,7 @@ export async function GET() {
   const { data: products, error: productsErr } = await supabaseServer
     .from("products")
     .select(
-      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at"
+      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
     )
     .order("sku", { ascending: true });
 
@@ -145,7 +146,7 @@ export async function GET() {
           excelCell(v.extra_price ?? ""),
           excelCell(v.memo ?? ""),
           excelCell(v.memo2 ?? ""),
-          excelCell(formatUpdatedAt(p.updated_at)),
+          excelCell(formatUpdatedAt(p.stock_updated_at)),
         ]);
       }
     } else {
@@ -164,7 +165,7 @@ export async function GET() {
         excelCell(p.extra_price ?? ""),
         excelCell(p.memo ?? ""),
         excelCell(p.memo2 ?? ""),
-        excelCell(formatUpdatedAt(p.updated_at)),
+        excelCell(formatUpdatedAt(p.stock_updated_at)),
       ]);
     }
   }

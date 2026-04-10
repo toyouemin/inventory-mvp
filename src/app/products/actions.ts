@@ -118,7 +118,7 @@ export async function createProduct(data: {
     if (vErr) throw new Error(vErr.message);
   }
 
-  await syncProductsStockFromVariantSums([String(productId)]);
+  await syncProductsStockFromVariantSums([String(productId)], new Date().toISOString());
 
   revalidatePath("/products");
   revalidatePath("/status");
@@ -156,6 +156,7 @@ export async function updateProduct(
   if (!productId) return;
 
   const updateData: Record<string, unknown> = {};
+  let stockTimestampForProduct: string | null = null;
   let imageUrlReplaceForStorageCleanup: { prev: string; next: string } | null = null;
 
   if (data.sku !== undefined) updateData.sku = normalizeSkuForMatch(data.sku);
@@ -190,8 +191,12 @@ export async function updateProduct(
   if (data.stock !== undefined)
     updateData.stock = Number.isFinite(Number(data.stock)) ? Math.max(0, Number(data.stock)) : 0;
   if (data.variants && data.variants.updates.length > 0) updateData.stock = 0;
+  if (data.stock !== undefined) {
+    stockTimestampForProduct = new Date().toISOString();
+    updateData.stock_updated_at = stockTimestampForProduct;
+  }
   if (Object.keys(updateData).length > 0) {
-    // 화면/엑셀의 최종수정일 기준은 products.updated_at 한 곳으로 통일
+    // 상품 메타 수정 기준 시각(재고 변경 시각은 stock_updated_at으로 분리)
     updateData.updated_at = new Date().toISOString();
   }
 
@@ -226,6 +231,31 @@ export async function updateProduct(
 
   if (hasVariantMutations && data.variants) {
     const { updates, deleteIds } = data.variants;
+    const { data: prevVariantsRaw, error: prevVariantsErr } = await supabaseServer
+      .from("product_variants")
+      .select("id, stock")
+      .eq("product_id", productId);
+    if (prevVariantsErr) throw new Error(prevVariantsErr.message);
+    const prevVariantRows = (prevVariantsRaw ?? []) as Array<{ id: string; stock: number | null }>;
+    const prevStockById = new Map<string, number>();
+    for (const v of prevVariantRows) {
+      const n = Number(v.stock ?? 0);
+      prevStockById.set(
+        String(v.id),
+        Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0
+      );
+    }
+    const normalizedStock = (n: number) => (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0);
+    const stockChangedByVariantMutation =
+      updates.some((u) => {
+        if (!u.id) return normalizedStock(Number(u.stock ?? 0)) !== 0;
+        return normalizedStock(Number(u.stock ?? 0)) !== (prevStockById.get(String(u.id)) ?? 0);
+      }) ||
+      deleteIds.some((id) => (prevStockById.get(String(id)) ?? 0) !== 0);
+    if (stockChangedByVariantMutation) {
+      stockTimestampForProduct = new Date().toISOString();
+    }
+
     const withId = updates.filter((u) => u.id);
     const withoutId = updates.filter((u) => !u.id);
 
@@ -304,7 +334,7 @@ export async function updateProduct(
       }
     }
 
-    await syncProductsStockFromVariantSums([productId]);
+    await syncProductsStockFromVariantSums([productId], stockTimestampForProduct ?? undefined);
   }
 
   revalidatePath("/products");
@@ -589,7 +619,7 @@ export async function adjustStock(productId: string, delta: number, note?: strin
   const touchedAt = new Date().toISOString();
   const { error: upErr } = await supabaseServer
     .from("products")
-    .update({ stock: next, updated_at: touchedAt })
+    .update({ stock: next, updated_at: touchedAt, stock_updated_at: touchedAt })
     .eq("id", productId);
   if (upErr) throw new Error(upErr.message);
 
@@ -607,7 +637,7 @@ export async function adjustStock(productId: string, delta: number, note?: strin
 
   /** `/products`는 RSC 재검증 시 `variantsSyncDigest`·클라 state가 뒤틀리거나 리마운트될 수 있어 ±조정에서는 생략(낙관적 UI는 클라가 유지). */
   revalidatePath("/status");
-  return { productId, stock: next, updatedAt: touchedAt };
+  return { productId, stock: next, stockUpdatedAt: touchedAt };
 }
 
 /** `adjustStock`과 동일 — 옵션 없는 상품만 가능 (`addMove` → `adjustStock`). */
@@ -658,12 +688,15 @@ export async function adjustVariantStock(
     await syncProductsStockFromVariantSums([productId], touchedAt);
     const { data: productRow, error: productReadErr } = await supabaseServer
       .from("products")
-      .select("stock, updated_at")
+      .select("stock, updated_at, stock_updated_at")
       .eq("id", productId)
       .maybeSingle();
     if (productReadErr) throw new Error(productReadErr.message);
     productStock = Number(productRow?.stock ?? 0);
-    productUpdatedAt = (productRow?.updated_at as string | null) ?? touchedAt;
+    productUpdatedAt =
+      (productRow?.stock_updated_at as string | null) ??
+      (productRow?.updated_at as string | null) ??
+      touchedAt;
   }
 
   if (LOG_MOVES) {
@@ -953,9 +986,11 @@ async function syncProductsStockFromVariantSums(
     }
 
     for (const [productId, total] of sumByProduct) {
+      const payload: Record<string, unknown> = { stock: total, updated_at: nextTouchedAt };
+      if (touchedAt) payload.stock_updated_at = nextTouchedAt;
       const { error: upErr } = await supabaseServer
         .from("products")
-        .update({ stock: total, updated_at: nextTouchedAt })
+        .update(payload)
         .eq("id", productId);
       if (upErr) throw new Error(upErr.message);
     }
@@ -1094,7 +1129,7 @@ async function consolidateDuplicateProductsByNormalizedSku(): Promise<void> {
   }
 
   if (keepIdsForSync.size > 0) {
-    await syncProductsStockFromVariantSums([...keepIdsForSync]);
+    await syncProductsStockFromVariantSums([...keepIdsForSync], new Date().toISOString());
   }
 }
 
@@ -1228,7 +1263,7 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
     if (vUpsertErr) throw new Error(vUpsertErr.message);
   }
 
-  await syncProductsStockFromVariantSums([...productIdsTouched]);
+  await syncProductsStockFromVariantSums([...productIdsTouched], new Date().toISOString());
   await ensureSingleProductPerNormSku();
 }
 
@@ -1386,7 +1421,7 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
       }
     }
 
-    await syncProductsStockFromVariantSums(resetProductIds);
+    await syncProductsStockFromVariantSums(resetProductIds, new Date().toISOString());
     await ensureSingleProductPerNormSku();
     const reconnect = await reconnectProductsImageUrlsFromStorageBySku({ onlyIfImageUrlEmpty: true });
     console.info("[CSV reset][image reconnect][summary]", {

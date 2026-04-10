@@ -1687,7 +1687,7 @@ export function ProductsClient({
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
-          상품 엑셀
+          상품 Excel
         </a>
       </div>,
       document.body

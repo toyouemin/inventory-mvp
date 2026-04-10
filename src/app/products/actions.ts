@@ -216,7 +216,11 @@ export async function updateProduct(
   const skuFromRequest = data.sku !== undefined ? normalizeSkuForMatch(data.sku) : "";
   const productSku = skuFromDb || skuFromRequest;
 
-  if (data.variants) {
+  const hasVariantMutations =
+    !!data.variants &&
+    (data.variants.updates.length > 0 || data.variants.deleteIds.some((id) => String(id ?? "").trim() !== ""));
+
+  if (hasVariantMutations && data.variants) {
     const { updates, deleteIds } = data.variants;
     const withId = updates.filter((u) => u.id);
     const withoutId = updates.filter((u) => !u.id);

@@ -32,6 +32,7 @@ import { VARIANT_AUDIT_TARGET_SKUS } from "./variantAuditTargets";
 import { fitCategorySelectWidth } from "./fitCategorySelectWidth";
 
 type ViewMode = "card" | "list";
+type ListStockUpdatedSort = "default" | "stock_updated_desc";
 
 type DownloadMenuDirection = "up" | "down";
 
@@ -545,6 +546,12 @@ function listRowAdjustKey(row: ProductRow): string {
   return row.variantId ? `v:${row.variantId}` : `p:${row.id}`;
 }
 
+function parseStockUpdatedAtToTime(value: string | null | undefined): number {
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const t = dayjs(value).valueOf();
+  return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY;
+}
+
 export function ProductsClient({
   products,
   categories = [],
@@ -633,6 +640,7 @@ export function ProductsClient({
     useState<Record<string, ProductVariant[]>>(variantsByProductId);
 
   const [viewMode, setViewMode] = useState<ViewMode>("card");
+  const [listStockUpdatedSort, setListStockUpdatedSort] = useState<ListStockUpdatedSort>("default");
   const [listImagePreview, setListImagePreview] = useState<{ url: string; alt: string } | null>(null);
 
   const categorySelectRef = useRef<HTMLSelectElement>(null);
@@ -1355,7 +1363,7 @@ export function ProductsClient({
   ]);
 
   /** List view: SKU 병합 후 (product, variant) 행 */
-  const listRows = useMemo((): ProductRow[] => {
+  const listRowsBase = useMemo((): ProductRow[] => {
     const rows: ProductRow[] = [];
     for (const { product: p, variants } of skuDisplayGroupsForView) {
       if (variants.length > 0) {
@@ -1411,6 +1419,14 @@ export function ProductsClient({
     }
     return rows;
   }, [skuDisplayGroupsForView, hideZeroStock]);
+
+  /** 리스트 렌더 직전 파생 정렬(원본 mutate 금지) */
+  const listRows = useMemo((): ProductRow[] => {
+    if (listStockUpdatedSort !== "stock_updated_desc") return listRowsBase;
+    return [...listRowsBase].sort(
+      (a, b) => parseStockUpdatedAtToTime(b.stockUpdatedAt) - parseStockUpdatedAtToTime(a.stockUpdatedAt)
+    );
+  }, [listRowsBase, listStockUpdatedSort]);
 
   useEffect(() => {
     if (!jumpProductId) {
@@ -2103,7 +2119,27 @@ export function ProductsClient({
                   <th>매장</th>
                   <th>비고1</th>
                   <th>비고2</th>
-                  <th className="products-table__th-updated">수량변경일</th>
+                  <th
+                    className="products-table__th-updated"
+                    aria-sort={listStockUpdatedSort === "stock_updated_desc" ? "descending" : "none"}
+                  >
+                    <button
+                      type="button"
+                      className="products-table__sort-btn"
+                      onClick={() =>
+                        setListStockUpdatedSort((prev) =>
+                          prev === "stock_updated_desc" ? "default" : "stock_updated_desc"
+                        )
+                      }
+                      aria-label={
+                        listStockUpdatedSort === "stock_updated_desc"
+                          ? "수량변경일 기본 정렬로 복귀"
+                          : "수량변경일 최신순 정렬"
+                      }
+                    >
+                      {listStockUpdatedSort === "stock_updated_desc" ? "수량변경일 ▼" : "수량변경일"}
+                    </button>
+                  </th>
                   <th>작업</th>
                 </tr>
               </thead>

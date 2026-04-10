@@ -1136,6 +1136,23 @@ label {
   text-align: center;
 }
 
+.products-table__sort-btn {
+  width: 100%;
+  min-height: 30px;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.products-table__sort-btn:focus-visible {
+  outline: 2px solid var(--accent, #8b7355);
+  outline-offset: 1px;
+}
+
 .products-table__updated-text {
   display: inline-block;
   max-width: 104px;

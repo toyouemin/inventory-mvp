@@ -60,6 +60,34 @@ function variantsToRows(variants: ProductVariant[], fallbackStock: number): Vari
   return [emptyVariantRow(String(fallbackStock ?? 0))];
 }
 
+function variantSignature(v: {
+  id?: string;
+  color: string;
+  gender: string;
+  size: string;
+  stock: number;
+  wholesalePrice: number;
+  msrpPrice: number;
+  salePrice: number;
+  extraPrice: number;
+  memo: string | null;
+  memo2: string | null;
+}): string {
+  return [
+    String(v.id ?? ""),
+    v.color.trim(),
+    v.gender.trim(),
+    v.size.trim(),
+    String(Math.max(0, Math.trunc(Number(v.stock) || 0))),
+    String(Math.max(0, Math.trunc(Number(v.wholesalePrice) || 0))),
+    String(Math.max(0, Math.trunc(Number(v.msrpPrice) || 0))),
+    String(Math.max(0, Math.trunc(Number(v.salePrice) || 0))),
+    String(Math.max(0, Math.trunc(Number(v.extraPrice) || 0))),
+    (v.memo ?? "").trim(),
+    (v.memo2 ?? "").trim(),
+  ].join("|");
+}
+
 export function EditProductModal({
   open,
   product,
@@ -71,7 +99,15 @@ export function EditProductModal({
   product: Product | null;
   variants?: ProductVariant[];
   onClose: () => void;
-  onSaved?: (payload: { productId: string; memo: string | null; memo2: string | null }) => void;
+  onSaved?: (payload: {
+    productId: string;
+    sku: string;
+    category: string | null;
+    name: string;
+    imageUrl: string | null;
+    memo: string | null;
+    memo2: string | null;
+  }) => void;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -89,6 +125,27 @@ export function EditProductModal({
 
   const initialVariantIds = useMemo(
     () => (variants ?? []).map((v) => v.id),
+    [variants]
+  );
+  const initialVariantSignatures = useMemo(
+    () =>
+      new Set(
+        (variants ?? []).map((v) =>
+          variantSignature({
+            id: v.id,
+            color: v.color ?? "",
+            gender: v.gender ?? "",
+            size: v.size ?? "",
+            stock: Number(v.stock ?? 0),
+            wholesalePrice: Number(v.wholesalePrice ?? 0),
+            msrpPrice: Number(v.msrpPrice ?? 0),
+            salePrice: Number(v.salePrice ?? 0),
+            extraPrice: Number(v.extraPrice ?? 0),
+            memo: v.memo ?? null,
+            memo2: v.memo2 ?? null,
+          })
+        )
+      ),
     [variants]
   );
 
@@ -156,10 +213,33 @@ export function EditProductModal({
     }));
     const remainingIds = new Set(updates.map((u) => u.id).filter(Boolean));
     const deleteIds = initialVariantIds.filter((id) => !remainingIds.has(id));
+    const nextVariantSignatures = new Set(
+      updates.map((u) =>
+        variantSignature({
+          id: u.id,
+          color: u.color,
+          gender: u.gender,
+          size: u.size,
+          stock: u.stock,
+          wholesalePrice: u.wholesalePrice ?? 0,
+          msrpPrice: u.msrpPrice ?? 0,
+          salePrice: u.salePrice ?? 0,
+          extraPrice: u.extraPrice ?? 0,
+          memo: u.memo ?? null,
+          memo2: u.memo2 ?? null,
+        })
+      )
+    );
+    const variantsChanged =
+      deleteIds.length > 0 ||
+      nextVariantSignatures.size !== initialVariantSignatures.size ||
+      [...nextVariantSignatures].some((sig) => !initialVariantSignatures.has(sig));
     const stockForSingle =
       updates.length === 0 && singleStockRow
         ? Math.max(0, parseInt(String(singleStockRow.stock), 10) || 0)
         : undefined;
+    const initialSingleStock = Math.max(0, Number(product.stock ?? 0));
+    const stockChanged = stockForSingle !== undefined && stockForSingle !== initialSingleStock;
 
     setPending(true);
     try {
@@ -182,8 +262,8 @@ export function EditProductModal({
         imageUrl: finalImageUrl,
         memo: memo.trim() || null,
         memo2: memo2.trim() || null,
-        variants: { updates, deleteIds },
-        stock: stockForSingle,
+        ...(variantsChanged ? { variants: { updates, deleteIds } } : {}),
+        ...(stockChanged ? { stock: stockForSingle } : {}),
       };
       if (
         typeof window !== "undefined" &&
@@ -212,6 +292,10 @@ export function EditProductModal({
       });
       onSaved?.({
         productId: product.id,
+        sku: sku.trim(),
+        category: category.trim() || null,
+        name: name.trim(),
+        imageUrl: finalImageUrl,
         memo: memo.trim() || null,
         memo2: memo2.trim() || null,
       });

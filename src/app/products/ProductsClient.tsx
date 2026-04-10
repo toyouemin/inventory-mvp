@@ -2109,12 +2109,18 @@ export function ProductsClient({
         open={editOpen}
         product={editingProduct}
         variants={editingVariants}
-        onSaved={({ productId, memo, memo2 }) => {
+        onSaved={({ productId, sku, category, name, imageUrl, memo, memo2 }) => {
           setLocalProducts((prev) =>
-            prev.map((p) => (p.id === productId ? { ...p, memo, memo2 } : p))
+            prev.map((p) =>
+              p.id === productId
+                ? { ...p, sku, category, name, imageUrl, memo, memo2 }
+                : p
+            )
           );
           setEditingProduct((prev) =>
-            prev && prev.id === productId ? { ...prev, memo, memo2 } : prev
+            prev && prev.id === productId
+              ? { ...prev, sku, category, name, imageUrl, memo, memo2 }
+              : prev
           );
         }}
         onClose={() => {

@@ -68,12 +68,7 @@ function formatUpdatedAt(value: string | null | undefined): string {
   if (!value) return "";
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  const yy = String(d.getFullYear()).slice(-2);
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${yy}/${mm}/${dd} ${hh}:${min}`;
+  return d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 }
 
 type ProductRow = {

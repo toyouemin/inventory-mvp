@@ -1128,6 +1128,29 @@ label {
   vertical-align: middle;
 }
 
+.products-table__th-updated,
+.products-table__td-updated {
+  width: 1%;
+  min-width: 86px;
+  max-width: 104px;
+  text-align: center;
+}
+
+.products-table__updated-text {
+  display: inline-block;
+  max-width: 104px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #888;
+  vertical-align: middle;
+}
+
+.products-table__td-updated--recent .products-table__updated-text {
+  color: #ff6b00;
+}
+
 .products-table__th-stock,
 .products-table__td-stock .stock-cell__qty {
   font-size: calc(14px + 1pt);

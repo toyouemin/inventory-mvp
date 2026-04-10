@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import type { CSSProperties, Ref } from "react";
 import { createPortal } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
+import dayjs from "dayjs";
 import type { Product, ProductVariant, ProductRow } from "./types";
 import { diagnoseSockSortVariant, formatGenderSizeDisplay, sortVariantsForDisplay, tryParseSockCombinedLabel } from "./variantOptions";
 import { useProductImageSrc } from "./useProductImageSrc";
@@ -363,6 +364,8 @@ const ProductsTableRow = memo(function ProductsTableRow({
   onDelete: (productId: string) => void;
 }) {
   const qty = row.variantStock;
+  const updatedAtText = row.updatedAt ? dayjs(row.updatedAt).format("YY/MM/DD HH:mm") : "-";
+  const isRecent = !!row.updatedAt && dayjs().diff(dayjs(row.updatedAt), "day") < 1;
   if (row.isListNoVisibleOptionsRow) {
     return (
       <tr className="products-table__tr-novis">
@@ -406,6 +409,11 @@ const ProductsTableRow = memo(function ProductsTableRow({
         <td>{row.extraPrice != null ? `${Number(row.extraPrice).toLocaleString()}원` : "-"}</td>
         <td>—</td>
         <td>—</td>
+        <td className={`products-table__td-updated${isRecent ? " products-table__td-updated--recent" : ""}`}>
+          <span className="products-table__updated-text" title={updatedAtText}>
+            {updatedAtText}
+          </span>
+        </td>
         <td>
           <div className="row-actions">
             <button type="button" className="btn btn-secondary btn-row" onClick={() => onEdit(row.id)}>
@@ -501,6 +509,11 @@ const ProductsTableRow = memo(function ProductsTableRow({
         ) : (
           "-"
         )}
+      </td>
+      <td className={`products-table__td-updated${isRecent ? " products-table__td-updated--recent" : ""}`}>
+        <span className="products-table__updated-text" title={updatedAtText}>
+          {updatedAtText}
+        </span>
       </td>
       <td>
         <div className="row-actions">
@@ -2058,6 +2071,7 @@ export function ProductsClient({
                   <th>매장</th>
                   <th>비고1</th>
                   <th>비고2</th>
+                  <th className="products-table__th-updated">최종 수정일</th>
                   <th>작업</th>
                 </tr>
               </thead>

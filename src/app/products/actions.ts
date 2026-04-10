@@ -693,10 +693,7 @@ export async function adjustVariantStock(
       .maybeSingle();
     if (productReadErr) throw new Error(productReadErr.message);
     productStock = Number(productRow?.stock ?? 0);
-    productUpdatedAt =
-      (productRow?.stock_updated_at as string | null) ??
-      (productRow?.updated_at as string | null) ??
-      touchedAt;
+    productUpdatedAt = (productRow?.stock_updated_at as string | null) ?? touchedAt;
   }
 
   if (LOG_MOVES) {

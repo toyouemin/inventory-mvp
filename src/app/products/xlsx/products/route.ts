@@ -33,6 +33,37 @@ const HEADER = [
   "수량변경일",
 ];
 
+const MIN_COL_WIDTH = 8;
+const MAX_COL_WIDTH = 30;
+const IMAGE_URL_COL_WIDTH = 14;
+
+function toSafeString(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function buildAutoColumnWidths(rows: readonly (readonly unknown[])[], imageUrlColIndex: number): { wch: number }[] {
+  const colCount = rows[0]?.length ?? 0;
+  const cols: { wch: number }[] = [];
+
+  for (let col = 0; col < colCount; col++) {
+    if (col === imageUrlColIndex) {
+      cols.push({ wch: IMAGE_URL_COL_WIDTH });
+      continue;
+    }
+
+    let maxLen = 0;
+    for (const row of rows) {
+      const cell = toSafeString(row[col]);
+      if (cell.length > maxLen) maxLen = cell.length;
+    }
+
+    cols.push({ wch: Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, maxLen + 2)) });
+  }
+
+  return cols;
+}
+
 function formatUpdatedAt(value: string | null | undefined): string {
   if (!value) return "";
   const d = new Date(value);
@@ -172,6 +203,7 @@ export async function GET() {
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = buildAutoColumnWidths(aoa, 3);
   XLSX.utils.book_append_sheet(wb, ws, "products");
 
   const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });

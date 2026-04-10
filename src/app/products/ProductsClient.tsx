@@ -1589,14 +1589,14 @@ export function ProductsClient({
             className={`btn btn-compact ${viewMode === "card" ? "btn-primary" : "btn-secondary"}`}
             onClick={() => setViewMode("card")}
           >
-            카드
+            모바일
           </button>
           <button
             type="button"
             className={`btn btn-compact ${viewMode === "list" ? "btn-primary" : "btn-secondary"}`}
             onClick={() => setViewMode("list")}
           >
-            리스트
+            PC
           </button>
         </div>
         <div className="download-dropdown" ref={downloadWrapRef}>

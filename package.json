@@ -11,7 +11,8 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
-    "verify:thp": "npx tsx scripts/verify-thp-sku.mts"
+    "verify:thp": "npx tsx scripts/verify-thp-sku.mts",
+    "debug:stock-e2e": "node scripts/stock-adjust-e2e.mjs"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -32,6 +33,7 @@
     "@types/react-dom": "^18.3.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.5",
+    "playwright": "^1.49.1",
     "prisma": "^5.20.0",
     "tsx": "^4.7.0",
     "typescript": "^5.4.5"

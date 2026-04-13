@@ -547,6 +547,78 @@ function listRowAdjustKey(row: ProductRow): string {
 
 /** 항목(`p:` / `v:`)별 재고 저장: 클릭은 즉시 낙관 반영, 서버는 누적 델타를 순서대로 전송(동시에 다른 항목은 독립). */
 type StockFlushBucket = { pendingDelta: number; running: boolean };
+type VariantFlushBucket = StockFlushBucket & { productId: string };
+
+function variantStockSumForProduct(
+  variantsByPid: Record<string, ProductVariant[]>,
+  productId: string
+): number {
+  const list = variantsByPid[productId] ?? [];
+  return list.reduce((s, v) => {
+    const n = Number(v.stock);
+    return s + (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0);
+  }, 0);
+}
+
+/**
+ * `variantsSyncDigest` 갱신 등으로 RSC 스냅샷이 들어올 때, 아직 서버에 안 붙은 낙관 재고(`pendingDelta|running`)는
+ * 서버 행으로 덮지 않음 — A 저장 직후 digest만 바뀌고 B는 아직 in-flight일 때 B 숫자가 사라지는 현상 방지.
+ */
+function mergeVariantsFromServerSnapshot(
+  prev: Record<string, ProductVariant[]>,
+  server: Record<string, ProductVariant[]>,
+  variantFlushRef: Map<string, VariantFlushBucket>
+): Record<string, ProductVariant[]> {
+  const pendingVids = new Set<string>();
+  for (const [k, b] of variantFlushRef) {
+    if (!k.startsWith("v:")) continue;
+    if (b.pendingDelta !== 0 || b.running) pendingVids.add(k.slice(2));
+  }
+  const out: Record<string, ProductVariant[]> = {};
+  for (const [pid, sList] of Object.entries(server)) {
+    const pList = prev[pid] ?? [];
+    const prevByVid = new Map(pList.map((v) => [v.id, v]));
+    out[pid] = sList.map((sv) => {
+      if (!pendingVids.has(sv.id)) return sv;
+      const lo = prevByVid.get(sv.id);
+      return lo ? { ...sv, stock: lo.stock } : sv;
+    });
+  }
+  return out;
+}
+
+function mergeProductsFromServerSnapshot(
+  prev: Product[],
+  server: Product[],
+  productFlushRef: Map<string, StockFlushBucket>,
+  mergedVariants: Record<string, ProductVariant[]>,
+  variantFlushRef: Map<string, VariantFlushBucket>
+): Product[] {
+  const pendingPids = new Set<string>();
+  for (const [k, b] of productFlushRef) {
+    if (!k.startsWith("p:")) continue;
+    if (b.pendingDelta !== 0 || b.running) pendingPids.add(k.slice(2));
+  }
+  const variantPendingOwners = new Set<string>();
+  for (const [k, b] of variantFlushRef) {
+    if (!k.startsWith("v:")) continue;
+    if (b.pendingDelta !== 0 || b.running) variantPendingOwners.add(b.productId);
+  }
+
+  const serverList = dedupeProductsById(server);
+  const prevById = new Map(prev.map((p) => [p.id, p]));
+  return serverList.map((srv) => {
+    const id = srv.id;
+    if (pendingPids.has(id)) {
+      const loc = prevById.get(id);
+      return loc ? { ...srv, stock: loc.stock, stockUpdatedAt: loc.stockUpdatedAt } : srv;
+    }
+    if (variantPendingOwners.has(id)) {
+      return { ...srv, stock: variantStockSumForProduct(mergedVariants, id) };
+    }
+    return srv;
+  });
+}
 
 /** `?debugStockAdjust=1` — 클릭·pending·flush·서버요청·응답·props 동기화 단계 로그(비동기 타이밍용 `performance.now()`). */
 function logStockAdjust(phase: string, data: Record<string, unknown>) {
@@ -821,7 +893,7 @@ export function ProductsClient({
     setUploadMenuStyle(pos.style);
   }, []);
   const productStockFlushRef = useRef<Map<string, StockFlushBucket>>(new Map());
-  const variantStockFlushRef = useRef<Map<string, StockFlushBucket & { productId: string }>>(new Map());
+  const variantStockFlushRef = useRef<Map<string, VariantFlushBucket>>(new Map());
   const localProductsRef = useRef<Product[]>(products);
   const localVariantsRef = useRef<Record<string, ProductVariant[]>>(variantsByProductId);
   localProductsRef.current = localProducts;
@@ -1308,6 +1380,18 @@ export function ProductsClient({
     variantSyncEffectRunRef.current += 1;
     const { products: snapProducts, variantsByProductId: snapVariants } = serverPropsSnapshotRef.current;
 
+    const prevProducts = localProductsRef.current;
+    const prevVariants = localVariantsRef.current;
+    const pFlush = productStockFlushRef.current;
+    const vFlush = variantStockFlushRef.current;
+
+    const preservedVariantKeys = [...vFlush.entries()]
+      .filter(([, b]) => b.pendingDelta !== 0 || b.running)
+      .map(([k]) => k);
+    const preservedProductKeys = [...pFlush.entries()]
+      .filter(([, b]) => b.pendingDelta !== 0 || b.running)
+      .map(([k]) => k);
+
     logStockAdjust("server_props_sync_effect_run", {
       runCount: variantSyncEffectRunRef.current,
       variantsSyncDigest,
@@ -1315,21 +1399,28 @@ export function ProductsClient({
       snapProductsLen: snapProducts.length,
       variantBucketKeys: Object.keys(snapVariants).length,
       productFlush: Object.fromEntries(
-        [...productStockFlushRef.current.entries()].map(([k, v]) => [
-          k,
-          { pendingDelta: v.pendingDelta, running: v.running },
-        ])
+        [...pFlush.entries()].map(([k, v]) => [k, { pendingDelta: v.pendingDelta, running: v.running }])
       ),
       variantFlush: Object.fromEntries(
-        [...variantStockFlushRef.current.entries()].map(([k, v]) => [
+        [...vFlush.entries()].map(([k, v]) => [
           k,
           { pendingDelta: v.pendingDelta, running: v.running, productId: v.productId },
         ])
       ),
+      mergePreservesVariantKeys: preservedVariantKeys,
+      mergePreservesProductKeys: preservedProductKeys,
     });
 
-    setLocalProducts(dedupeProductsById(snapProducts));
-    setLocalVariantsByProductId(snapVariants);
+    const mergedVariants = mergeVariantsFromServerSnapshot(prevVariants, snapVariants, vFlush);
+    const mergedProducts = mergeProductsFromServerSnapshot(
+      prevProducts,
+      snapProducts,
+      pFlush,
+      mergedVariants,
+      vFlush
+    );
+    setLocalVariantsByProductId(mergedVariants);
+    setLocalProducts(mergedProducts);
 
     if (debugVariantSync && typeof console !== "undefined" && console.info) {
       const tid = traceProductId.trim();

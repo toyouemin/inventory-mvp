@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import type { Product, ProductVariant, ProductRow } from "./types";
@@ -548,6 +548,13 @@ function listRowAdjustKey(row: ProductRow): string {
 /** 항목(`p:` / `v:`)별 재고 저장: 클릭은 즉시 낙관 반영, 서버는 누적 델타를 순서대로 전송(동시에 다른 항목은 독립). */
 type StockFlushBucket = { pendingDelta: number; running: boolean };
 
+/** `?debugStockAdjust=1` — 클릭·pending·flush·서버요청·응답·props 동기화 단계 로그(비동기 타이밍용 `performance.now()`). */
+function logStockAdjust(phase: string, data: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  if (new URLSearchParams(window.location.search).get("debugStockAdjust") !== "1") return;
+  console.info(`[stockAdjust] ${phase}`, { ...data, t: performance.now() });
+}
+
 function parseStockUpdatedAtToTime(value: string | null | undefined): number {
   if (!value) return Number.NEGATIVE_INFINITY;
   const t = dayjs(value).valueOf();
@@ -844,8 +851,12 @@ export function ProductsClient({
         b = { pendingDelta: 0, running: false };
         m.set(key, b);
       }
-      if (b.running) return;
+      if (b.running) {
+        logStockAdjust("product_flush_skip_running", { key, productId, pendingDelta: b.pendingDelta });
+        return;
+      }
       b.running = true;
+      logStockAdjust("product_flush_runner_start", { key, productId });
 
       void (async () => {
         try {
@@ -856,9 +867,17 @@ export function ProductsClient({
             bucket.pendingDelta = 0;
             if (d === 0) continue;
 
+            logStockAdjust("product_flush_batch_start", { key, productId, deltaToServer: d });
             patchAdjusting((s) => new Set(s).add(key));
             try {
+              logStockAdjust("product_adjustStock_call", { key, productId, deltaToServer: d });
               const saved = await adjustStock(productId, d);
+              logStockAdjust("product_adjustStock_response", {
+                key,
+                productId,
+                deltaToServer: d,
+                saved: saved ? { stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt } : null,
+              });
               if (saved) {
                 setLocalProducts((prev) =>
                   prev.map((x) =>
@@ -867,8 +886,20 @@ export function ProductsClient({
                       : x
                   )
                 );
+                logStockAdjust("product_apply_server_to_local", {
+                  key,
+                  productId,
+                  onlyProductId: productId,
+                  stock: saved.stock,
+                });
               }
             } catch (err) {
+              logStockAdjust("product_adjustStock_error", {
+                key,
+                productId,
+                deltaToServer: d,
+                message: err instanceof Error ? err.message : String(err),
+              });
               setLocalProducts((prev) =>
                 prev.map((x) => {
                   if (x.id !== productId) return x;
@@ -883,11 +914,17 @@ export function ProductsClient({
                 n.delete(key);
                 return n;
               });
+              logStockAdjust("product_flush_batch_end", { key, productId, deltaToServer: d });
             }
           }
         } finally {
           const bucket = m.get(key);
           if (bucket) bucket.running = false;
+          logStockAdjust("product_flush_runner_stop", {
+            key,
+            productId,
+            pendingAfter: bucket?.pendingDelta ?? 0,
+          });
           const again = m.get(key);
           if (again && again.pendingDelta !== 0 && !again.running) {
             runProductStockFlushLoop(key, productId);
@@ -908,8 +945,17 @@ export function ProductsClient({
       } else {
         b.productId = productId;
       }
-      if (b.running) return;
+      if (b.running) {
+        logStockAdjust("variant_flush_skip_running", {
+          key,
+          productId,
+          variantId,
+          pendingDelta: b.pendingDelta,
+        });
+        return;
+      }
       b.running = true;
+      logStockAdjust("variant_flush_runner_start", { key, productId, variantId });
 
       void (async () => {
         try {
@@ -921,9 +967,24 @@ export function ProductsClient({
             if (d === 0) continue;
 
             const ownerId = bucket.productId;
+            logStockAdjust("variant_flush_batch_start", { key, ownerId, variantId, deltaToServer: d });
             patchAdjusting((s) => new Set(s).add(key));
             try {
+              logStockAdjust("variant_adjustVariantStock_call", { key, ownerId, variantId, deltaToServer: d });
               const saved = await adjustVariantStock(variantId, d);
+              logStockAdjust("variant_adjustVariantStock_response", {
+                key,
+                ownerId,
+                variantId,
+                deltaToServer: d,
+                saved: saved
+                  ? {
+                      variantStock: saved.variantStock,
+                      productId: saved.productId,
+                      productStock: saved.productRow?.stock ?? saved.productStock,
+                    }
+                  : null,
+              });
               if (saved) {
                 setLocalVariantsByProductId((prev) => {
                   const list = prev[ownerId];
@@ -950,8 +1011,22 @@ export function ProductsClient({
                       : x
                   )
                 );
+                logStockAdjust("variant_apply_server_to_local", {
+                  key,
+                  ownerId,
+                  variantId,
+                  variantStock: saved.variantStock,
+                  productRowStock: saved.productRow?.stock ?? saved.productStock,
+                });
               }
             } catch (err) {
+              logStockAdjust("variant_adjustVariantStock_error", {
+                key,
+                ownerId,
+                variantId,
+                deltaToServer: d,
+                message: err instanceof Error ? err.message : String(err),
+              });
               setLocalVariantsByProductId((prev) => {
                 const list = prev[ownerId];
                 if (!list) return prev;
@@ -971,11 +1046,18 @@ export function ProductsClient({
                 n.delete(key);
                 return n;
               });
+              logStockAdjust("variant_flush_batch_end", { key, ownerId, variantId, deltaToServer: d });
             }
           }
         } finally {
           const bucket = m.get(key);
           if (bucket) bucket.running = false;
+          logStockAdjust("variant_flush_runner_stop", {
+            key,
+            productId,
+            variantId,
+            pendingAfter: bucket?.pendingDelta ?? 0,
+          });
           const again = m.get(key);
           if (again && again.pendingDelta !== 0 && !again.running) {
             runVariantStockFlushLoop(key, productId, variantId);
@@ -989,18 +1071,25 @@ export function ProductsClient({
   const onProductStockDelta = useCallback(
     (productId: string, delta: number) => {
       const key = `p:${productId}`;
-      let applied = false;
-      setLocalProducts((prev) => {
-        const p = prev.find((x) => x.id === productId);
-        if (!p) return prev;
-        const old = p.stock ?? 0;
-        if (delta < 0 && old < 1) return prev;
-        applied = true;
-        const next = Math.max(0, old + delta);
-        return prev.map((x) => (x.id === productId ? { ...x, stock: next } : x));
+      logStockAdjust("product_click", { key, productId, delta });
+
+      let changed = false;
+      flushSync(() => {
+        setLocalProducts((prev) => {
+          const p = prev.find((x) => x.id === productId);
+          if (!p) return prev;
+          const old = p.stock ?? 0;
+          if (delta < 0 && old < 1) return prev;
+          changed = true;
+          const next = Math.max(0, old + delta);
+          return prev.map((x) => (x.id === productId ? { ...x, stock: next } : x));
+        });
       });
 
-      if (!applied) return;
+      if (!changed) {
+        logStockAdjust("product_click_skip_no_state_change", { key, productId, delta });
+        return;
+      }
 
       const m = productStockFlushRef.current;
       let b = m.get(key);
@@ -1009,6 +1098,13 @@ export function ProductsClient({
         m.set(key, b);
       }
       b.pendingDelta += delta;
+      logStockAdjust("product_pendingDelta_after_click", {
+        key,
+        productId,
+        delta,
+        pendingDelta: b.pendingDelta,
+        running: b.running,
+      });
       runProductStockFlushLoop(key, productId);
     },
     [runProductStockFlushLoop]
@@ -1017,22 +1113,29 @@ export function ProductsClient({
   const onVariantStockDelta = useCallback(
     (productId: string, variantId: string, delta: number) => {
       const key = `v:${variantId}`;
-      let applied = false;
-      setLocalVariantsByProductId((prev) => {
-        const list = prev[productId];
-        if (!list) return prev;
-        const idx = list.findIndex((v) => v.id === variantId);
-        if (idx < 0) return prev;
-        const old = list[idx].stock ?? 0;
-        if (delta < 0 && old < 1) return prev;
-        applied = true;
-        const next = Math.max(0, old + delta);
-        const nl = [...list];
-        nl[idx] = { ...list[idx], stock: next };
-        return { ...prev, [productId]: nl };
+      logStockAdjust("variant_click", { key, productId, variantId, delta });
+
+      let changed = false;
+      flushSync(() => {
+        setLocalVariantsByProductId((prev) => {
+          const list = prev[productId];
+          if (!list) return prev;
+          const idx = list.findIndex((v) => v.id === variantId);
+          if (idx < 0) return prev;
+          const old = list[idx].stock ?? 0;
+          if (delta < 0 && old < 1) return prev;
+          changed = true;
+          const next = Math.max(0, old + delta);
+          const nl = [...list];
+          nl[idx] = { ...list[idx], stock: next };
+          return { ...prev, [productId]: nl };
+        });
       });
 
-      if (!applied) return;
+      if (!changed) {
+        logStockAdjust("variant_click_skip_no_state_change", { key, productId, variantId, delta });
+        return;
+      }
 
       const m = variantStockFlushRef.current;
       let b = m.get(key);
@@ -1043,6 +1146,14 @@ export function ProductsClient({
         b.productId = productId;
       }
       b.pendingDelta += delta;
+      logStockAdjust("variant_pendingDelta_after_click", {
+        key,
+        productId,
+        variantId,
+        delta,
+        pendingDelta: b.pendingDelta,
+        running: b.running,
+      });
       runVariantStockFlushLoop(key, productId, variantId);
     },
     [runVariantStockFlushLoop]
@@ -1050,6 +1161,13 @@ export function ProductsClient({
 
   const onListRowStockDelta = useCallback(
     (row: ProductRow, delta: number) => {
+      logStockAdjust("list_row_click", {
+        rowKey: listRowAdjustKey(row),
+        productId: row.id,
+        variantId: row.variantId || null,
+        ownerProductId: row.variantOwnerProductId ?? row.id,
+        delta,
+      });
       const owner = row.variantOwnerProductId ?? row.id;
       if (row.variantId) onVariantStockDelta(owner, row.variantId, delta);
       else onProductStockDelta(row.id, delta);
@@ -1169,20 +1287,60 @@ export function ProductsClient({
     };
   }, [uploadOpen, updateUploadMenuPosition]);
 
+  /**
+   * 서버 `products` 배열 참조만 바뀌는 RSC 재렌더에서는 시그니처가 같으면 로컬 낙관 상태를 유지합니다.
+   * (이전에는 `[products, variantsByProductId]` 의존으로 매번 `setLocal*` 전체 덮어쓰기 → 다른 항목 조정도 초기화될 수 있음.)
+   */
+  const productsServerSig = useMemo(
+    () =>
+      [...products]
+        .map((p) => `${p.id}:${p.stock ?? 0}:${p.stockUpdatedAt ?? ""}`)
+        .sort()
+        .join("|"),
+    [products]
+  );
+
+  const serverPropsSnapshotRef = useRef({ products, variantsByProductId });
+  serverPropsSnapshotRef.current = { products, variantsByProductId };
+
   const variantSyncEffectRunRef = useRef(0);
   useEffect(() => {
     variantSyncEffectRunRef.current += 1;
-    setLocalProducts(dedupeProductsById(products));
-    setLocalVariantsByProductId(variantsByProductId);
+    const { products: snapProducts, variantsByProductId: snapVariants } = serverPropsSnapshotRef.current;
+
+    logStockAdjust("server_props_sync_effect_run", {
+      runCount: variantSyncEffectRunRef.current,
+      variantsSyncDigest,
+      productsServerSig,
+      snapProductsLen: snapProducts.length,
+      variantBucketKeys: Object.keys(snapVariants).length,
+      productFlush: Object.fromEntries(
+        [...productStockFlushRef.current.entries()].map(([k, v]) => [
+          k,
+          { pendingDelta: v.pendingDelta, running: v.running },
+        ])
+      ),
+      variantFlush: Object.fromEntries(
+        [...variantStockFlushRef.current.entries()].map(([k, v]) => [
+          k,
+          { pendingDelta: v.pendingDelta, running: v.running, productId: v.productId },
+        ])
+      ),
+    });
+
+    setLocalProducts(dedupeProductsById(snapProducts));
+    setLocalVariantsByProductId(snapVariants);
+
     if (debugVariantSync && typeof console !== "undefined" && console.info) {
       const tid = traceProductId.trim();
-      const traceBucket = tid ? (variantsByProductId[tid] ?? []) : [];
-      const flatCount = Object.values(variantsByProductId).reduce((s, arr) => s + arr.length, 0);
-      console.info("[ProductsClient][debugVariantSync] useEffect([products, variantsByProductId, variantsSyncDigest]) 실행", {
+      const traceBucket = tid ? (snapVariants[tid] ?? []) : [];
+      const flatCount = Object.values(snapVariants).reduce((s, arr) => s + arr.length, 0);
+      console.info("[ProductsClient][debugVariantSync] useEffect([variantsSyncDigest, productsServerSig]) 실행", {
         runCount: variantSyncEffectRunRef.current,
         variantsSyncDigest,
-        productsLength: products.length,
-        variantBuckets: Object.keys(variantsByProductId).length,
+        productsServerSig,
+        productsLength: snapProducts.length,
+        variantBuckets: Object.keys(snapVariants).length,
         flatVariantCount: flatCount,
         traceProductId: tid || "(없음)",
         traceBucketLength: traceBucket.length,
@@ -1191,7 +1349,8 @@ export function ProductsClient({
           .map((v) => v.id),
       });
     }
-  }, [products, variantsByProductId, variantsSyncDigest, debugVariantSync, traceProductId]);
+    /* debugVariantSync·traceProductId는 의존성에 넣지 않음 — URL만 바뀔 때 로컬 재고 낙관 상태가 통째로 초기화되는 것을 막기 위함 */
+  }, [variantsSyncDigest, productsServerSig]);
 
   useEffect(() => {
     if (!debugVariantTrace || !traceProductId.trim()) return;

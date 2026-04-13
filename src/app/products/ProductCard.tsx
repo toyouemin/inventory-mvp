@@ -7,6 +7,12 @@ import type { Product, ProductVariant } from "./types";
 import { normalizeSkuForMatch, variantMatchesNormSku } from "./skuNormalize";
 import { formatGenderSizeDisplay, sortVariantsForDisplay, variantCompositeKey } from "./variantOptions";
 
+function dbgStockCard(phase: string, data: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  if (new URLSearchParams(window.location.search).get("debugStockAdjust") !== "1") return;
+  console.info(`[stockAdjust][ProductCard] ${phase}`, { ...data, t: performance.now() });
+}
+
 function VariantOptionChips({ variant }: { variant: ProductVariant }) {
   const color = (variant.color ?? "").trim();
   const gs = formatGenderSizeDisplay(variant.gender, variant.size);
@@ -166,6 +172,7 @@ export const ProductCard = memo(function ProductCard({
   }, [product, sortedVariants]);
 
   function handleAdjustProduct(delta: number) {
+    dbgStockCard("card_product_btn_click", { productId: product.id, delta });
     void onProductStockDelta?.(product.id, delta);
   }
 
@@ -179,6 +186,11 @@ export const ProductCard = memo(function ProductCard({
       );
       return;
     }
+    dbgStockCard("card_variant_btn_click", {
+      productId: variant.productId,
+      variantId: variant.id,
+      delta,
+    });
     void onVariantStockDelta?.(variant.productId, variant.id, delta);
   }
 

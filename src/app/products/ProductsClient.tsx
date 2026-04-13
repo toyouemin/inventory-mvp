@@ -457,9 +457,9 @@ const ProductsTableRow = memo(function ProductsTableRow({
             <button
               type="button"
               className="btn-mini"
-              disabled={qty < 1 || rowSaving}
+              disabled={qty < 1}
               onClick={() => {
-                void onStockDelta(row, -1);
+                onStockDelta(row, -1);
               }}
             >
               -1
@@ -467,9 +467,8 @@ const ProductsTableRow = memo(function ProductsTableRow({
             <button
               type="button"
               className="btn-mini"
-              disabled={rowSaving}
               onClick={() => {
-                void onStockDelta(row, 1);
+                onStockDelta(row, 1);
               }}
             >
               +1
@@ -545,6 +544,9 @@ function listRowAdjustKey(row: ProductRow): string {
   if (row.isListNoVisibleOptionsRow) return `novis:${row.id}`;
   return row.variantId ? `v:${row.variantId}` : `p:${row.id}`;
 }
+
+/** 항목(`p:` / `v:`)별 재고 저장: 클릭은 즉시 낙관 반영, 서버는 누적 델타를 순서대로 전송(동시에 다른 항목은 독립). */
+type StockFlushBucket = { pendingDelta: number; running: boolean };
 
 function parseStockUpdatedAtToTime(value: string | null | undefined): number {
   if (!value) return Number.NEGATIVE_INFINITY;
@@ -811,7 +813,8 @@ export function ProductsClient({
     setUploadMenuDirection(pos.direction);
     setUploadMenuStyle(pos.style);
   }, []);
-  const adjustLocksRef = useRef<Set<string>>(new Set());
+  const productStockFlushRef = useRef<Map<string, StockFlushBucket>>(new Map());
+  const variantStockFlushRef = useRef<Map<string, StockFlushBucket & { productId: string }>>(new Map());
   const localProductsRef = useRef<Product[]>(products);
   const localVariantsRef = useRef<Record<string, ProductVariant[]>>(variantsByProductId);
   localProductsRef.current = localProducts;
@@ -833,69 +836,187 @@ export function ProductsClient({
     }, 5000);
   }, []);
 
-  const onProductStockDelta = useCallback(
-    async (productId: string, delta: number) => {
-      const key = `p:${productId}`;
-      if (adjustLocksRef.current.has(key)) return;
-      adjustLocksRef.current.add(key);
+  const runProductStockFlushLoop = useCallback(
+    (key: string, productId: string) => {
+      const m = productStockFlushRef.current;
+      let b = m.get(key);
+      if (!b) {
+        b = { pendingDelta: 0, running: false };
+        m.set(key, b);
+      }
+      if (b.running) return;
+      b.running = true;
 
-      const rollback = { current: null as number | null };
+      void (async () => {
+        try {
+          for (;;) {
+            const bucket = m.get(key);
+            if (!bucket || bucket.pendingDelta === 0) break;
+            const d = bucket.pendingDelta;
+            bucket.pendingDelta = 0;
+            if (d === 0) continue;
+
+            patchAdjusting((s) => new Set(s).add(key));
+            try {
+              const saved = await adjustStock(productId, d);
+              if (saved) {
+                setLocalProducts((prev) =>
+                  prev.map((x) =>
+                    x.id === productId
+                      ? { ...x, stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt }
+                      : x
+                  )
+                );
+              }
+            } catch (err) {
+              setLocalProducts((prev) =>
+                prev.map((x) => {
+                  if (x.id !== productId) return x;
+                  const cur = x.stock ?? 0;
+                  return { ...x, stock: Math.max(0, cur - d) };
+                })
+              );
+              showStockErrorToast(err instanceof Error ? err.message : String(err));
+            } finally {
+              patchAdjusting((s) => {
+                const n = new Set(s);
+                n.delete(key);
+                return n;
+              });
+            }
+          }
+        } finally {
+          const bucket = m.get(key);
+          if (bucket) bucket.running = false;
+          const again = m.get(key);
+          if (again && again.pendingDelta !== 0 && !again.running) {
+            runProductStockFlushLoop(key, productId);
+          }
+        }
+      })();
+    },
+    [patchAdjusting, showStockErrorToast]
+  );
+
+  const runVariantStockFlushLoop = useCallback(
+    (key: string, productId: string, variantId: string) => {
+      const m = variantStockFlushRef.current;
+      let b = m.get(key);
+      if (!b) {
+        b = { pendingDelta: 0, running: false, productId };
+        m.set(key, b);
+      } else {
+        b.productId = productId;
+      }
+      if (b.running) return;
+      b.running = true;
+
+      void (async () => {
+        try {
+          for (;;) {
+            const bucket = m.get(key);
+            if (!bucket || bucket.pendingDelta === 0) break;
+            const d = bucket.pendingDelta;
+            bucket.pendingDelta = 0;
+            if (d === 0) continue;
+
+            const ownerId = bucket.productId;
+            patchAdjusting((s) => new Set(s).add(key));
+            try {
+              const saved = await adjustVariantStock(variantId, d);
+              if (saved) {
+                setLocalVariantsByProductId((prev) => {
+                  const list = prev[ownerId];
+                  if (!list) return prev;
+                  return {
+                    ...prev,
+                    [ownerId]: list.map((v) =>
+                      v.id === variantId ? { ...v, stock: saved.variantStock } : v
+                    ),
+                  };
+                });
+                setLocalProducts((prev) =>
+                  prev.map((x) =>
+                    x.id === ownerId
+                      ? {
+                          ...x,
+                          stock: saved.productRow?.stock ?? saved.productStock,
+                          stockUpdatedAt:
+                            saved.productRow?.stock_updated_at ??
+                            saved.productUpdatedAt ??
+                            x.stockUpdatedAt ??
+                            null,
+                        }
+                      : x
+                  )
+                );
+              }
+            } catch (err) {
+              setLocalVariantsByProductId((prev) => {
+                const list = prev[ownerId];
+                if (!list) return prev;
+                return {
+                  ...prev,
+                  [ownerId]: list.map((v) => {
+                    if (v.id !== variantId) return v;
+                    const cur = v.stock ?? 0;
+                    return { ...v, stock: Math.max(0, cur - d) };
+                  }),
+                };
+              });
+              showStockErrorToast(err instanceof Error ? err.message : String(err));
+            } finally {
+              patchAdjusting((s) => {
+                const n = new Set(s);
+                n.delete(key);
+                return n;
+              });
+            }
+          }
+        } finally {
+          const bucket = m.get(key);
+          if (bucket) bucket.running = false;
+          const again = m.get(key);
+          if (again && again.pendingDelta !== 0 && !again.running) {
+            runVariantStockFlushLoop(key, productId, variantId);
+          }
+        }
+      })();
+    },
+    [patchAdjusting, showStockErrorToast]
+  );
+
+  const onProductStockDelta = useCallback(
+    (productId: string, delta: number) => {
+      const key = `p:${productId}`;
       let applied = false;
       setLocalProducts((prev) => {
         const p = prev.find((x) => x.id === productId);
         if (!p) return prev;
         const old = p.stock ?? 0;
         if (delta < 0 && old < 1) return prev;
-        rollback.current = old;
         applied = true;
         const next = Math.max(0, old + delta);
         return prev.map((x) => (x.id === productId ? { ...x, stock: next } : x));
       });
 
-      if (!applied) {
-        adjustLocksRef.current.delete(key);
-        return;
-      }
+      if (!applied) return;
 
-      patchAdjusting((s) => new Set(s).add(key));
-      try {
-        const saved = await adjustStock(productId, delta);
-        if (saved) {
-          setLocalProducts((prev) =>
-            prev.map((x) =>
-              x.id === productId
-                ? { ...x, stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt }
-                : x
-            )
-          );
-        }
-      } catch (err) {
-        const old = rollback.current;
-        if (old !== null) {
-          setLocalProducts((prev) =>
-            prev.map((x) => (x.id === productId ? { ...x, stock: old } : x))
-          );
-        }
-        showStockErrorToast(err instanceof Error ? err.message : String(err));
-      } finally {
-        adjustLocksRef.current.delete(key);
-        patchAdjusting((s) => {
-          const n = new Set(s);
-          n.delete(key);
-          return n;
-        });
+      const m = productStockFlushRef.current;
+      let b = m.get(key);
+      if (!b) {
+        b = { pendingDelta: 0, running: false };
+        m.set(key, b);
       }
+      b.pendingDelta += delta;
+      runProductStockFlushLoop(key, productId);
     },
-    [patchAdjusting, showStockErrorToast]
+    [runProductStockFlushLoop]
   );
 
   const onVariantStockDelta = useCallback(
-    async (productId: string, variantId: string, delta: number) => {
+    (productId: string, variantId: string, delta: number) => {
       const key = `v:${variantId}`;
-      if (adjustLocksRef.current.has(key)) return;
-      adjustLocksRef.current.add(key);
-
-      const rollback = { current: null as number | null };
       let applied = false;
       setLocalVariantsByProductId((prev) => {
         const list = prev[productId];
@@ -904,7 +1025,6 @@ export function ProductsClient({
         if (idx < 0) return prev;
         const old = list[idx].stock ?? 0;
         if (delta < 0 && old < 1) return prev;
-        rollback.current = old;
         applied = true;
         const next = Math.max(0, old + delta);
         const nl = [...list];
@@ -912,71 +1032,27 @@ export function ProductsClient({
         return { ...prev, [productId]: nl };
       });
 
-      if (!applied) {
-        adjustLocksRef.current.delete(key);
-        return;
-      }
+      if (!applied) return;
 
-      patchAdjusting((s) => new Set(s).add(key));
-      try {
-        const saved = await adjustVariantStock(variantId, delta);
-        if (saved) {
-          setLocalVariantsByProductId((prev) => {
-            const list = prev[productId];
-            if (!list) return prev;
-            return {
-              ...prev,
-              [productId]: list.map((v) =>
-                v.id === variantId ? { ...v, stock: saved.variantStock } : v
-              ),
-            };
-          });
-          setLocalProducts((prev) =>
-            prev.map((x) =>
-              x.id === productId
-                ? {
-                    ...x,
-                    stock: saved.productRow?.stock ?? saved.productStock,
-                    stockUpdatedAt:
-                      saved.productRow?.stock_updated_at ??
-                      saved.productUpdatedAt ??
-                      x.stockUpdatedAt ??
-                      null,
-                  }
-                : x
-            )
-          );
-        }
-      } catch (err) {
-        const old = rollback.current;
-        if (old !== null) {
-          setLocalVariantsByProductId((prev) => {
-            const list = prev[productId];
-            if (!list) return prev;
-            return {
-              ...prev,
-              [productId]: list.map((v) => (v.id === variantId ? { ...v, stock: old } : v)),
-            };
-          });
-        }
-        showStockErrorToast(err instanceof Error ? err.message : String(err));
-      } finally {
-        adjustLocksRef.current.delete(key);
-        patchAdjusting((s) => {
-          const n = new Set(s);
-          n.delete(key);
-          return n;
-        });
+      const m = variantStockFlushRef.current;
+      let b = m.get(key);
+      if (!b) {
+        b = { pendingDelta: 0, running: false, productId };
+        m.set(key, b);
+      } else {
+        b.productId = productId;
       }
+      b.pendingDelta += delta;
+      runVariantStockFlushLoop(key, productId, variantId);
     },
-    [patchAdjusting, showStockErrorToast]
+    [runVariantStockFlushLoop]
   );
 
   const onListRowStockDelta = useCallback(
-    async (row: ProductRow, delta: number) => {
+    (row: ProductRow, delta: number) => {
       const owner = row.variantOwnerProductId ?? row.id;
-      if (row.variantId) await onVariantStockDelta(owner, row.variantId, delta);
-      else await onProductStockDelta(row.id, delta);
+      if (row.variantId) onVariantStockDelta(owner, row.variantId, delta);
+      else onProductStockDelta(row.id, delta);
     },
     [onProductStockDelta, onVariantStockDelta]
   );

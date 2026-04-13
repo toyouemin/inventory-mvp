@@ -410,15 +410,11 @@ export const ProductCard = memo(function ProductCard({
                           <button
                             type="button"
                             onClick={() => handleAdjustVariant(variant, -1)}
-                            disabled={variantSaving || qty < 1}
+                            disabled={qty < 1}
                           >
                             -1
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleAdjustVariant(variant, 1)}
-                            disabled={variantSaving}
-                          >
+                          <button type="button" onClick={() => handleAdjustVariant(variant, 1)}>
                             +1
                           </button>
                         </div>
@@ -501,11 +497,11 @@ export const ProductCard = memo(function ProductCard({
                       <button
                         type="button"
                         onClick={() => handleAdjustProduct(-1)}
-                        disabled={productStockSaving || (product?.stock ?? 0) < 1}
+                        disabled={(product?.stock ?? 0) < 1}
                       >
                         -1
                       </button>
-                      <button type="button" onClick={() => handleAdjustProduct(1)} disabled={productStockSaving}>
+                      <button type="button" onClick={() => handleAdjustProduct(1)}>
                         +1
                       </button>
                     </div>

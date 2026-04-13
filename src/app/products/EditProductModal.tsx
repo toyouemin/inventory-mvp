@@ -315,94 +315,96 @@ export function EditProductModal({
           <h3>상품 수정</h3>
         </div>
         <form id="edit-product-form" onSubmit={handleSave} className="modal-form add-product-modal-form">
-          {product.updatedAt && (
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
-              마지막 수정: {new Date(product.updatedAt).toLocaleString("ko-KR")}
+          <div className="add-product-modal__body-scroll">
+            {product.updatedAt && (
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
+                마지막 수정: {new Date(product.updatedAt).toLocaleString("ko-KR")}
+              </div>
+            )}
+            <div className="edit-product-modal__sku-row">
+              <label>
+                품목코드 (SKU) * <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>수정불가</span>
+              </label>
+              <div className="edit-product-modal__sku-actions">
+                <button type="submit" className="modal-header-cancel edit-product-modal__sku-save" disabled={pending}>
+                  저장
+                </button>
+                <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
+                  취소
+                </button>
+              </div>
             </div>
-          )}
-          <div className="edit-product-modal__sku-row">
-            <label>
-              품목코드 (SKU) * <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>수정불가</span>
-            </label>
-            <div className="edit-product-modal__sku-actions">
-              <button type="submit" className="modal-header-cancel edit-product-modal__sku-save" disabled={pending}>
-                저장
-              </button>
-              <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
-                취소
-              </button>
-            </div>
+            <input value={sku} onChange={(e) => setSku(e.target.value)} required readOnly />
+            <label>카테고리</label>
+            <input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="(선택)"
+            />
+
+            <label>상품명 *</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} required />
+
+            <VariantEditor rows={variantRows} onRowsChange={setVariantRows} error={variantError} />
+
+            <label>이미지</label>
+            {(imagePreview || imageUrl) && (
+              <div style={{ marginBottom: 8 }}>
+                <img
+                  src={imagePreview || imageUrl}
+                  alt="미리보기"
+                  style={{ maxWidth: "100%", maxHeight: 160, objectFit: "contain", borderRadius: 8, border: "1px solid var(--border)" }}
+                />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                if (!f) return;
+                setImageFile(f);
+                setImageUrl("");
+                try {
+                  setImagePreview(await readAsDataURL(f));
+                } catch {
+                  setImagePreview(null);
+                }
+              }}
+            />
+            <input
+              type="text"
+              value={imageUrl}
+              onChange={(e) => {
+                setImageUrl(e.target.value);
+                if (e.target.value) {
+                  setImageFile(null);
+                  setImagePreview(null);
+                }
+              }}
+              placeholder="또는 이미지 URL 입력"
+            />
+
+            <label className="variant-editor-product-memo-label">메모1 (상품)</label>
+            <input
+              type="text"
+              className="variant-editor-size-input variant-editor-product-memo-input"
+              value={memo}
+              onChange={(e) => setMemo(e.target.value)}
+              placeholder="메모1"
+              autoComplete="off"
+            />
+
+            <label className="variant-editor-product-memo-label">메모2 (상품)</label>
+            <input
+              type="text"
+              className="variant-editor-size-input variant-editor-product-memo-input"
+              value={memo2}
+              onChange={(e) => setMemo2(e.target.value)}
+              placeholder="메모2"
+              autoComplete="off"
+            />
           </div>
-          <input value={sku} onChange={(e) => setSku(e.target.value)} required readOnly />
-          <label>카테고리</label>
-          <input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="(선택)"
-          />
-
-          <label>상품명 *</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-
-          <VariantEditor rows={variantRows} onRowsChange={setVariantRows} error={variantError} />
-
-          <label>이미지</label>
-          {(imagePreview || imageUrl) && (
-            <div style={{ marginBottom: 8 }}>
-              <img
-                src={imagePreview || imageUrl}
-                alt="미리보기"
-                style={{ maxWidth: "100%", maxHeight: 160, objectFit: "contain", borderRadius: 8, border: "1px solid var(--border)" }}
-              />
-            </div>
-          )}
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              setImageFile(f);
-              setImageUrl("");
-              try {
-                setImagePreview(await readAsDataURL(f));
-              } catch {
-                setImagePreview(null);
-              }
-            }}
-          />
-          <input
-            type="text"
-            value={imageUrl}
-            onChange={(e) => {
-              setImageUrl(e.target.value);
-              if (e.target.value) {
-                setImageFile(null);
-                setImagePreview(null);
-              }
-            }}
-            placeholder="또는 이미지 URL 입력"
-          />
-
-          <label className="variant-editor-product-memo-label">메모1 (상품)</label>
-          <input
-            type="text"
-            className="variant-editor-size-input variant-editor-product-memo-input"
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="메모1"
-            autoComplete="off"
-          />
-
-          <label className="variant-editor-product-memo-label">메모2 (상품)</label>
-          <input
-            type="text"
-            className="variant-editor-size-input variant-editor-product-memo-input"
-            value={memo2}
-            onChange={(e) => setMemo2(e.target.value)}
-            placeholder="메모2"
-            autoComplete="off"
-          />
 
           <div className="modal-actions">
             <button type="submit" disabled={pending}>

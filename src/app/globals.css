@@ -2045,6 +2045,43 @@ label {
   padding: 22px 16px 14px;
 }
 
+/* 상품 추가·수정: 본문만 스크롤, 하단 저장/취소 고정 (일괄 이미지 모달은 제외) */
+.modal.add-product-modal:not(.bulk-image-modal) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal.add-product-modal:not(.bulk-image-modal) .modal-header-add-product {
+  flex-shrink: 0;
+}
+
+.add-product-modal-form {
+  flex: 1 1 0;
+  min-height: 0;
+  gap: 6px !important;
+}
+
+.add-product-modal__body-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-product-modal-form > .modal-actions {
+  flex-shrink: 0;
+  margin-top: 0;
+  padding-top: 10px;
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
 .edit-product-modal {
   position: relative;
 }
@@ -2118,17 +2155,9 @@ label {
   touch-action: manipulation;
 }
 
-.add-product-modal-form {
-  gap: 6px !important;
-}
-
 .add-product-modal-form .variant-editor-section {
   margin-top: 8px;
   padding-top: 8px;
-}
-
-.add-product-modal-form .modal-actions {
-  margin-top: 10px;
 }
 
 .add-product-modal-form .variant-editor-product-memo-label {

@@ -55,8 +55,84 @@ function variantToRow(v: ProductVariant): VariantRow {
   };
 }
 
+const GENDER_SORT_ORDER: Record<string, number> = {
+  "남": 0,
+  "남성": 0,
+  "여": 1,
+  "여성": 1,
+};
+
+const NON_NUMERIC_SIZE_ORDER = [
+  "XXXS",
+  "XXS",
+  "XS",
+  "S",
+  "M",
+  "L",
+  "XL",
+  "XXL",
+  "XXXL",
+  "FREE",
+  "F",
+  "ONE",
+  "ONESIZE",
+] as const;
+
+function normalizeGenderSortKey(raw: string): number {
+  const g = raw.trim();
+  if (!g) return 98;
+  return GENDER_SORT_ORDER[g] ?? 99;
+}
+
+function parseFirstNumber(raw: string): number | null {
+  const m = raw.match(/\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = Number(m[0]);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeNonNumericSizeRank(raw: string): number {
+  const s = raw.trim().replace(/\s+/g, "").toUpperCase();
+  if (!s) return 10_000;
+  const idx = NON_NUMERIC_SIZE_ORDER.indexOf(s as (typeof NON_NUMERIC_SIZE_ORDER)[number]);
+  return idx >= 0 ? idx : 1_000;
+}
+
+function sortVariantRowsForEditModal(rows: VariantRow[]): VariantRow[] {
+  return rows
+    .map((row, idx) => ({ row, idx }))
+    .sort((a, b) => {
+      const ga = normalizeGenderSortKey(a.row.gender ?? "");
+      const gb = normalizeGenderSortKey(b.row.gender ?? "");
+      if (ga !== gb) return ga - gb;
+
+      const saRaw = String(a.row.size ?? "");
+      const sbRaw = String(b.row.size ?? "");
+      const saNum = parseFirstNumber(saRaw);
+      const sbNum = parseFirstNumber(sbRaw);
+      const aIsNum = saNum != null;
+      const bIsNum = sbNum != null;
+
+      if (aIsNum && bIsNum) {
+        if (saNum !== sbNum) return (saNum as number) - (sbNum as number);
+      } else if (aIsNum !== bIsNum) {
+        return aIsNum ? -1 : 1;
+      } else {
+        const ra = normalizeNonNumericSizeRank(saRaw);
+        const rb = normalizeNonNumericSizeRank(sbRaw);
+        if (ra !== rb) return ra - rb;
+        const sc = saRaw.localeCompare(sbRaw, "ko", { sensitivity: "base" });
+        if (sc !== 0) return sc;
+      }
+
+      // 안정 정렬: 기존 순서를 마지막 tie-breaker로 유지
+      return a.idx - b.idx;
+    })
+    .map((x) => x.row);
+}
+
 function variantsToRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
-  if (variants.length > 0) return variants.map(variantToRow);
+  if (variants.length > 0) return sortVariantRowsForEditModal(variants.map(variantToRow));
   return [emptyVariantRow(String(fallbackStock ?? 0))];
 }
 
@@ -123,6 +199,13 @@ export function EditProductModal({
   const [variantRows, setVariantRows] = useState<VariantRow[]>(() => [emptyVariantRow()]);
   const [variantError, setVariantError] = useState("");
 
+  function setVariantRowsSorted(next: VariantRow[] | ((prev: VariantRow[]) => VariantRow[])) {
+    setVariantRows((prev) => {
+      const resolved = typeof next === "function" ? next(prev) : next;
+      return sortVariantRowsForEditModal(resolved);
+    });
+  }
+
   const initialVariantIds = useMemo(
     () => (variants ?? []).map((v) => v.id),
     [variants]
@@ -163,7 +246,7 @@ export function EditProductModal({
     setMemo(product.memo ?? "");
     setMemo2(product.memo2 ?? "");
     const rows = variantsToRows(variants ?? [], product.stock ?? 0);
-    setVariantRows(rows.length > 0 ? rows : [emptyVariantRow(String(product.stock ?? 0))]);
+    setVariantRowsSorted(rows.length > 0 ? rows : [emptyVariantRow(String(product.stock ?? 0))]);
     setVariantError("");
   }, [open, product, variants]);
 
@@ -345,7 +428,7 @@ export function EditProductModal({
             <label>상품명 *</label>
             <input value={name} onChange={(e) => setName(e.target.value)} required />
 
-            <VariantEditor rows={variantRows} onRowsChange={setVariantRows} error={variantError} />
+            <VariantEditor rows={variantRows} onRowsChange={setVariantRowsSorted} error={variantError} />
 
             <label>이미지</label>
             {(imagePreview || imageUrl) && (

@@ -56,31 +56,28 @@ function variantToRow(v: ProductVariant): VariantRow {
 }
 
 const GENDER_SORT_ORDER: Record<string, number> = {
-  "남": 0,
-  "남성": 0,
-  "여": 1,
-  "여성": 1,
+  "여성": 0,
+  "여": 0,
+  "여자": 0,
+  "남성": 1,
+  "남": 1,
+  "남자": 1,
 };
 
 const NON_NUMERIC_SIZE_ORDER = [
-  "XXXS",
-  "XXS",
-  "XS",
   "S",
   "M",
   "L",
   "XL",
-  "XXL",
-  "XXXL",
-  "FREE",
-  "F",
-  "ONE",
-  "ONESIZE",
+  "2XL",
+  "3XL",
+  "4XL",
+  "5XL",
 ] as const;
 
 function normalizeGenderSortKey(raw: string): number {
   const g = raw.trim();
-  if (!g) return 98;
+  if (!g) return 100;
   return GENDER_SORT_ORDER[g] ?? 99;
 }
 

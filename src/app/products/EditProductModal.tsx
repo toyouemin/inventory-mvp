@@ -74,6 +74,7 @@ const NON_NUMERIC_SIZE_ORDER = [
   "4XL",
   "5XL",
 ] as const;
+const EN_SIZE_TOKEN_REGEX = /\b(5XL|4XL|3XL|2XL|XL|L|M|S)\b/i;
 
 function normalizeGenderSortKey(raw: string): number {
   const g = raw.trim();
@@ -88,10 +89,16 @@ function parseFirstNumber(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function extractEnglishSizeToken(raw: string): string | null {
+  const normalized = raw.toUpperCase().replace(/\s+/g, " ");
+  const m = normalized.match(EN_SIZE_TOKEN_REGEX);
+  return m?.[1] ?? null;
+}
+
 function normalizeNonNumericSizeRank(raw: string): number {
-  const s = raw.trim().replace(/\s+/g, "").toUpperCase();
-  if (!s) return 10_000;
-  const idx = NON_NUMERIC_SIZE_ORDER.indexOf(s as (typeof NON_NUMERIC_SIZE_ORDER)[number]);
+  const token = extractEnglishSizeToken(raw);
+  if (!token) return 1_000;
+  const idx = NON_NUMERIC_SIZE_ORDER.indexOf(token as (typeof NON_NUMERIC_SIZE_ORDER)[number]);
   return idx >= 0 ? idx : 1_000;
 }
 
@@ -105,6 +112,19 @@ function sortVariantRowsForEditModal(rows: VariantRow[]): VariantRow[] {
 
       const saRaw = String(a.row.size ?? "");
       const sbRaw = String(b.row.size ?? "");
+      const saToken = extractEnglishSizeToken(saRaw);
+      const sbToken = extractEnglishSizeToken(sbRaw);
+      const aHasToken = saToken != null;
+      const bHasToken = sbToken != null;
+      if (aHasToken || bHasToken) {
+        if (aHasToken !== bHasToken) return aHasToken ? 1 : -1;
+        const ra = normalizeNonNumericSizeRank(saRaw);
+        const rb = normalizeNonNumericSizeRank(sbRaw);
+        if (ra !== rb) return ra - rb;
+        const sc = saRaw.localeCompare(sbRaw, "ko", { sensitivity: "base" });
+        if (sc !== 0) return sc;
+        return a.idx - b.idx;
+      }
       const saNum = parseFirstNumber(saRaw);
       const sbNum = parseFirstNumber(sbRaw);
       const aIsNum = saNum != null;

@@ -1,7 +1,8 @@
+import { buildProductStockExcelColumnWidths } from "@/lib/excelDownloadColumnWidths";
 import {
   applyExcelDownloadFontToWorksheet,
-  applyThousandsPriceFormatToColumns,
-  PRODUCT_STOCK_XLSX_PRICE_COLS,
+  applyThousandsNumberFormatToColumns,
+  PRODUCT_STOCK_XLSX_COMMA_NUMBER_COLS,
   writeStyledXlsxBuffer,
 } from "@/lib/excelDownloadFont";
 import { supabaseServer } from "@/lib/supabaseClient";
@@ -38,36 +39,7 @@ const HEADER = [
   "memo2",
 ];
 
-const MIN_COL_WIDTH = 8;
-const MAX_COL_WIDTH = 30;
-const IMAGE_URL_COL_WIDTH = 14;
-
-function toSafeString(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  return String(value);
-}
-
-function buildAutoColumnWidths(rows: readonly (readonly unknown[])[], imageUrlColIndex: number): { wch: number }[] {
-  const colCount = rows[0]?.length ?? 0;
-  const cols: { wch: number }[] = [];
-
-  for (let col = 0; col < colCount; col++) {
-    if (col === imageUrlColIndex) {
-      cols.push({ wch: IMAGE_URL_COL_WIDTH });
-      continue;
-    }
-
-    let maxLen = 0;
-    for (const row of rows) {
-      const cell = toSafeString(row[col]);
-      if (cell.length > maxLen) maxLen = cell.length;
-    }
-
-    cols.push({ wch: Math.min(MAX_COL_WIDTH, Math.max(MIN_COL_WIDTH, maxLen + 2)) });
-  }
-
-  return cols;
-}
+const IMAGE_URL_COL_INDEX = 3;
 
 type ProductRow = {
   id: string;
@@ -191,8 +163,8 @@ export async function GET() {
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = buildAutoColumnWidths(aoa, 3);
-  applyThousandsPriceFormatToColumns(ws, PRODUCT_STOCK_XLSX_PRICE_COLS);
+  ws["!cols"] = buildProductStockExcelColumnWidths(aoa, IMAGE_URL_COL_INDEX);
+  applyThousandsNumberFormatToColumns(ws, PRODUCT_STOCK_XLSX_COMMA_NUMBER_COLS);
   applyExcelDownloadFontToWorksheet(ws);
   XLSX.utils.book_append_sheet(wb, ws, "stock");
 

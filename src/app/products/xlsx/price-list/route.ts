@@ -1,3 +1,4 @@
+import { ExcelColumnWidthAccumulator } from "@/lib/excelDownloadColumnWidths";
 import { applyExcelDownloadFontToWorksheet, writeStyledXlsxBuffer } from "@/lib/excelDownloadFont";
 import { supabaseServer } from "@/lib/supabaseClient";
 import * as XLSX from "xlsx-js-style";
@@ -209,6 +210,10 @@ export async function GET() {
 
   const ws: XLSX.WorkSheet = {};
   const enc = XLSX.utils.encode_cell;
+  const colWidths = new ExcelColumnWidthAccumulator(HEADERS.length, [2, 3, 4]);
+  for (let c = 0; c < HEADERS.length; c++) {
+    colWidths.consider(c, HEADERS[c]);
+  }
 
   for (let c = 0; c < HEADERS.length; c++) {
     ws[enc({ r: 0, c })] = { v: HEADERS[c], t: "s", s: HEADER_STYLE };
@@ -222,6 +227,13 @@ export async function GET() {
     const prices = resolvePrices(p, vars);
     const stock = totalStockForProduct(p, vars);
     const note = stock <= 0 ? "품절" : "";
+
+    colWidths.consider(0, cat);
+    colWidths.consider(1, name);
+    colWidths.consider(2, prices.wholesale);
+    colWidths.consider(3, prices.sale);
+    colWidths.consider(4, prices.minSale);
+    colWidths.consider(5, note);
 
     ws[enc({ r, c: 0 })] = { v: cat, t: "s" };
     ws[enc({ r, c: 1 })] = { v: name, t: "s" };
@@ -244,14 +256,7 @@ export async function GET() {
   const lastRow = Math.max(0, r - 1);
   ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: lastRow, c: HEADERS.length - 1 } });
 
-  ws["!cols"] = [
-    { wch: 20 },
-    { wch: 40 },
-    { wch: 14 },
-    { wch: 14 },
-    { wch: 16 },
-    { wch: 12 },
-  ];
+  ws["!cols"] = colWidths.toCols();
 
   if (lastRow >= 1) {
     ws["!autofilter"] = { ref: `A1:F${lastRow + 1}` };

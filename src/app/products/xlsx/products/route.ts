@@ -1,4 +1,9 @@
-import { applyExcelDownloadFontToWorksheet, writeStyledXlsxBuffer } from "@/lib/excelDownloadFont";
+import {
+  applyExcelDownloadFontToWorksheet,
+  applyThousandsPriceFormatToColumns,
+  PRODUCT_STOCK_XLSX_PRICE_COLS,
+  writeStyledXlsxBuffer,
+} from "@/lib/excelDownloadFont";
 import { supabaseServer } from "@/lib/supabaseClient";
 import * as XLSX from "xlsx-js-style";
 import { unstable_noStore as noStore } from "next/cache";
@@ -200,6 +205,7 @@ export async function GET() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = buildAutoColumnWidths(aoa, 3);
+  applyThousandsPriceFormatToColumns(ws, PRODUCT_STOCK_XLSX_PRICE_COLS);
   applyExcelDownloadFontToWorksheet(ws);
   XLSX.utils.book_append_sheet(wb, ws, "products");
 

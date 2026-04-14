@@ -9,8 +9,8 @@ export const EXCEL_DOWNLOAD_ROW_HEIGHT_PT = 16.5;
 
 /** 상품/재고 엑셀: stock(7) + wholesalePrice~extraPrice(8–11), 0-based */
 export const PRODUCT_STOCK_XLSX_COMMA_NUMBER_COLS = [7, 8, 9, 10, 11] as const;
-/** 상품/재고 엑셀: color(4), gender(5), size(6), memo(12), 0-based */
-export const PRODUCT_STOCK_XLSX_CENTER_ALIGN_COLS = [4, 5, 6, 12] as const;
+/** 상품/재고 엑셀: color(4), gender(5), size(6), memo(12), memo2(13), 0-based */
+export const PRODUCT_STOCK_XLSX_CENTER_ALIGN_COLS = [4, 5, 6, 12, 13] as const;
 
 export const EXCEL_COMMA_NUMBER_NUMFMT = "#,##0";
 

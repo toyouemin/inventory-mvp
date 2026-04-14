@@ -1,3 +1,4 @@
+import { applyExcelDownloadFontToWorksheet, writeStyledXlsxBuffer } from "@/lib/excelDownloadFont";
 import { supabaseServer } from "@/lib/supabaseClient";
 import * as XLSX from "xlsx-js-style";
 import { normalizeCategoryLabel } from "../../categoryNormalize";
@@ -266,14 +267,12 @@ export async function GET() {
     },
   ];
 
+  applyExcelDownloadFontToWorksheet(ws);
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "가격표");
 
-  const buffer = XLSX.write(wb, {
-    bookType: "xlsx",
-    type: "buffer",
-    cellStyles: true,
-  }) as Buffer;
+  const buffer = writeStyledXlsxBuffer(wb);
 
   const fname = `price-list-${priceListFilenameDate()}.xlsx`;
 

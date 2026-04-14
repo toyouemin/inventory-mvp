@@ -1,5 +1,6 @@
+import { applyExcelDownloadFontToWorksheet, writeStyledXlsxBuffer } from "@/lib/excelDownloadFont";
 import { supabaseServer } from "@/lib/supabaseClient";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
 
@@ -186,11 +187,12 @@ export async function GET() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = buildAutoColumnWidths(aoa, 3);
+  applyExcelDownloadFontToWorksheet(ws);
   XLSX.utils.book_append_sheet(wb, ws, "stock");
 
-  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
+  const buffer = writeStyledXlsxBuffer(wb);
 
-  return new Response(buffer, {
+  return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "Content-Disposition": 'attachment; filename="stock.xlsx"',

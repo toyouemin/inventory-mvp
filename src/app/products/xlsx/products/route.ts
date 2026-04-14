@@ -1,7 +1,9 @@
 import { buildProductStockExcelColumnWidths } from "@/lib/excelDownloadColumnWidths";
 import {
   applyExcelDownloadFontToWorksheet,
+  applyHorizontalCenterToColumns,
   applyThousandsNumberFormatToColumns,
+  PRODUCT_STOCK_XLSX_CENTER_ALIGN_COLS,
   PRODUCT_STOCK_XLSX_COMMA_NUMBER_COLS,
   writeStyledXlsxBuffer,
 } from "@/lib/excelDownloadFont";
@@ -178,6 +180,7 @@ export async function GET() {
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = buildProductStockExcelColumnWidths(aoa, IMAGE_URL_COL_INDEX);
   applyThousandsNumberFormatToColumns(ws, PRODUCT_STOCK_XLSX_COMMA_NUMBER_COLS);
+  applyHorizontalCenterToColumns(ws, PRODUCT_STOCK_XLSX_CENTER_ALIGN_COLS);
   applyExcelDownloadFontToWorksheet(ws);
   XLSX.utils.book_append_sheet(wb, ws, "products");
 

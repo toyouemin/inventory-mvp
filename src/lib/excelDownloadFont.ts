@@ -9,6 +9,8 @@ export const EXCEL_DOWNLOAD_ROW_HEIGHT_PT = 16.5;
 
 /** 상품/재고 엑셀: stock(7) + wholesalePrice~extraPrice(8–11), 0-based */
 export const PRODUCT_STOCK_XLSX_COMMA_NUMBER_COLS = [7, 8, 9, 10, 11] as const;
+/** 상품/재고 엑셀: color(4), gender(5), size(6), memo(12), 0-based */
+export const PRODUCT_STOCK_XLSX_CENTER_ALIGN_COLS = [4, 5, 6, 12] as const;
 
 export const EXCEL_COMMA_NUMBER_NUMFMT = "#,##0";
 
@@ -50,6 +52,39 @@ export function applyThousandsNumberFormatToColumns(
         s: {
           ...prevS,
           numFmt: EXCEL_COMMA_NUMBER_NUMFMT,
+        },
+      };
+    }
+  }
+}
+
+/**
+ * 지정 열(헤더 포함 전체 행)에 `alignment.horizontal = "center"`를 병합 적용합니다.
+ * 기존 alignment의 나머지 속성(vertical/wrapText 등)과 다른 스타일은 유지합니다.
+ */
+export function applyHorizontalCenterToColumns(
+  ws: XLSX.WorkSheet,
+  columnIndices: readonly number[]
+): void {
+  const ref = ws["!ref"];
+  if (!ref) return;
+  const range = XLSX.utils.decode_range(ref);
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (const c of columnIndices) {
+      if (c < range.s.c || c > range.e.c) continue;
+      const addr = XLSX.utils.encode_cell({ r, c });
+      let cell = ws[addr];
+      if (!cell) {
+        cell = { t: "s", v: "" };
+        ws[addr] = cell;
+      }
+      const prev = cell.s ?? {};
+      const prevAlign = prev.alignment ?? {};
+      cell.s = {
+        ...prev,
+        alignment: {
+          ...prevAlign,
+          horizontal: "center",
         },
       };
     }

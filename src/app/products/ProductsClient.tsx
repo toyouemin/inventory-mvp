@@ -1894,7 +1894,7 @@ export function ProductsClient({
     if (orphanResult.orphanCount === 0) return;
     if (
       !confirm(
-        `불필요 이미지 ${orphanResult.orphanCount}건을 삭제합니다. 계속할까요?\n(참조 중 이미지와 placeholder는 삭제하지 않습니다.)`
+        `불필요 이미지 ${orphanResult.orphanCount}건을 삭제합니다. 계속할까요?\n(참조 중인 이미지는 삭제하지 않습니다.)`
       )
     ) {
       return;
@@ -2329,7 +2329,7 @@ export function ProductsClient({
             <>
               <p className="orphan-cleanup-panel__summary">
                 저장소 <strong>{orphanResult.bucket || "-"}</strong> · DB에서 사용 중{" "}
-                <strong>{orphanResult.referencedCount}개</strong> · 스토리지 전체{" "}
+                <strong>{orphanResult.referencedCount}개</strong> · 스토리지 이미지 파일{" "}
                 <strong>{orphanResult.storageFileCount}개</strong> · 불필요 이미지{" "}
                 <strong>{orphanResult.orphanCount}개</strong>
                 {orphanResult.deletedCount > 0 ? (

@@ -1,7 +1,15 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 
 export const PRODUCT_IMAGES_BUCKET = "product-images";
+/** Storage 빈 폴더 유지용 — 점검·통계·orphan 비교에서 제외 */
+export const PRODUCT_IMAGES_EMPTY_FOLDER_PLACEHOLDER = ".emptyFolderPlaceholder";
+
 const STORAGE_PUBLIC_PREFIX = `/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/`;
+
+export function isProductImagesEmptyFolderPlaceholderPath(path: string): boolean {
+  const base = (path.split("/").pop() ?? "").trim();
+  return base === PRODUCT_IMAGES_EMPTY_FOLDER_PLACEHOLDER;
+}
 
 function supabaseProjectOrigin(): string | null {
   const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -122,6 +130,7 @@ export function extractProductImagesObjectPathFromAnyRef(rawRef: string): string
 export type ProductImageOrphanCleanupResult = {
   bucket: string;
   referencedCount: number;
+  /** 버킷 내 삭제 가능한 이미지 확장자 파일 수(.emptyFolderPlaceholder·비이미지 제외) */
   storageFileCount: number;
   orphanCount: number;
   orphanPaths: string[];
@@ -134,7 +143,7 @@ export type ProductImageOrphanCleanupResult = {
 const DELETABLE_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "avif", "bmp", "tif", "tiff"]);
 const RESET_IMAGE_MATCH_EXTENSION_PRIORITY = ["jpg", "jpeg", "png", "webp"] as const;
 
-function isDeletableImageObjectPath(path: string): boolean {
+export function isDeletableImageObjectPath(path: string): boolean {
   const p = String(path ?? "").trim();
   if (!p) return false;
   const base = p.split("/").pop() ?? p;
@@ -144,7 +153,7 @@ function isDeletableImageObjectPath(path: string): boolean {
   return DELETABLE_IMAGE_EXTENSIONS.has(m[1].toLowerCase());
 }
 
-async function listAllProductImagesObjectPaths(): Promise<string[]> {
+export async function listAllProductImagesObjectPaths(): Promise<string[]> {
   const out: string[] = [];
   const queue: string[] = [""];
   while (queue.length > 0) {
@@ -171,6 +180,7 @@ async function listAllProductImagesObjectPaths(): Promise<string[]> {
           queue.push(fullPath);
           continue;
         }
+        if (isProductImagesEmptyFolderPlaceholderPath(fullPath)) continue;
         out.push(fullPath);
       }
 
@@ -327,7 +337,8 @@ async function removeStoragePaths(paths: string[]): Promise<{
 }
 
 /**
- * products.image_url 참조 집합과 Storage 파일 집합을 비교해 orphan 후보를 계산/삭제.
+ * products.image_url 참조 집합과 Storage 이미지 파일 집합을 비교해 orphan 후보를 계산/삭제.
+ * - `.emptyFolderPlaceholder` 및 비이미지 객체는 목록·개수·비교에서 제외
  * - 기본 dry-run
  * - dryRun=false + confirm=true 일 때만 실제 삭제
  * - parse 실패한 image_url은 삭제 계산에서 제외하고 `parseFailures`로 반환
@@ -362,10 +373,9 @@ export async function cleanupProductImageOrphans(options?: {
   }
 
   const storagePaths = await listAllProductImagesObjectPaths();
-  // placeholder/비이미지 파일은 orphan 계산·삭제 대상에서 제외
-  const orphanPaths = storagePaths
+  const imageStoragePaths = storagePaths.filter((p) => isDeletableImageObjectPath(p));
+  const orphanPaths = imageStoragePaths
     .filter((p) => !referenced.has(p))
-    .filter((p) => isDeletableImageObjectPath(p))
     .sort((a, b) => a.localeCompare(b, "ko"));
 
   let deletedPaths: string[] = [];
@@ -387,7 +397,7 @@ export async function cleanupProductImageOrphans(options?: {
   return {
     bucket: PRODUCT_IMAGES_BUCKET,
     referencedCount: referenced.size,
-    storageFileCount: storagePaths.length,
+    storageFileCount: imageStoragePaths.length,
     orphanCount: orphanPaths.length,
     orphanPaths,
     deletedCount: deletedPaths.length,

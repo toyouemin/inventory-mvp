@@ -9,7 +9,7 @@ import {
   mergeCategoryOrderMapForDisplay,
 } from "../../categorySortOrder.utils";
 import type { ProductVariant } from "../../types";
-import { sortVariantsForDisplay } from "../../variantOptions";
+import { sortVariants } from "../../variantOptions";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +102,7 @@ function resolvePrices(p: DbProduct, variants: DbVariant[]): {
   sale: number | null;
   minSale: number | null;
 } {
-  const sorted = sortVariantsForDisplay(variantsToProductVariants(p, variants));
+  const sorted = sortVariants(variantsToProductVariants(p, variants));
   const rep = sorted[0];
   return {
     wholesale: toExcelNumber(p.wholesale_price ?? rep?.wholesalePrice ?? null),

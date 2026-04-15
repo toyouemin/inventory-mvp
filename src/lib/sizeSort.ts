@@ -16,6 +16,17 @@ const ALPHA_SIZE_ORDER = [
 const ALPHA_SUFFIX_PATTERN =
   /(6XL|5XL|4XL|3XL|2XL|XXS|XS|XL|L|M|S)$/;
 
+/** `공용 S`, `남 2XL`, `여 XL` 등 공백 구분 문자열에서 영문 사이즈 토큰 추출 */
+const ENGLISH_SIZE_TOKEN_REGEX = /\b(6XL|5XL|4XL|3XL|2XL|XXS|XS|XL|L|M|S)\b/i;
+
+export function extractEnglishSizeToken(raw: string | null | undefined): string | null {
+  if (raw == null || raw === "") return null;
+  const normalized = String(raw).toUpperCase().replace(/\s+/g, " ");
+  const m = normalized.match(ENGLISH_SIZE_TOKEN_REGEX);
+  if (!m?.[1]) return null;
+  return m[1].toUpperCase();
+}
+
 function alphaSizeRank(size: string): number {
   const idx = ALPHA_SIZE_ORDER.indexOf(size);
   return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
@@ -59,6 +70,9 @@ export function extractAlphaSize(raw: string | null | undefined): string {
 
   const direct = text.match(ALPHA_SUFFIX_PATTERN);
   if (direct?.[1]) return direct[1].toUpperCase();
+
+  const word = extractEnglishSizeToken(raw);
+  if (word && alphaSizeRank(word) !== Number.MAX_SAFE_INTEGER) return word;
 
   return "";
 }

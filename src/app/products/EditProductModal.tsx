@@ -6,7 +6,7 @@ import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
 import { VariantEditor, type VariantRow, generateRowId } from "./VariantEditor";
-import { variantCompositeKey } from "./variantOptions";
+import { sortVariants, variantCompositeKey } from "./variantOptions";
 
 function parsePriceInput(value: string): number | null {
   const cleaned = String(value ?? "").replace(/,/g, "").trim();
@@ -55,101 +55,8 @@ function variantToRow(v: ProductVariant): VariantRow {
   };
 }
 
-const GENDER_SORT_ORDER: Record<string, number> = {
-  "여성": 0,
-  "여": 0,
-  "여자": 0,
-  "남성": 1,
-  "남": 1,
-  "남자": 1,
-};
-
-const NON_NUMERIC_SIZE_ORDER = [
-  "S",
-  "M",
-  "L",
-  "XL",
-  "2XL",
-  "3XL",
-  "4XL",
-  "5XL",
-] as const;
-const EN_SIZE_TOKEN_REGEX = /\b(5XL|4XL|3XL|2XL|XL|L|M|S)\b/i;
-
-function normalizeGenderSortKey(raw: string): number {
-  const g = raw.trim();
-  if (!g) return 100;
-  return GENDER_SORT_ORDER[g] ?? 99;
-}
-
-function parseFirstNumber(raw: string): number | null {
-  const m = raw.match(/\d+(?:\.\d+)?/);
-  if (!m) return null;
-  const n = Number(m[0]);
-  return Number.isFinite(n) ? n : null;
-}
-
-function extractEnglishSizeToken(raw: string): string | null {
-  const normalized = raw.toUpperCase().replace(/\s+/g, " ");
-  const m = normalized.match(EN_SIZE_TOKEN_REGEX);
-  return m?.[1] ?? null;
-}
-
-function normalizeNonNumericSizeRank(raw: string): number {
-  const token = extractEnglishSizeToken(raw);
-  if (!token) return 1_000;
-  const idx = NON_NUMERIC_SIZE_ORDER.indexOf(token as (typeof NON_NUMERIC_SIZE_ORDER)[number]);
-  return idx >= 0 ? idx : 1_000;
-}
-
-function sortVariantRowsForEditModal(rows: VariantRow[]): VariantRow[] {
-  return rows
-    .map((row, idx) => ({ row, idx }))
-    .sort((a, b) => {
-      const ga = normalizeGenderSortKey(a.row.gender ?? "");
-      const gb = normalizeGenderSortKey(b.row.gender ?? "");
-      if (ga !== gb) return ga - gb;
-
-      const saRaw = String(a.row.size ?? "");
-      const sbRaw = String(b.row.size ?? "");
-      const saToken = extractEnglishSizeToken(saRaw);
-      const sbToken = extractEnglishSizeToken(sbRaw);
-      const aHasToken = saToken != null;
-      const bHasToken = sbToken != null;
-      if (aHasToken || bHasToken) {
-        if (aHasToken !== bHasToken) return aHasToken ? 1 : -1;
-        const ra = normalizeNonNumericSizeRank(saRaw);
-        const rb = normalizeNonNumericSizeRank(sbRaw);
-        if (ra !== rb) return ra - rb;
-        const sc = saRaw.localeCompare(sbRaw, "ko", { sensitivity: "base" });
-        if (sc !== 0) return sc;
-        return a.idx - b.idx;
-      }
-      const saNum = parseFirstNumber(saRaw);
-      const sbNum = parseFirstNumber(sbRaw);
-      const aIsNum = saNum != null;
-      const bIsNum = sbNum != null;
-
-      if (aIsNum && bIsNum) {
-        if (saNum !== sbNum) return (saNum as number) - (sbNum as number);
-      } else if (aIsNum !== bIsNum) {
-        return aIsNum ? -1 : 1;
-      } else {
-        const ra = normalizeNonNumericSizeRank(saRaw);
-        const rb = normalizeNonNumericSizeRank(sbRaw);
-        if (ra !== rb) return ra - rb;
-        const sc = saRaw.localeCompare(sbRaw, "ko", { sensitivity: "base" });
-        if (sc !== 0) return sc;
-      }
-
-      // 안정 정렬: 기존 순서를 마지막 tie-breaker로 유지
-      return a.idx - b.idx;
-    })
-    .map((x) => x.row);
-}
-
 function variantsToRows(variants: ProductVariant[], fallbackStock: number): VariantRow[] {
-  if (variants.length > 0) return sortVariantRowsForEditModal(variants.map(variantToRow));
+  if (variants.length > 0) return sortVariants(variants).map(variantToRow);
   return [emptyVariantRow(String(fallbackStock ?? 0))];
 }
 
@@ -187,6 +94,8 @@ export function EditProductModal({
   variants = [],
   onClose,
   onSaved,
+  toolbarVariant = "default",
+  onToolbarDelete,
 }: {
   open: boolean;
   product: Product | null;
@@ -201,6 +110,9 @@ export function EditProductModal({
     memo: string | null;
     memo2: string | null;
   }) => void;
+  /** 카드(모바일) 보기에서만 상단 저장·취소 대신 삭제 단추 */
+  toolbarVariant?: "default" | "card";
+  onToolbarDelete?: () => void;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -219,7 +131,7 @@ export function EditProductModal({
   function setVariantRowsSorted(next: VariantRow[] | ((prev: VariantRow[]) => VariantRow[])) {
     setVariantRows((prev) => {
       const resolved = typeof next === "function" ? next(prev) : next;
-      return sortVariantRowsForEditModal(resolved);
+      return sortVariants(resolved);
     });
   }
 
@@ -426,12 +338,25 @@ export function EditProductModal({
                 품목코드 (SKU) * <span style={{ fontSize: 12, color: "#666", fontWeight: 500 }}>수정불가</span>
               </label>
               <div className="edit-product-modal__sku-actions">
-                <button type="submit" className="modal-header-cancel edit-product-modal__sku-save" disabled={pending}>
-                  저장
-                </button>
-                <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
-                  취소
-                </button>
+                {toolbarVariant === "default" ? (
+                  <>
+                    <button type="submit" className="modal-header-cancel edit-product-modal__sku-save" disabled={pending}>
+                      저장
+                    </button>
+                    <button type="button" className="modal-header-cancel edit-product-modal__sku-cancel" onClick={onClose}>
+                      취소
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-danger btn-strong edit-product-modal__sku-delete"
+                    onClick={() => onToolbarDelete?.()}
+                    disabled={pending}
+                  >
+                    삭제
+                  </button>
+                )}
               </div>
             </div>
             <input value={sku} onChange={(e) => setSku(e.target.value)} required readOnly />

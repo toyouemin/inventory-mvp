@@ -526,6 +526,9 @@ button.download-dropdown__item:disabled {
 
 .product-card__head-text {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .product-card__head-category-line {
@@ -544,25 +547,37 @@ button.download-dropdown__item:disabled {
 
 .product-card__head-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: flex-end;
   gap: 8px;
   /* 버튼 높이를 줄인 만큼 위·아래 여백으로 복원 → 메뉴 주변이 더 넓어 보이게 */
-  margin-top: 5px;
+  margin-top: 6px;
   margin-bottom: 3px;
 }
 
 .product-card__head-action-edit {
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-width: 0;
+  width: auto;
+  max-width: 100%;
 }
 
-.product-card__head-action-delete {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 5.75rem;
-  padding-left: 12px;
-  padding-right: 12px;
+.product-card__head-stock-updated-at {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(11rem, 52%);
+  margin-top: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.25;
+  align-self: flex-end;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 높이는 검색창보다 살짝 낮춤(44→38), 절약분은 margin으로 위임 */
@@ -572,11 +587,6 @@ button.download-dropdown__item:disabled {
   font-size: 14px;
 }
 
-.product-card__head-actions .product-card__head-action-delete.btn-compact {
-  padding-left: 12px;
-  padding-right: 12px;
-  font-size: 14px;
-}
 
 .product-card__thumb {
   display: none;
@@ -2122,6 +2132,64 @@ label {
   border-color: var(--accent);
 }
 
+/* 카드(모바일) 전용: 상단 취소와 동일한 박스 크기(btn-danger 유지) */
+.edit-product-modal__sku-row .edit-product-modal__sku-delete {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 62px;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.edit-product-modal__sku-row .edit-product-modal__sku-delete:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 카드 전용: 삭제 확인 — 화면 중앙(상단 add-product 오버레이 규칙 미사용) */
+.modal-overlay.product-delete-confirm-overlay {
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(0, 0, 0, 0.58);
+  z-index: 220;
+}
+
+.modal.product-delete-confirm-modal {
+  max-width: min(340px, calc(100vw - 32px));
+  width: 100%;
+  padding: 22px 18px 16px;
+  margin: 0;
+}
+
+.product-delete-confirm-modal__message {
+  margin: 0 0 20px;
+  padding: 4px 4px 0;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.product-delete-confirm-modal__actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.product-delete-confirm-modal__actions .product-delete-confirm-modal__btn {
+  flex: 1 1 0;
+  min-width: 0;
+  width: auto;
+  box-sizing: border-box;
+}
+
 .modal-header-add-product {
   display: flex;
   justify-content: space-between;
@@ -2579,7 +2647,7 @@ label {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 96px;
     gap: 8px;
-    align-items: start;
+    align-items: stretch;
   }
 
   .product-card__thumb {
@@ -2637,9 +2705,9 @@ label {
   }
 
   .product-card__head-actions {
-    gap: 6px;
-    margin-top: 4px;
-    margin-bottom: 4px;
+    margin-top: auto;
+    margin-bottom: 2px;
+    padding-top: 4px;
   }
 
   .product-card__body > .product-card__prices {
@@ -2649,13 +2717,6 @@ label {
   .product-card__head-actions .btn-compact {
     height: 32px;
     padding: 0 10px;
-    font-size: 14px;
-  }
-
-  .product-card__head-actions .product-card__head-action-delete.btn-compact {
-    min-width: 4.75rem;
-    padding-left: 10px;
-    padding-right: 10px;
     font-size: 14px;
   }
 

@@ -1,11 +1,12 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import dayjs from "dayjs";
 import { updateProductMemo, updateVariantMemo } from "./actions";
 import { useProductImageSrc } from "./useProductImageSrc";
 import type { Product, ProductVariant } from "./types";
 import { normalizeSkuForMatch, variantMatchesNormSku } from "./skuNormalize";
-import { formatGenderSizeDisplay, sortVariantsForDisplay, variantCompositeKey } from "./variantOptions";
+import { formatGenderSizeDisplay, sortVariants, variantCompositeKey } from "./variantOptions";
 
 function dbgStockCard(phase: string, data: Record<string, unknown>) {
   if (typeof window === "undefined") return;
@@ -49,7 +50,6 @@ export type ProductCardProps = {
   localImageHrefBySkuLower: Record<string, string>;
   variants?: ProductVariant[];
   onEditClick?: (productId: string) => void;
-  onDeleteClick?: (productId: string) => void | Promise<void>;
   onProductStockDelta?: (productId: string, delta: number) => void | Promise<void>;
   onVariantStockDelta?: (productId: string, variantId: string, delta: number) => void | Promise<void>;
   productStockSaving?: boolean;
@@ -72,7 +72,6 @@ export const ProductCard = memo(function ProductCard({
   localImageHrefBySkuLower,
   variants = [],
   onEditClick,
-  onDeleteClick,
   onProductStockDelta,
   onVariantStockDelta,
   productStockSaving = false,
@@ -113,7 +112,7 @@ export const ProductCard = memo(function ProductCard({
     [savingVariantIdsKey]
   );
 
-  const sortedVariants = useMemo(() => sortVariantsForDisplay(safeVariants), [safeVariants]);
+  const sortedVariants = useMemo(() => sortVariants(safeVariants), [safeVariants]);
 
   useEffect(() => {
     if (!debugVariantSkuMix || !displayGroupNormSku.trim()) return;
@@ -232,6 +231,13 @@ export const ProductCard = memo(function ProductCard({
 
   const displayName = (product?.name ?? "").trim() || product?.sku || "-";
 
+  const stockUpdatedAtShort = useMemo(() => {
+    const raw = product?.stockUpdatedAt;
+    if (!raw) return "-";
+    const d = dayjs(raw);
+    return d.isValid() ? d.format("MM/DD HH:mm") : "-";
+  }, [product?.stockUpdatedAt]);
+
   if (debugProductsDupes) {
     console.info("[productsPipeline][ProductCard render]", {
       componentInstance: debugInstanceId.current,
@@ -294,15 +300,12 @@ export const ProductCard = memo(function ProductCard({
               >
                 수정
               </button>
-              {onDeleteClick ? (
-                <button
-                  type="button"
-                  className="btn btn-danger btn-compact product-card__head-action-delete"
-                  onClick={() => void onDeleteClick(product.id)}
-                >
-                  삭제
-                </button>
-              ) : null}
+              <span
+                className="product-card__head-stock-updated-at"
+                title={product?.stockUpdatedAt ? dayjs(product.stockUpdatedAt).format("YYYY-MM-DD HH:mm") : undefined}
+              >
+                {stockUpdatedAtShort}
+              </span>
             </div>
           </div>
           {!imgDead && imgSrc ? (

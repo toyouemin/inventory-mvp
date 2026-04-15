@@ -219,13 +219,23 @@ function compareSockParsed(A: SockParsedKey, B: SockParsedKey): number {
 }
 
 /**
- * 화면에 넘기기 직전 variant 배열 정렬(카드·리스트 공통, `sortVariantRows` 단일 기준).
+ * variant 배열 정렬(카드·리스트·엑셀·수정 모달 공통).
+ * 비교는 `sortVariantRows`, 동률 시 입력 순서 유지(안정 정렬).
  */
-export function sortVariantsForDisplay<T extends { color?: string | null; gender?: string | null; size?: string | null }>(
+export function sortVariants<T extends { color?: string | null; gender?: string | null; size?: string | null }>(
   variants: T[]
 ): T[] {
-  return [...variants].sort((a, b) => sortVariantRows(a, b));
+  return variants
+    .map((row, idx) => ({ row, idx }))
+    .sort((a, b) => {
+      const c = sortVariantRows(a.row, b.row);
+      if (c !== 0) return c;
+      return a.idx - b.idx;
+    })
+    .map((x) => x.row);
 }
+
+export { extractEnglishSizeToken } from "@/lib/sizeSort";
 
 /**
  * 비양말형 표시 순서. DB 컬럼 color / gender / size (= UI에서의 option1·option2·size).

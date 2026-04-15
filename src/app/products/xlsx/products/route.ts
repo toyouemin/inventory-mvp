@@ -12,6 +12,7 @@ import * as XLSX from "xlsx-js-style";
 import { unstable_noStore as noStore } from "next/cache";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
+import { sortVariants } from "../../variantOptions";
 
 export const dynamic = "force-dynamic";
 
@@ -133,7 +134,7 @@ export async function GET() {
   const aoa: (string | number)[][] = [HEADER];
 
   for (const p of list) {
-    const productVariants = variantsByProductId.get(p.id) ?? [];
+    const productVariants = sortVariants(variantsByProductId.get(p.id) ?? []);
     const name = (p.name ?? "").trim() || p.sku;
     if (productVariants.length > 0) {
       for (const v of productVariants) {

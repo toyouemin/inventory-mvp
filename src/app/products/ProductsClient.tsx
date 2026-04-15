@@ -6,7 +6,7 @@ import { createPortal, flushSync } from "react-dom";
 import { useRouter, useSearchParams } from "next/navigation";
 import dayjs from "dayjs";
 import type { Product, ProductVariant, ProductRow } from "./types";
-import { diagnoseSockSortVariant, formatGenderSizeDisplay, sortVariantsForDisplay, tryParseSockCombinedLabel } from "./variantOptions";
+import { diagnoseSockSortVariant, formatGenderSizeDisplay, sortVariants, tryParseSockCombinedLabel } from "./variantOptions";
 import { useProductImageSrc } from "./useProductImageSrc";
 import { ProductCard } from "./ProductCard";
 import { AddProductModal } from "./AddProductModal";
@@ -709,6 +709,10 @@ export function ProductsClient({
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingVariants, setEditingVariants] = useState<ProductVariant[]>([]);
+  /** 목록·카드 공통: 삭제 확인 모달(문구·버튼 동일) */
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmTargetId, setDeleteConfirmTargetId] = useState<string | null>(null);
+  const [deleteConfirmWorking, setDeleteConfirmWorking] = useState(false);
   /**
    * 서버 `products`로만 목록을 맞춤 — prev에 append/merge/concat 금지.
    * props가 바뀔 때마다 `setLocalProducts(한 번에 통째로)`만 사용(Strict Mode 이중 실행에도 누적 없음).
@@ -1255,10 +1259,44 @@ export function ProductsClient({
     setEditOpen(true);
   }, []);
 
-  const requestDeleteProduct = useCallback(async (productId: string) => {
-    if (!confirm("이 상품을 삭제하시겠습니까?")) return;
-    await deleteProduct(productId);
+  const requestDeleteProduct = useCallback((productId: string) => {
+    setDeleteConfirmTargetId(productId);
+    setDeleteConfirmOpen(true);
   }, []);
+
+  const openProductDeleteConfirm = useCallback(() => {
+    const id = editingProduct?.id;
+    if (!id) return;
+    setDeleteConfirmTargetId(id);
+    setDeleteConfirmOpen(true);
+  }, [editingProduct?.id]);
+
+  const closeProductDeleteConfirm = useCallback(() => {
+    if (deleteConfirmWorking) return;
+    setDeleteConfirmOpen(false);
+    setDeleteConfirmTargetId(null);
+  }, [deleteConfirmWorking]);
+
+  const runProductDeleteConfirmed = useCallback(async () => {
+    const id = deleteConfirmTargetId;
+    if (!id || deleteConfirmWorking) return;
+    setDeleteConfirmWorking(true);
+    try {
+      await deleteProduct(id);
+      queueMicrotask(() => {
+        router.refresh();
+      });
+      setDeleteConfirmOpen(false);
+      setDeleteConfirmTargetId(null);
+      if (editingProduct?.id === id) {
+        setEditOpen(false);
+        setEditingProduct(null);
+        setEditingVariants([]);
+      }
+    } finally {
+      setDeleteConfirmWorking(false);
+    }
+  }, [deleteConfirmTargetId, deleteConfirmWorking, router, editingProduct?.id]);
 
   const categorySelectDisplayedLabel = categoryFilter === "" ? "전체" : categoryFilter;
 
@@ -1699,7 +1737,7 @@ export function ProductsClient({
       if (variants.length > 0) {
         const visible = variantsAfterZeroStockFilter(variants, hideZeroStock);
         if (visible.length > 0) {
-          for (const v of sortVariantsForDisplay(visible)) {
+          for (const v of sortVariants(visible)) {
             rows.push({
               ...p,
               variantOwnerProductId: v.productId,
@@ -2409,7 +2447,6 @@ export function ProductsClient({
                   memoShowAll={cardsMemoVisible}
                   onMemoShowAllChange={setCardsMemoVisible}
                   onEditClick={openEditById}
-                  onDeleteClick={requestDeleteProduct}
                   onProductStockDelta={onProductStockDelta}
                   onVariantStockDelta={onVariantStockDelta}
                   productStockSaving={adjustingStockKeys.has(`p:${p.id}`)}
@@ -2521,6 +2558,8 @@ export function ProductsClient({
         open={editOpen}
         product={editingProduct}
         variants={editingVariants}
+        toolbarVariant={viewMode === "card" ? "card" : "default"}
+        onToolbarDelete={viewMode === "card" ? openProductDeleteConfirm : undefined}
         onSaved={({ productId, sku, category, name, imageUrl, memo, memo2 }) => {
           setLocalProducts((prev) =>
             prev.map((p) =>
@@ -2539,8 +2578,44 @@ export function ProductsClient({
           setEditOpen(false);
           setEditingProduct(null);
           setEditingVariants([]);
+          setDeleteConfirmOpen(false);
+          setDeleteConfirmTargetId(null);
         }}
       />
+
+      {deleteConfirmOpen ? (
+        <div
+          className="modal-overlay product-delete-confirm-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="product-delete-confirm-title"
+          onClick={closeProductDeleteConfirm}
+        >
+          <div className="modal product-delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <p id="product-delete-confirm-title" className="product-delete-confirm-modal__message">
+              이 상품을 삭제하시겠습니까?
+            </p>
+            <div className="product-delete-confirm-modal__actions">
+              <button
+                type="button"
+                className="btn btn-secondary product-delete-confirm-modal__btn"
+                disabled={deleteConfirmWorking}
+                onClick={closeProductDeleteConfirm}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger product-delete-confirm-modal__btn"
+                disabled={deleteConfirmWorking}
+                onClick={() => void runProductDeleteConfirmed()}
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {bulkImageModalOpen ? (
         <div

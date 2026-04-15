@@ -7,16 +7,13 @@ import {
   PRODUCT_STOCK_XLSX_COMMA_NUMBER_COLS,
   writeStyledXlsxBuffer,
 } from "@/lib/excelDownloadFont";
-import { supabaseServer } from "@/lib/supabaseClient";
 import * as XLSX from "xlsx-js-style";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
+import { fetchAllProductsPaged, fetchVariantsByProductIdsPaged } from "../pagedFetch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const PRODUCTS_PAGE_SIZE = 1000;
-const PRODUCT_VARIANTS_PAGE_SIZE = 1000;
-const PRODUCT_ID_BATCH_SIZE = 200;
 
 function excelCell(v: unknown): string | number {
   if (v === null || v === undefined) return "";
@@ -76,57 +73,12 @@ type VariantRow = {
   memo2: string | null;
 };
 
-async function fetchAllProducts(): Promise<{ rows: ProductRow[]; error: { message: string } | null }> {
-  const out: ProductRow[] = [];
-  for (let offset = 0; ; offset += PRODUCTS_PAGE_SIZE) {
-    const { data, error } = await supabaseServer
-      .from("products")
-      .select(
-        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at"
-      )
-      .order("sku", { ascending: true })
-      .order("created_at", { ascending: false })
-      .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);
-    if (error) return { rows: [], error };
-    const chunk = (data ?? []) as ProductRow[];
-    out.push(...chunk);
-    if (chunk.length < PRODUCTS_PAGE_SIZE) break;
-  }
-  return { rows: out, error: null };
-}
-
-async function fetchVariantsByProductIds(
-  productIds: string[]
-): Promise<{ rows: VariantRow[]; error: { message: string } | null }> {
-  if (productIds.length === 0) return { rows: [], error: null };
-  const out: VariantRow[] = [];
-  for (let start = 0; start < productIds.length; start += PRODUCT_ID_BATCH_SIZE) {
-    const batchIds = productIds.slice(start, start + PRODUCT_ID_BATCH_SIZE);
-    for (let offset = 0; ; offset += PRODUCT_VARIANTS_PAGE_SIZE) {
-      const { data, error } = await supabaseServer
-        .from("product_variants")
-        .select(
-          "product_id, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2"
-        )
-        .in("product_id", batchIds)
-        .order("product_id", { ascending: true })
-        .order("color", { ascending: true })
-        .order("gender", { ascending: true })
-        .order("size", { ascending: true })
-        .range(offset, offset + PRODUCT_VARIANTS_PAGE_SIZE - 1);
-      if (error) return { rows: [], error };
-      const chunk = (data ?? []) as VariantRow[];
-      out.push(...chunk);
-      if (chunk.length < PRODUCT_VARIANTS_PAGE_SIZE) break;
-    }
-  }
-  return { rows: out, error: null };
-}
-
 export async function GET() {
   const categoryOrderFromDb = await fetchCategoryOrderMap();
 
-  const { rows: products, error: productsErr } = await fetchAllProducts();
+  const { rows: products, error: productsErr } = await fetchAllProductsPaged<ProductRow>(
+    "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at"
+  );
 
   if (productsErr) {
     return new Response(`XLSX export failed: ${productsErr.message}`, { status: 500 });
@@ -148,7 +100,10 @@ export async function GET() {
 
   let variants: VariantRow[] = [];
   if (productIds.length > 0) {
-    const { rows: variantsRows, error: variantsErr } = await fetchVariantsByProductIds(productIds);
+    const { rows: variantsRows, error: variantsErr } = await fetchVariantsByProductIdsPaged<VariantRow>(
+      productIds,
+      "product_id, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2"
+    );
     if (variantsErr) {
       return new Response(`XLSX export failed: ${variantsErr.message}`, { status: 500 });
     }

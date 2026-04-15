@@ -887,6 +887,32 @@ function chunkArray<T>(arr: T[], chunkSize: number) {
   return out;
 }
 
+const CSV_SNAPSHOT_PAGE_SIZE = 1000;
+type CsvSnapshotTable = "products" | "product_variants";
+
+/**
+ * CSV reset/snapshot 경로도 PostgREST 기본 상한(보통 1000)으로 잘릴 수 있으므로
+ * 단발 select(*) 대신 페이지네이션으로 전체 행을 조회한다.
+ */
+async function fetchAllRowsFromTablePaged(
+  table: CsvSnapshotTable,
+  selectCols: string
+): Promise<{ rows: Record<string, unknown>[]; error: { message: string } | null }> {
+  const out: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += CSV_SNAPSHOT_PAGE_SIZE) {
+    const { data, error } = await supabaseServer
+      .from(table)
+      .select(selectCols)
+      .order("id", { ascending: true })
+      .range(offset, offset + CSV_SNAPSHOT_PAGE_SIZE - 1);
+    if (error) return { rows: [], error };
+    const chunk = (data ?? []) as unknown as Record<string, unknown>[];
+    out.push(...chunk);
+    if (chunk.length < CSV_SNAPSHOT_PAGE_SIZE) break;
+  }
+  return { rows: out, error: null };
+}
+
 /** `products.sku`가 비었을 때: 해당 product의 variant sku 정규화 값 **다수결**로 묶기 키(클라이언트 productNormSku와 동일 규칙). */
 async function modeNormVariantSkuByProductId(productIds: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -1354,11 +1380,11 @@ async function restoreProductsAndVariantsSnapshot(snapshot: {
   const oldVariantIds = oldVariants.map((v) => String((v as any).id));
 
   // 현재 데이터 제거(부분 insert가 있었을 가능성 대비)
-  const { data: curProducts, error: curPErr } = await supabaseServer.from("products").select("id");
+  const { rows: curProducts, error: curPErr } = await fetchAllRowsFromTablePaged("products", "id");
   if (curPErr) throw new Error(curPErr.message);
   const curProductIds = (curProducts ?? []).map((p: any) => String(p.id));
 
-  const { data: curVariants, error: curVErr } = await supabaseServer.from("product_variants").select("id");
+  const { rows: curVariants, error: curVErr } = await fetchAllRowsFromTablePaged("product_variants", "id");
   if (curVErr) throw new Error(curVErr.message);
   const curVariantIds = (curVariants ?? []).map((v: any) => String(v.id));
 
@@ -1381,11 +1407,11 @@ async function restoreProductsAndVariantsSnapshot(snapshot: {
 }
 
 async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<void> {
-  const { data: oldProductsRaw, error: oldProductsErr } = await supabaseServer.from("products").select("*");
+  const { rows: oldProductsRaw, error: oldProductsErr } = await fetchAllRowsFromTablePaged("products", "*");
   if (oldProductsErr) throw new Error(oldProductsErr.message);
   const oldProducts = (oldProductsRaw ?? []) as Array<Record<string, unknown>>;
 
-  const { data: oldVariantsRaw, error: oldVariantsErr } = await supabaseServer.from("product_variants").select("*");
+  const { rows: oldVariantsRaw, error: oldVariantsErr } = await fetchAllRowsFromTablePaged("product_variants", "*");
   if (oldVariantsErr) throw new Error(oldVariantsErr.message);
   const oldVariants = (oldVariantsRaw ?? []) as Array<Record<string, unknown>>;
 

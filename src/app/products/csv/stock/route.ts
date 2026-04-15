@@ -1,6 +1,7 @@
 import { supabaseServer } from "@/lib/supabaseClient";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
+import { fetchAllProductsPaged, fetchVariantsByProductIdsPaged } from "../../xlsx/pagedFetch";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,40 +45,26 @@ type VariantRow = {
   memo2: string | null;
 };
 
-const PRODUCTS_PAGE_SIZE = 1000;
-
-async function fetchAllProductRows(): Promise<{ rows: ProductRow[]; error: { message: string } | null }> {
-  const out: ProductRow[] = [];
-  for (let offset = 0; ; offset += PRODUCTS_PAGE_SIZE) {
-    const { data, error } = await supabaseServer
-      .from("products")
-      .select(
-        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at"
-      )
-      .order("sku", { ascending: true })
-      .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);
-    if (error) return { rows: [], error };
-    const chunk = (data ?? []) as ProductRow[];
-    out.push(...chunk);
-    if (chunk.length < PRODUCTS_PAGE_SIZE) break;
-  }
-  return { rows: out, error: null };
-}
-
-export async function GET() {
+export async function GET(req: Request) {
   if (!supabaseServer) {
     return new Response("Supabase server client not ready. Check env vars.", { status: 500 });
   }
+  const debugCsv = new URL(req.url).searchParams.get("debugCsv") === "1";
 
   const categoryOrderFromDb = await fetchCategoryOrderMap();
 
-  const { rows: products, error: productsErr } = await fetchAllProductRows();
+  const { rows: products, error: productsErr } = await fetchAllProductsPaged<ProductRow>(
+    "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at"
+  );
 
   if (productsErr) {
     return new Response(`Supabase error: ${productsErr.message}`, { status: 500 });
   }
 
   const list = (products ?? []) as ProductRow[];
+  if (debugCsv) {
+    console.info("[csv/stock] fetched-counts", { fetchedProducts: list.length });
+  }
   const categoryOrder = mergeCategoryOrderMapForDisplay(
     list.map((p) => ({ category: p.category, createdAt: p.created_at, id: p.id })),
     categoryOrderFromDb
@@ -93,13 +80,20 @@ export async function GET() {
 
   let variants: VariantRow[] = [];
   if (productIds.length > 0) {
-    const { data: variantsData } = await supabaseServer
-      .from("product_variants")
-      .select(
-        "product_id, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2"
-      )
-      .in("product_id", productIds);
-    variants = (variantsData ?? []) as VariantRow[];
+    const { rows: variantsRows, error: variantsErr } = await fetchVariantsByProductIdsPaged<VariantRow>(
+      productIds,
+      "product_id, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2"
+    );
+    if (variantsErr) {
+      return new Response(`Supabase error: ${variantsErr.message}`, { status: 500 });
+    }
+    variants = variantsRows;
+    if (debugCsv) {
+      console.info("[csv/stock] fetched-counts", {
+        fetchedVariants: variants.length,
+        fetchedVariantProductIdCount: new Set(variants.map((v) => String(v.product_id))).size,
+      });
+    }
   }
 
   const variantsByProductId = new Map<string, VariantRow[]>();
@@ -110,9 +104,11 @@ export async function GET() {
   }
 
   const rows: string[][] = [];
+  const singleRowSkus: string[] = [];
   for (const p of list) {
     const productVariants = variantsByProductId.get(p.id) ?? [];
     const name = (p.name ?? "").trim() || p.sku;
+    // 분기 기준: variant 행이 1개 이상이면 무조건 variant 행 생성
     if (productVariants.length > 0) {
       for (const v of productVariants) {
         rows.push([
@@ -133,6 +129,7 @@ export async function GET() {
         ]);
       }
     } else {
+      singleRowSkus.push(p.sku);
       rows.push([
         csvEscape(p.sku),
         csvEscape(p.category ?? ""),
@@ -150,6 +147,13 @@ export async function GET() {
         csvEscape(p.memo2 ?? ""),
       ]);
     }
+  }
+  if (debugCsv) {
+    console.info("[csv/stock] single-row-sku-summary", {
+      totalSingleRowSkuCount: singleRowSkus.length,
+      uniqueSingleRowSkuCount: new Set(singleRowSkus).size,
+      skus: singleRowSkus,
+    });
   }
 
   const lines = [CSV_HEADER, ...rows.map((r) => r.join(","))];

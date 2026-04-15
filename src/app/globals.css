@@ -2721,6 +2721,15 @@ label {
     font-size: 14px;
   }
 
+  .product-card__head-actions .product-card__head-action-edit.btn-compact {
+    background: #c0392b;
+    color: #ffffff;
+  }
+
+  .product-card__head-actions .product-card__head-action-edit.btn-compact:hover {
+    background: #a93226;
+  }
+
   .product-card__option-name {
     font-size: 14px;
     font-weight: 700;

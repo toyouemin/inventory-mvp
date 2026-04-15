@@ -8,6 +8,7 @@ import {
   CATEGORY_ORDER_FALLBACK,
   mergeCategoryOrderMapForDisplay,
 } from "../../categorySortOrder.utils";
+import { normalizeSkuForMatch } from "../../skuNormalize";
 import type { ProductVariant } from "../../types";
 import { sortVariants } from "../../variantOptions";
 
@@ -45,6 +46,21 @@ type DbVariant = {
   msrp_price: number | null;
   sale_price: number | null;
   extra_price: number | null;
+};
+
+type PriceListDebugReason = {
+  sku: string;
+  appProductCount: number;
+  appVariantCount: number;
+  allVariantsStockZero: boolean;
+  hasVariantFallbackSource: boolean;
+  productDetails: Array<{
+    productId: string;
+    productName: string;
+    productSku: string;
+    variantSkus: string[];
+  }>;
+  notes: string[];
 };
 
 function pad2(n: number): string {
@@ -122,6 +138,32 @@ function comparePriceListRows(a: DbProduct, b: DbProduct, orderMap: Record<strin
   return (a.sku ?? "").localeCompare(b.sku ?? "", "ko");
 }
 
+function dominantNormSkuFromVariants(vars: DbVariant[]): string {
+  const counts = new Map<string, number>();
+  for (const v of vars) {
+    const n = normalizeSkuForMatch(v.sku);
+    if (!n) continue;
+    counts.set(n, (counts.get(n) ?? 0) + 1);
+  }
+  let best = "";
+  let bestCount = -1;
+  for (const [k, c] of counts) {
+    if (c > bestCount) {
+      best = k;
+      bestCount = c;
+      continue;
+    }
+    if (c === bestCount && k < best) best = k;
+  }
+  return best;
+}
+
+function appLikeSkuKey(p: DbProduct, vars: DbVariant[]): string {
+  const byProduct = normalizeSkuForMatch(p.sku);
+  if (byProduct) return byProduct;
+  return dominantNormSkuFromVariants(vars);
+}
+
 async function fetchAllProducts(): Promise<{ rows: DbProduct[]; error: { message: string } | null }> {
   if (!supabaseServer) return { rows: [], error: { message: "Supabase not configured" } };
   const out: DbProduct[] = [];
@@ -176,10 +218,11 @@ const NUMBER_STYLE = {
   numFmt: "#,##0",
 };
 
-export async function GET() {
+export async function GET(req: Request) {
   if (!supabaseServer) {
     return new Response("Supabase server client not ready.", { status: 503 });
   }
+  const debugPriceList = new URL(req.url).searchParams.get("debugPriceList") === "1";
 
   const categoryOrderFromDb = await fetchCategoryOrderMap();
   const { rows: products, error: productsErr } = await fetchAllProducts();
@@ -206,6 +249,121 @@ export async function GET() {
   const { map: variantsByProductId, error: vErr } = await fetchVariantsByProductIds(productIds);
   if (vErr) {
     return new Response(`가격표보내기 실패: ${vErr.message}`, { status: 500 });
+  }
+  if (debugPriceList) {
+    let fetchedVariantCount = 0;
+    for (const arr of variantsByProductId.values()) fetchedVariantCount += arr.length;
+    console.info("[xlsx/price-list] fetched-counts", {
+      fetchedProducts: list.length,
+      fetchedVariants: fetchedVariantCount,
+      fetchedVariantProductIdCount: variantsByProductId.size,
+    });
+  }
+
+  const appSkuSet = new Set<string>();
+  const priceListSkuSet = new Set<string>();
+  const appSkuToProductCount = new Map<string, number>();
+  const appSkuToVariantCount = new Map<string, number>();
+  const appSkuHasVariantFallback = new Map<string, boolean>();
+  const appSkuAllVariantStockZero = new Map<string, boolean>();
+  const appSkuToProductDetails = new Map<
+    string,
+    Array<{ productId: string; productName: string; productSku: string; variantSkus: string[] }>
+  >();
+  for (const p of list) {
+    const vars = variantsByProductId.get(p.id) ?? [];
+    const appSku = appLikeSkuKey(p, vars);
+    if (appSku) {
+      appSkuSet.add(appSku);
+      appSkuToProductCount.set(appSku, (appSkuToProductCount.get(appSku) ?? 0) + 1);
+      appSkuToVariantCount.set(appSku, (appSkuToVariantCount.get(appSku) ?? 0) + vars.length);
+      if (!normalizeSkuForMatch(p.sku) && dominantNormSkuFromVariants(vars)) {
+        appSkuHasVariantFallback.set(appSku, true);
+      }
+      if (vars.length > 0) {
+        const allZero = vars.every((v) => Math.max(0, Math.trunc(Number(v.stock) || 0)) <= 0);
+        const prev = appSkuAllVariantStockZero.get(appSku);
+        appSkuAllVariantStockZero.set(appSku, prev == null ? allZero : prev && allZero);
+      }
+      const detailList = appSkuToProductDetails.get(appSku) ?? [];
+      const productName = ((p.name ?? "").trim() || p.sku).trim();
+      const variantSkus = [...new Set(vars.map((v) => normalizeSkuForMatch(v.sku)).filter(Boolean))] as string[];
+      detailList.push({
+        productId: String(p.id),
+        productName,
+        productSku: String(p.sku ?? ""),
+        variantSkus,
+      });
+      appSkuToProductDetails.set(appSku, detailList);
+    }
+    const skuInPriceList = normalizeSkuForMatch(p.sku);
+    if (skuInPriceList) priceListSkuSet.add(skuInPriceList);
+  }
+  const missingFromPriceList = [...appSkuSet].filter((sku) => !priceListSkuSet.has(sku)).sort();
+  const missingReasons: PriceListDebugReason[] = missingFromPriceList.map((sku) => {
+    const notes: string[] = [];
+    const appProductCount = appSkuToProductCount.get(sku) ?? 0;
+    const appVariantCount = appSkuToVariantCount.get(sku) ?? 0;
+    const allVariantsStockZero = appSkuAllVariantStockZero.get(sku) ?? false;
+    const hasVariantFallbackSource = appSkuHasVariantFallback.get(sku) ?? false;
+    const productDetails = appSkuToProductDetails.get(sku) ?? [];
+    if (hasVariantFallbackSource) notes.push("products.sku 비어 variant.sku 다수결로 앱 SKU 산출");
+    if (appProductCount > 1) notes.push("앱 SKU 병합 대상(동일 SKU 다중 product)");
+    if (allVariantsStockZero) notes.push("옵션 전량 재고 0");
+    if (notes.length === 0) notes.push("가격표 route에서 필터/품절제외/숨김 로직 없음, SKU 산출 경로 차이 우선 의심");
+    return {
+      sku,
+      appProductCount,
+      appVariantCount,
+      allVariantsStockZero,
+      hasVariantFallbackSource,
+      productDetails,
+      notes,
+    };
+  });
+  if (debugPriceList) {
+    console.info("[xlsx/price-list] sku-compare-summary", {
+      appSkuCount: appSkuSet.size,
+      priceListSkuCount: priceListSkuSet.size,
+      missingSkuCount: missingFromPriceList.length,
+      missingSkus: missingFromPriceList,
+      // price-list route는 숨김/삭제/옵션병합/품절제외/필터조건으로 SKU를 제외하지 않는다.
+      exclusionFlags: {
+        hidden: false,
+        deletedFilter: false,
+        optionMergeFilter: false,
+        soldOutExclusion: false,
+        customFilterCondition: false,
+      },
+      missingReasons,
+    });
+    if (missingFromPriceList.length === 0) {
+      console.info("[xlsx/price-list] missingSkus: none");
+    } else {
+      console.info("[xlsx/price-list] missingSkus (one-line)");
+      missingFromPriceList.forEach((sku, idx) => {
+        console.info(`  ${idx + 1}. ${sku}`);
+      });
+      console.info("[xlsx/price-list] missingReasons (one-line)");
+      missingReasons.forEach((x, idx) => {
+        const detailText =
+          x.productDetails.length > 0
+            ? x.productDetails
+                .map(
+                  (d) =>
+                    `productId=${d.productId}, name="${d.productName}", products.sku="${d.productSku}", variantSkus=[${
+                      d.variantSkus.join(", ") || "-"
+                    }]`
+                )
+                .join(" | ")
+            : "product details 없음";
+        console.info(
+          `  ${idx + 1}. sku=${x.sku} | appProductCount=${x.appProductCount} | appVariantCount=${x.appVariantCount} | allVariantsStockZero=${
+            x.allVariantsStockZero
+          } | variantFallback=${x.hasVariantFallbackSource} | notes=${x.notes.join("; ")} | ${detailText}`
+        );
+      });
+    }
   }
 
   const ws: XLSX.WorkSheet = {};
@@ -251,6 +409,11 @@ export async function GET() {
       ws[enc({ r, c: 5 })] = { v: note, t: "s" };
     }
     r++;
+  }
+  if (debugPriceList) {
+    console.info("[xlsx/price-list] export-summary", {
+      exportedRowCount: Math.max(0, r - 1),
+    });
   }
 
   const lastRow = Math.max(0, r - 1);

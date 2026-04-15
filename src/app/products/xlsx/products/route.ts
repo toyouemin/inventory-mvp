@@ -15,6 +15,9 @@ import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from 
 import { sortVariants } from "../../variantOptions";
 
 export const dynamic = "force-dynamic";
+const PRODUCTS_PAGE_SIZE = 1000;
+const PRODUCT_VARIANTS_PAGE_SIZE = 1000;
+const PRODUCT_ID_BATCH_SIZE = 200;
 
 function excelCell(v: unknown): string | number {
   if (v === null || v === undefined) return "";
@@ -84,22 +87,69 @@ type VariantRow = {
   memo2: string | null;
 };
 
-export async function GET() {
+async function fetchAllProducts(): Promise<{ rows: ProductRow[]; error: { message: string } | null }> {
+  const out: ProductRow[] = [];
+  for (let offset = 0; ; offset += PRODUCTS_PAGE_SIZE) {
+    const { data, error } = await supabaseServer
+      .from("products")
+      .select(
+        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
+      )
+      .order("sku", { ascending: true })
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);
+    if (error) return { rows: [], error };
+    const chunk = (data ?? []) as ProductRow[];
+    out.push(...chunk);
+    if (chunk.length < PRODUCTS_PAGE_SIZE) break;
+  }
+  return { rows: out, error: null };
+}
+
+async function fetchVariantsByProductIds(
+  productIds: string[]
+): Promise<{ rows: VariantRow[]; error: { message: string } | null }> {
+  if (productIds.length === 0) return { rows: [], error: null };
+  const out: VariantRow[] = [];
+  for (let start = 0; start < productIds.length; start += PRODUCT_ID_BATCH_SIZE) {
+    const batchIds = productIds.slice(start, start + PRODUCT_ID_BATCH_SIZE);
+    for (let offset = 0; ; offset += PRODUCT_VARIANTS_PAGE_SIZE) {
+      const { data, error } = await supabaseServer
+        .from("product_variants")
+        .select(
+          "product_id, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2"
+        )
+        .in("product_id", batchIds)
+        .order("product_id", { ascending: true })
+        .order("color", { ascending: true })
+        .order("gender", { ascending: true })
+        .order("size", { ascending: true })
+        .range(offset, offset + PRODUCT_VARIANTS_PAGE_SIZE - 1);
+      if (error) return { rows: [], error };
+      const chunk = (data ?? []) as VariantRow[];
+      out.push(...chunk);
+      if (chunk.length < PRODUCT_VARIANTS_PAGE_SIZE) break;
+    }
+  }
+  return { rows: out, error: null };
+}
+
+export async function GET(req: Request) {
   noStore();
   const categoryOrderFromDb = await fetchCategoryOrderMap();
-
-  const { data: products, error: productsErr } = await supabaseServer
-    .from("products")
-    .select(
-      "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
-    )
-    .order("sku", { ascending: true });
+  const debugVariantRows = new URL(req.url).searchParams.get("debugVariants") === "1";
+  const { rows: products, error: productsErr } = await fetchAllProducts();
 
   if (productsErr) {
     return new Response(`XLSX export failed: ${productsErr.message}`, { status: 500 });
   }
 
   const list = (products ?? []) as ProductRow[];
+  if (debugVariantRows) {
+    console.info("[xlsx/products] fetched-counts", {
+      fetchedProducts: list.length,
+    });
+  }
   const categoryOrder = mergeCategoryOrderMapForDisplay(
     list.map((p) => ({ category: p.category, createdAt: p.created_at, id: p.id })),
     categoryOrderFromDb
@@ -115,13 +165,17 @@ export async function GET() {
 
   let variants: VariantRow[] = [];
   if (productIds.length > 0) {
-    const { data: variantsData } = await supabaseServer
-      .from("product_variants")
-      .select(
-        "product_id, color, gender, size, stock, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2"
-      )
-      .in("product_id", productIds);
-    variants = (variantsData ?? []) as VariantRow[];
+    const { rows: variantsRows, error: variantsErr } = await fetchVariantsByProductIds(productIds);
+    if (variantsErr) {
+      return new Response(`XLSX export failed: ${variantsErr.message}`, { status: 500 });
+    }
+    variants = variantsRows;
+    if (debugVariantRows) {
+      console.info("[xlsx/products] fetched-counts", {
+        fetchedVariants: variants.length,
+        fetchedVariantProductIdCount: new Set(variants.map((v) => String(v.product_id))).size,
+      });
+    }
   }
 
   const variantsByProductId = new Map<string, VariantRow[]>();
@@ -132,10 +186,22 @@ export async function GET() {
   }
 
   const aoa: (string | number)[][] = [HEADER];
+  const singleRowSkus: string[] = [];
 
   for (const p of list) {
     const productVariants = sortVariants(variantsByProductId.get(p.id) ?? []);
+    if (debugVariantRows) {
+      const variantLabels = productVariants.map((v) => `${(v.gender ?? "").trim()}/${(v.size ?? "").trim()}`);
+      console.info("[xlsx/products] row-build", {
+        sku: p.sku,
+        productId: p.id,
+        stock: Number(p.stock ?? 0),
+        variantsLength: productVariants.length,
+        variants: variantLabels,
+      });
+    }
     const name = (p.name ?? "").trim() || p.sku;
+    // 분기 기준: variant 행이 1개 이상이면 무조건 variant 기준으로 출력
     if (productVariants.length > 0) {
       for (const v of productVariants) {
         aoa.push([
@@ -157,6 +223,7 @@ export async function GET() {
         ]);
       }
     } else {
+      singleRowSkus.push(p.sku);
       aoa.push([
         excelCell(p.sku),
         excelCell(p.category ?? ""),
@@ -174,7 +241,21 @@ export async function GET() {
         excelCell(p.memo2 ?? ""),
         excelCell(formatUpdatedAt(p.stock_updated_at)),
       ]);
+      if (debugVariantRows) {
+        console.warn("[xlsx/products] no-variant-single-row", {
+          sku: p.sku,
+          productId: p.id,
+          stock: Number(p.stock ?? 0),
+        });
+      }
     }
+  }
+  if (debugVariantRows) {
+    console.info("[xlsx/products] single-row-sku-summary", {
+      totalSingleRowSkuCount: singleRowSkus.length,
+      uniqueSingleRowSkuCount: new Set(singleRowSkus).size,
+      skus: singleRowSkus,
+    });
   }
 
   const wb = XLSX.utils.book_new();

@@ -587,6 +587,15 @@ button.download-dropdown__item:disabled {
   font-size: 14px;
 }
 
+.product-card__head-actions .product-card__head-action-edit.btn-compact {
+  background: #c0392b;
+  color: #ffffff;
+}
+
+.product-card__head-actions .product-card__head-action-edit.btn-compact:hover {
+  background: #a93226;
+}
+
 
 .product-card__thumb {
   display: none;
@@ -2719,15 +2728,6 @@ label {
     height: 32px;
     padding: 0 10px;
     font-size: 14px;
-  }
-
-  .product-card__head-actions .product-card__head-action-edit.btn-compact {
-    background: #c0392b;
-    color: #ffffff;
-  }
-
-  .product-card__head-actions .product-card__head-action-edit.btn-compact:hover {
-    background: #a93226;
   }
 
   .product-card__option-name {

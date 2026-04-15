@@ -2646,15 +2646,15 @@ label {
 
   .product-card__mobile-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 112px;
+    grid-template-columns: minmax(0, 1fr) 106px;
     gap: 8px;
     align-items: flex-start;
   }
 
   .product-card__thumb {
     display: block;
-    width: 112px;
-    height: 112px;
+    width: 106px;
+    height: 106px;
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0;

@@ -2327,6 +2327,11 @@ label {
   max-width: none;
 }
 
+/* 상품 수정 모달: 옵션 수량 칸 식별성을 위해 숫자 기본색을 빨간색으로 표시 */
+.edit-product-modal .variant-editor-row .variant-editor-stock-input {
+  color: #c0392b;
+}
+
 .variant-editor-section {
   margin-top: 12px;
   padding-top: 12px;

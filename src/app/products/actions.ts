@@ -504,6 +504,7 @@ function stemFromProductImageFilename(name: string): string {
   return imageFilenameBasename(name).replace(/\.(jpe?g|png|webp)$/i, "").trim();
 }
 
+/** TODO(ENABLE_BATCH_IMAGE_UPLOAD): UI에서 기능 제거 시 이 타입·아래 `bulkUploadProductImages`·내부 전용 헬퍼까지 삭제 가능 — `ProductsClient`·`featureFlags.ts` TODO 참고 */
 export type BulkProductImageUploadResult = {
   successCount: number;
   matchFailedCount: number;
@@ -524,6 +525,7 @@ export type BulkProductImageUploadResult = {
 /**
  * 여러 이미지 일괄 업로드: 파일명 stem → normalizeSkuForMatch → products.sku 매칭 후 image_url 갱신.
  * Storage는 매번 새 경로(덮어쓰기 아님). DB 갱신 성공 후 이전 product-images 객체는 공용 정리 로직으로 삭제 시도.
+ * TODO(ENABLE_BATCH_IMAGE_UPLOAD): 전면 제거 시 `BulkProductImageUploadResult` 타입과 함께 삭제.
  */
 export async function bulkUploadProductImages(formData: FormData): Promise<BulkProductImageUploadResult> {
   if (!supabaseServer) {

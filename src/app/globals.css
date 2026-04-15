@@ -1843,6 +1843,7 @@ label {
   font-size: 18px;
 }
 
+/* TODO(ENABLE_BATCH_IMAGE_UPLOAD): 기능 제거 시 `.bulk-image-modal` 관련 규칙 블록 전체 삭제 */
 .modal.add-product-modal.bulk-image-modal {
   max-width: 440px;
 }
@@ -2136,8 +2137,8 @@ label {
 .edit-product-modal__sku-row .edit-product-modal__sku-delete {
   flex: 0 0 auto;
   width: auto;
-  min-width: 62px;
-  padding: 4px 8px;
+  min-width: 5.5rem;
+  padding: 4px 10px;
   font-size: 13px;
   line-height: 1.2;
   white-space: nowrap;
@@ -2645,15 +2646,15 @@ label {
 
   .product-card__mobile-head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 96px;
+    grid-template-columns: minmax(0, 1fr) 120px;
     gap: 8px;
-    align-items: stretch;
+    align-items: flex-start;
   }
 
   .product-card__thumb {
     display: block;
-    width: 96px;
-    height: 96px;
+    width: 120px;
+    height: 120px;
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 0;

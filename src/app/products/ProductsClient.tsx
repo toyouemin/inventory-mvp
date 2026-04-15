@@ -13,10 +13,10 @@ import { AddProductModal } from "./AddProductModal";
 import {
   adjustStock,
   adjustVariantStock,
-  bulkUploadProductImages,
+  bulkUploadProductImages, // TODO(ENABLE_BATCH_IMAGE_UPLOAD): `actions.ts`의 `bulkUploadProductImages` export·구현과 함께 제거 가능
   deleteProduct,
   uploadProductsCsv,
-  type BulkProductImageUploadResult,
+  type BulkProductImageUploadResult, // TODO(ENABLE_BATCH_IMAGE_UPLOAD): 위와 함께 제거
 } from "./actions";
 import { resizeAndCompressImage } from "./imageUtils";
 import { normalizeCategoryLabel } from "./categoryNormalize";
@@ -29,6 +29,7 @@ import {
   type SkuDisplayGroup,
 } from "./skuDisplayMerge";
 import { VARIANT_AUDIT_TARGET_SKUS } from "./variantAuditTargets";
+import { ENABLE_BATCH_IMAGE_UPLOAD } from "./featureFlags";
 import { fitCategorySelectWidth } from "./fitCategorySelectWidth";
 
 type ViewMode = "card" | "list";
@@ -760,6 +761,7 @@ export function ProductsClient({
   const [stockErrorToast, setStockErrorToast] = useState<string | null>(null);
   const stockErrorToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // TODO(ENABLE_BATCH_IMAGE_UPLOAD): 플래그·아래 state·ref·handleBulkImageFiles·메뉴·모달 JSX·bulkUpload import 한꺼번에 삭제
   const [bulkImageModalOpen, setBulkImageModalOpen] = useState(false);
   const [bulkOnlyEmptyImage, setBulkOnlyEmptyImage] = useState(false);
   const [bulkImageWorking, setBulkImageWorking] = useState(false);
@@ -1855,6 +1857,7 @@ export function ProductsClient({
     }
   }
 
+  // TODO(ENABLE_BATCH_IMAGE_UPLOAD): `handleBulkImageFiles` 통째로 삭제
   const handleBulkImageFiles = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const list = e.target.files;
@@ -2294,22 +2297,29 @@ export function ProductsClient({
               >
                 {orphanWorkingMode === "delete" ? "불필요 이미지 삭제 중…" : "불필요 이미지 삭제"}
               </button>
-              <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
-              <button
-                type="button"
-                role="menuitem"
-                className="download-dropdown__item"
-                disabled={bulkImageWorking}
-                onClick={() => {
-                  setUploadOpen(false);
-                  setDownloadOpen(false);
-                  setBulkImageResult(null);
-                  setBulkImageModalOpen(true);
-                }}
-              >
-                일괄 이미지 업로드
-              </button>
-              <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
+              {/* TODO(ENABLE_BATCH_IMAGE_UPLOAD): 아래 분기 전체 + 일괄 메뉴 버튼 블록 삭제 */}
+              {ENABLE_BATCH_IMAGE_UPLOAD ? (
+                <>
+                  <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="download-dropdown__item"
+                    disabled={bulkImageWorking}
+                    onClick={() => {
+                      setUploadOpen(false);
+                      setDownloadOpen(false);
+                      setBulkImageResult(null);
+                      setBulkImageModalOpen(true);
+                    }}
+                  >
+                    일괄 이미지 업로드
+                  </button>
+                  <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
+                </>
+              ) : (
+                <div className="download-dropdown__divider download-dropdown__divider--thin" role="separator" />
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -2617,7 +2627,8 @@ export function ProductsClient({
         </div>
       ) : null}
 
-      {bulkImageModalOpen ? (
+      {/* TODO(ENABLE_BATCH_IMAGE_UPLOAD): 아래 모달 JSX 전체 삭제 */}
+      {ENABLE_BATCH_IMAGE_UPLOAD && bulkImageModalOpen ? (
         <div
           className="modal-overlay add-product-modal-overlay"
           role="dialog"

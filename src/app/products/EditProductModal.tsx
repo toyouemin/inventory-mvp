@@ -110,7 +110,7 @@ export function EditProductModal({
     memo: string | null;
     memo2: string | null;
   }) => void;
-  /** 카드(모바일) 보기에서만 상단 저장·취소 대신 삭제 단추 */
+  /** 카드(모바일) 보기에서만 상단 저장·취소 대신 제품 삭제 단추 */
   toolbarVariant?: "default" | "card";
   onToolbarDelete?: () => void;
 }) {
@@ -354,7 +354,7 @@ export function EditProductModal({
                     onClick={() => onToolbarDelete?.()}
                     disabled={pending}
                   >
-                    삭제
+                    제품 삭제
                   </button>
                 )}
               </div>

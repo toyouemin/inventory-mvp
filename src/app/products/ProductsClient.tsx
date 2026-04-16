@@ -704,7 +704,7 @@ export function ProductsClient({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [hideZeroStock, setHideZeroStock] = useState(false);
+  const [hideZeroStock, setHideZeroStock] = useState(true);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   /** 카드 메모 본문 전역 표시(툴바 메모ON·카드 메모 버튼 공유). PC/모바일 공통 ON으로 시작 */
   const [cardsMemoVisible, setCardsMemoVisible] = useState(true);

@@ -49,6 +49,8 @@ export type ProductCardProps = {
   /** `getLocalImageHrefBySkuLower()` 맵(키 = 정규화 SKU) */
   localImageHrefBySkuLower: Record<string, string>;
   variants?: ProductVariant[];
+  /** 가격 계산용 원본 옵션(재고0 필터 전). 없으면 `variants` 사용 */
+  priceSourceVariants?: ProductVariant[];
   onEditClick?: (productId: string) => void;
   onProductStockDelta?: (productId: string, delta: number) => void | Promise<void>;
   onVariantStockDelta?: (productId: string, variantId: string, delta: number) => void | Promise<void>;
@@ -71,6 +73,7 @@ export const ProductCard = memo(function ProductCard({
   product,
   localImageHrefBySkuLower,
   variants = [],
+  priceSourceVariants,
   onEditClick,
   onProductStockDelta,
   onVariantStockDelta,
@@ -99,6 +102,13 @@ export const ProductCard = memo(function ProductCard({
     () => (Array.isArray(variants) ? variants : []).filter((v) => v && String(v.id ?? "").trim()),
     [variants]
   );
+  const safePriceSourceVariants = useMemo(
+    () =>
+      (Array.isArray(priceSourceVariants) ? priceSourceVariants : safeVariants).filter(
+        (v) => v && String(v.id ?? "").trim()
+      ),
+    [priceSourceVariants, safeVariants]
+  );
 
   const { src: imgSrc, onError: onImgError, dead: imgDead } = useProductImageSrc(
     product.sku,
@@ -117,6 +127,7 @@ export const ProductCard = memo(function ProductCard({
   );
 
   const sortedVariants = useMemo(() => sortVariants(safeVariants), [safeVariants]);
+  const sortedPriceSourceVariants = useMemo(() => sortVariants(safePriceSourceVariants), [safePriceSourceVariants]);
 
   useEffect(() => {
     if (!debugVariantSkuMix || !displayGroupNormSku.trim()) return;
@@ -169,14 +180,14 @@ export const ProductCard = memo(function ProductCard({
 
   /** CSV·현재 스키마는 가격이 variants에만 있고 products 가격은 비는 경우가 많음 → 상단은 상품값 우선, 없으면 정렬된 첫 variant */
   const headerPrices = useMemo(() => {
-    const rep = sortedVariants[0];
+    const rep = sortedPriceSourceVariants[0];
     return {
       wholesalePrice: product.wholesalePrice ?? rep?.wholesalePrice ?? null,
       msrpPrice: product.msrpPrice ?? rep?.msrpPrice ?? null,
       salePrice: product.salePrice ?? rep?.salePrice ?? null,
       extraPrice: product.extraPrice ?? rep?.extraPrice ?? null,
     };
-  }, [product, sortedVariants]);
+  }, [product, sortedPriceSourceVariants]);
 
   function handleAdjustProduct(delta: number) {
     dbgStockCard("card_product_btn_click", { productId: product.id, delta });

@@ -2580,6 +2580,7 @@ export function ProductsClient({
                   displayGroupNormSku={normSku}
                   localImageHrefBySkuLower={localImageHrefBySkuLower}
                   variants={displayVars}
+                  priceSourceVariants={vars}
                   showNoVisibleOptionsHint={showNoVisibleOptionsHint}
                   memoShowAll={cardsMemoVisible}
                   onMemoShowAllChange={setCardsMemoVisible}

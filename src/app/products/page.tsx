@@ -11,6 +11,7 @@ import {
   sortCategoryFilterLabels,
 } from "./categorySortOrder.utils";
 import { ProductsClient } from "./ProductsClient";
+import { ProductsClientErrorBoundary } from "./ProductsClientErrorBoundary";
 import type { Product, ProductVariant } from "./types";
 import { normalizeSkuForMatch, productNormSku, variantMatchesNormSku } from "./skuNormalize";
 import { variantCompositeKey } from "./variantOptions";
@@ -448,22 +449,24 @@ export default async function ProductsPage({
 
   return (
     /* `variantsSyncDigest`를 key로 쓰면 재고 ±1마다 digest가 바뀌어 전체 리마운트 → 검색·스크롤·필터·보기모드가 초기화됨. 동기화는 ProductsClient의 useEffect(products, variantsByProductId, digest)로 처리. */
-    <ProductsClient
-      products={products}
-      categories={categories}
-      categoryOrder={categoryOrder}
-      localImageHrefBySkuLower={localImageHrefBySkuLower}
-      variantsByProductId={variantsByProductId}
-      variantsSyncDigest={variantsSyncDigest}
-      debugProductsDupes={debugProductsDupes}
-      debugVariantSkuMix={debugVariantSkuMix}
-      debugDisplayGroups={debugDisplayGroups}
-      debugVariantTrace={debugVariantTrace}
-      debugVariantSync={debugVariantSync}
-      traceProductId={traceProductId}
-      focusSku={focusSku}
-      debugTargetSkus={debugTargetSkus}
-      debugCategoryOrder={debugCategoryOrder}
-    />
+    <ProductsClientErrorBoundary>
+      <ProductsClient
+        products={products}
+        categories={categories}
+        categoryOrder={categoryOrder}
+        localImageHrefBySkuLower={localImageHrefBySkuLower}
+        variantsByProductId={variantsByProductId}
+        variantsSyncDigest={variantsSyncDigest}
+        debugProductsDupes={debugProductsDupes}
+        debugVariantSkuMix={debugVariantSkuMix}
+        debugDisplayGroups={debugDisplayGroups}
+        debugVariantTrace={debugVariantTrace}
+        debugVariantSync={debugVariantSync}
+        traceProductId={traceProductId}
+        focusSku={focusSku}
+        debugTargetSkus={debugTargetSkus}
+        debugCategoryOrder={debugCategoryOrder}
+      />
+    </ProductsClientErrorBoundary>
   );
 }

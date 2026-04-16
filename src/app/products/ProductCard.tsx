@@ -103,7 +103,11 @@ export const ProductCard = memo(function ProductCard({
   const [memoDraft1, setMemoDraft1] = useState("");
   const [memoDraft2, setMemoDraft2] = useState("");
   const [memoPending, setMemoPending] = useState(false);
-  const safeVariants = Array.isArray(variants) ? variants : [];
+  /** id 없는 행은 ±·키·저장 키에서 제외 — 병합·정렬 단계 예외 방지 */
+  const safeVariants = useMemo(
+    () => (Array.isArray(variants) ? variants : []).filter((v) => v && String(v.id ?? "").trim()),
+    [variants]
+  );
 
   const { src: imgSrc, onError: onImgError, dead: imgDead } = useProductImageSrc(
     product.sku,
@@ -153,6 +157,10 @@ export const ProductCard = memo(function ProductCard({
   }, [sortedVariants]);
 
   const hasVariants = sortedVariants.length > 0;
+  const productStockQty = useMemo(() => {
+    const n = Number(product?.stock);
+    return Number.isFinite(n) ? n : 0;
+  }, [product?.stock]);
   /** 품명 옆 총재고: 옵션이 2개 이상일 때만 표시 */
   const showNameTotalStock = sortedVariants.length >= 2;
   const totalVariantStock = useMemo(() => {
@@ -373,7 +381,8 @@ export const ProductCard = memo(function ProductCard({
           {hasVariants ? (
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               {sortedVariants.map((variant) => {
-                const qty = variant?.stock ?? 0;
+                const qtyRaw = Number(variant?.stock);
+                const qty = Number.isFinite(qtyRaw) ? qtyRaw : 0;
                 const variantSaving = savingVariantSet.has(variant.id);
                 const variantMemo = (variant?.memo ?? "").trim();
                 const variantMemo2 = (variant?.memo2 ?? "").trim();
@@ -382,7 +391,7 @@ export const ProductCard = memo(function ProductCard({
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
                 const vp = variantResolvedPrices(product, variant);
-                const zeroMuted = hideZeroStock && Number(qty) < 1;
+                const zeroMuted = hideZeroStock && qty < 1;
                 return (
                   <div
                     className={`product-card__option-item${zeroMuted ? " product-card__option-item--zero-muted" : ""}`}
@@ -432,7 +441,7 @@ export const ProductCard = memo(function ProductCard({
                           <button
                             type="button"
                             onClick={() => handleAdjustVariant(variant, -1)}
-                            disabled={qty < 1}
+                            disabled={!Number.isFinite(qty) || qty < 1}
                           >
                             -1
                           </button>
@@ -533,7 +542,7 @@ export const ProductCard = memo(function ProductCard({
                       <button
                         type="button"
                         onClick={() => handleAdjustProduct(-1)}
-                        disabled={(product?.stock ?? 0) < 1}
+                        disabled={productStockQty < 1}
                       >
                         -1
                       </button>

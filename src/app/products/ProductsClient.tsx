@@ -65,6 +65,7 @@ function dedupeProductsById(products: Product[]): Product[] {
   const seen = new Set<string>();
   const out: Product[] = [];
   for (const p of products) {
+    if (!p) continue;
     const id = String(p.id ?? "").trim();
     if (!id || seen.has(id)) continue;
     seen.add(id);
@@ -365,7 +366,8 @@ const ProductsTableRow = memo(function ProductsTableRow({
   onEdit: (productId: string) => void;
   onDelete: (productId: string) => void;
 }) {
-  const qty = row.variantStock;
+  const qtyRaw = Number(row.variantStock);
+  const qty = Number.isFinite(qtyRaw) ? qtyRaw : 0;
   const stockUpdatedAtText = row.stockUpdatedAt ? dayjs(row.stockUpdatedAt).format("YY/MM/DD HH:mm") : "-";
   const isRecent = !!row.stockUpdatedAt && dayjs().diff(dayjs(row.stockUpdatedAt), "day") < 1;
   if (row.isListNoVisibleOptionsRow) {
@@ -532,7 +534,7 @@ const ProductsTableRow = memo(function ProductsTableRow({
 
 function variantSavingKeyForProduct(adjustingKeys: Set<string>, variants: ProductVariant[]): string {
   if (!variants.length) return "";
-  const ids = new Set(variants.map((v) => v.id));
+  const ids = new Set(variants.map((v) => String(v?.id ?? "").trim()).filter(Boolean));
   return [...adjustingKeys]
     .filter((k) => k.startsWith("v:"))
     .map((k) => k.slice(2))
@@ -578,10 +580,16 @@ function mergeVariantsFromServerSnapshot(
   const out: Record<string, ProductVariant[]> = {};
   for (const [pid, sList] of Object.entries(server)) {
     const pList = prev[pid] ?? [];
-    const prevByVid = new Map(pList.map((v) => [v.id, v]));
-    out[pid] = sList.map((sv) => {
-      if (!pendingVids.has(sv.id)) return sv;
-      const lo = prevByVid.get(sv.id);
+    const prevByVid = new Map(
+      pList
+        .filter((v) => v && String(v.id ?? "").trim())
+        .map((v) => [String(v.id), v] as const)
+    );
+    out[pid] = (sList ?? []).map((sv) => {
+      if (!sv || String(sv.id ?? "").trim() === "") return sv;
+      const vid = String(sv.id);
+      if (!pendingVids.has(vid)) return sv;
+      const lo = prevByVid.get(vid);
       return lo ? { ...sv, stock: lo.stock } : sv;
     });
   }
@@ -603,21 +611,25 @@ function mergeProductsFromServerSnapshot(
   const variantPendingOwners = new Set<string>();
   for (const [k, b] of variantFlushRef) {
     if (!k.startsWith("v:")) continue;
-    if (b.pendingDelta !== 0 || b.running) variantPendingOwners.add(b.productId);
+    if (b.pendingDelta !== 0 || b.running) {
+      const oid = String(b.productId ?? "").trim();
+      if (oid) variantPendingOwners.add(oid);
+    }
   }
 
   const serverList = dedupeProductsById(server);
   const prevById = new Map(prev.map((p) => [p.id, p]));
-  return serverList.map((srv) => {
-    const id = srv.id;
+  return serverList.flatMap((srv) => {
+    const id = String(srv?.id ?? "").trim();
+    if (!id) return [];
     if (pendingPids.has(id)) {
       const loc = prevById.get(id);
-      return loc ? { ...srv, stock: loc.stock, stockUpdatedAt: loc.stockUpdatedAt } : srv;
+      return [loc ? { ...srv, stock: loc.stock, stockUpdatedAt: loc.stockUpdatedAt } : srv];
     }
     if (variantPendingOwners.has(id)) {
-      return { ...srv, stock: variantStockSumForProduct(mergedVariants, id) };
+      return [{ ...srv, stock: variantStockSumForProduct(mergedVariants, id) }];
     }
-    return srv;
+    return [srv];
   });
 }
 
@@ -794,6 +806,14 @@ export function ProductsClient({
     };
   }, []);
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
     searchDebounceRef.current = setTimeout(() => {
@@ -895,6 +915,9 @@ export function ProductsClient({
   const variantStockFlushRef = useRef<Map<string, VariantFlushBucket>>(new Map());
   const localProductsRef = useRef<Product[]>(products);
   const localVariantsRef = useRef<Record<string, ProductVariant[]>>(variantsByProductId);
+  /** 재고 flush `await` 전후로 RSC 스냅샷이 바뀌면 늦은 응답 적용을 생략(경합·덮어쓰기 완화). */
+  const variantsDigestLiveRef = useRef(variantsSyncDigest);
+  const productsSigLiveRef = useRef("");
   localProductsRef.current = localProducts;
   localVariantsRef.current = localVariantsByProductId;
 
@@ -940,6 +963,8 @@ export function ProductsClient({
 
             logStockAdjust("product_flush_batch_start", { key, productId, deltaToServer: d });
             patchAdjusting((s) => new Set(s).add(key));
+            const digestBefore = variantsDigestLiveRef.current;
+            const sigBefore = productsSigLiveRef.current;
             try {
               logStockAdjust("product_adjustStock_call", { key, productId, deltaToServer: d });
               const saved = await adjustStock(productId, d);
@@ -949,14 +974,37 @@ export function ProductsClient({
                 deltaToServer: d,
                 saved: saved ? { stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt } : null,
               });
-              if (saved) {
-                setLocalProducts((prev) =>
-                  prev.map((x) =>
-                    x.id === productId
-                      ? { ...x, stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt }
-                      : x
-                  )
-                );
+              const snapshotUnchanged =
+                variantsDigestLiveRef.current === digestBefore &&
+                productsSigLiveRef.current === sigBefore;
+              if (!mountedRef.current) {
+                logStockAdjust("product_skip_apply_unmounted", { key, productId });
+              } else if (!snapshotUnchanged) {
+                logStockAdjust("product_skip_stale_apply_props_changed", {
+                  key,
+                  productId,
+                  digestBefore,
+                  digestAfter: variantsDigestLiveRef.current,
+                  sigBefore,
+                  sigAfter: productsSigLiveRef.current,
+                });
+              } else if (saved) {
+                try {
+                  setLocalProducts((prev) =>
+                    prev.map((x) =>
+                      x.id === productId
+                        ? { ...x, stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt }
+                        : x
+                    )
+                  );
+                } catch (applyErr) {
+                  logStockAdjust("product_apply_local_throw", {
+                    key,
+                    productId,
+                    message: applyErr instanceof Error ? applyErr.message : String(applyErr),
+                  });
+                  if (typeof console !== "undefined" && console.error) console.error(applyErr);
+                }
                 logStockAdjust("product_apply_server_to_local", {
                   key,
                   productId,
@@ -971,13 +1019,28 @@ export function ProductsClient({
                 deltaToServer: d,
                 message: err instanceof Error ? err.message : String(err),
               });
-              setLocalProducts((prev) =>
-                prev.map((x) => {
-                  if (x.id !== productId) return x;
-                  const cur = x.stock ?? 0;
-                  return { ...x, stock: Math.max(0, cur - d) };
-                })
-              );
+              const snapshotUnchanged =
+                variantsDigestLiveRef.current === digestBefore &&
+                productsSigLiveRef.current === sigBefore;
+              if (mountedRef.current && snapshotUnchanged) {
+                try {
+                  setLocalProducts((prev) =>
+                    prev.map((x) => {
+                      if (x.id !== productId) return x;
+                      const cur = Number(x.stock);
+                      const base = Number.isFinite(cur) ? cur : 0;
+                      return { ...x, stock: Math.max(0, base - d) };
+                    })
+                  );
+                } catch (rollbackErr) {
+                  logStockAdjust("product_rollback_local_throw", {
+                    key,
+                    productId,
+                    message: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+                  });
+                  if (typeof console !== "undefined" && console.error) console.error(rollbackErr);
+                }
+              }
               showStockErrorToast(err instanceof Error ? err.message : String(err));
             } finally {
               patchAdjusting((s) => {
@@ -1037,9 +1100,15 @@ export function ProductsClient({
             bucket.pendingDelta = 0;
             if (d === 0) continue;
 
-            const ownerId = bucket.productId;
+            const ownerId = String(bucket.productId ?? productId ?? "").trim();
+            if (!ownerId) {
+              logStockAdjust("variant_flush_skip_empty_owner", { key, variantId, deltaToServer: d });
+              continue;
+            }
             logStockAdjust("variant_flush_batch_start", { key, ownerId, variantId, deltaToServer: d });
             patchAdjusting((s) => new Set(s).add(key));
+            const digestBefore = variantsDigestLiveRef.current;
+            const sigBefore = productsSigLiveRef.current;
             try {
               logStockAdjust("variant_adjustVariantStock_call", { key, ownerId, variantId, deltaToServer: d });
               const saved = await adjustVariantStock(variantId, d);
@@ -1056,32 +1125,57 @@ export function ProductsClient({
                     }
                   : null,
               });
-              if (saved) {
-                setLocalVariantsByProductId((prev) => {
-                  const list = prev[ownerId];
-                  if (!list) return prev;
-                  return {
-                    ...prev,
-                    [ownerId]: list.map((v) =>
-                      v.id === variantId ? { ...v, stock: saved.variantStock } : v
-                    ),
-                  };
+              const snapshotUnchanged =
+                variantsDigestLiveRef.current === digestBefore &&
+                productsSigLiveRef.current === sigBefore;
+              if (!mountedRef.current) {
+                logStockAdjust("variant_skip_apply_unmounted", { key, ownerId, variantId });
+              } else if (!snapshotUnchanged) {
+                logStockAdjust("variant_skip_stale_apply_props_changed", {
+                  key,
+                  ownerId,
+                  variantId,
+                  digestBefore,
+                  digestAfter: variantsDigestLiveRef.current,
+                  sigBefore,
+                  sigAfter: productsSigLiveRef.current,
                 });
-                setLocalProducts((prev) =>
-                  prev.map((x) =>
-                    x.id === ownerId
-                      ? {
-                          ...x,
-                          stock: saved.productRow?.stock ?? saved.productStock,
-                          stockUpdatedAt:
-                            saved.productRow?.stock_updated_at ??
-                            saved.productUpdatedAt ??
-                            x.stockUpdatedAt ??
-                            null,
-                        }
-                      : x
-                  )
-                );
+              } else if (saved) {
+                try {
+                  setLocalVariantsByProductId((prev) => {
+                    const list = prev[ownerId];
+                    if (!list) return prev;
+                    return {
+                      ...prev,
+                      [ownerId]: list.map((v) =>
+                        v.id === variantId ? { ...v, stock: saved.variantStock } : v
+                      ),
+                    };
+                  });
+                  setLocalProducts((prev) =>
+                    prev.map((x) =>
+                      x.id === ownerId
+                        ? {
+                            ...x,
+                            stock: saved.productRow?.stock ?? saved.productStock,
+                            stockUpdatedAt:
+                              saved.productRow?.stock_updated_at ??
+                              saved.productUpdatedAt ??
+                              x.stockUpdatedAt ??
+                              null,
+                          }
+                        : x
+                    )
+                  );
+                } catch (applyErr) {
+                  logStockAdjust("variant_apply_local_throw", {
+                    key,
+                    ownerId,
+                    variantId,
+                    message: applyErr instanceof Error ? applyErr.message : String(applyErr),
+                  });
+                  if (typeof console !== "undefined" && console.error) console.error(applyErr);
+                }
                 logStockAdjust("variant_apply_server_to_local", {
                   key,
                   ownerId,
@@ -1098,18 +1192,34 @@ export function ProductsClient({
                 deltaToServer: d,
                 message: err instanceof Error ? err.message : String(err),
               });
-              setLocalVariantsByProductId((prev) => {
-                const list = prev[ownerId];
-                if (!list) return prev;
-                return {
-                  ...prev,
-                  [ownerId]: list.map((v) => {
-                    if (v.id !== variantId) return v;
-                    const cur = v.stock ?? 0;
-                    return { ...v, stock: Math.max(0, cur - d) };
-                  }),
-                };
-              });
+              const snapshotUnchanged =
+                variantsDigestLiveRef.current === digestBefore &&
+                productsSigLiveRef.current === sigBefore;
+              if (mountedRef.current && snapshotUnchanged) {
+                try {
+                  setLocalVariantsByProductId((prev) => {
+                    const list = prev[ownerId];
+                    if (!list) return prev;
+                    return {
+                      ...prev,
+                      [ownerId]: list.map((v) => {
+                        if (v.id !== variantId) return v;
+                        const cur = Number(v.stock);
+                        const base = Number.isFinite(cur) ? cur : 0;
+                        return { ...v, stock: Math.max(0, base - d) };
+                      }),
+                    };
+                  });
+                } catch (rollbackErr) {
+                  logStockAdjust("variant_rollback_local_throw", {
+                    key,
+                    ownerId,
+                    variantId,
+                    message: rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr),
+                  });
+                  if (typeof console !== "undefined" && console.error) console.error(rollbackErr);
+                }
+              }
               showStockErrorToast(err instanceof Error ? err.message : String(err));
             } finally {
               patchAdjusting((s) => {
@@ -1141,24 +1251,29 @@ export function ProductsClient({
 
   const onProductStockDelta = useCallback(
     (productId: string, delta: number) => {
-      const key = `p:${productId}`;
-      logStockAdjust("product_click", { key, productId, delta });
+      const pid = String(productId ?? "").trim();
+      if (!pid) return;
+      const d = Number(delta);
+      if (!Number.isFinite(d) || d === 0) return;
+      const key = `p:${pid}`;
+      logStockAdjust("product_click", { key, productId: pid, delta: d });
 
       let changed = false;
       flushSync(() => {
         setLocalProducts((prev) => {
-          const p = prev.find((x) => x.id === productId);
+          const p = prev.find((x) => x.id === pid);
           if (!p) return prev;
-          const old = p.stock ?? 0;
-          if (delta < 0 && old < 1) return prev;
+          const oldRaw = Number(p.stock);
+          const old = Number.isFinite(oldRaw) ? oldRaw : 0;
+          if (d < 0 && old < 1) return prev;
           changed = true;
-          const next = Math.max(0, old + delta);
-          return prev.map((x) => (x.id === productId ? { ...x, stock: next } : x));
+          const next = Math.max(0, old + d);
+          return prev.map((x) => (x.id === pid ? { ...x, stock: next } : x));
         });
       });
 
       if (!changed) {
-        logStockAdjust("product_click_skip_no_state_change", { key, productId, delta });
+        logStockAdjust("product_click_skip_no_state_change", { key, productId: pid, delta: d });
         return;
       }
 
@@ -1168,64 +1283,72 @@ export function ProductsClient({
         b = { pendingDelta: 0, running: false };
         m.set(key, b);
       }
-      b.pendingDelta += delta;
+      b.pendingDelta += d;
       logStockAdjust("product_pendingDelta_after_click", {
         key,
-        productId,
-        delta,
+        productId: pid,
+        delta: d,
         pendingDelta: b.pendingDelta,
         running: b.running,
       });
-      runProductStockFlushLoop(key, productId);
+      runProductStockFlushLoop(key, pid);
     },
     [runProductStockFlushLoop]
   );
 
   const onVariantStockDelta = useCallback(
     (productId: string, variantId: string, delta: number) => {
-      const key = `v:${variantId}`;
-      logStockAdjust("variant_click", { key, productId, variantId, delta });
+      const pid = String(productId ?? "").trim();
+      const vid = String(variantId ?? "").trim();
+      if (!pid || !vid) return;
+      const d = Number(delta);
+      if (!Number.isFinite(d) || d === 0) return;
+      const key = `v:${vid}`;
+      logStockAdjust("variant_click", { key, productId: pid, variantId: vid, delta: d });
 
       let changed = false;
       flushSync(() => {
         setLocalVariantsByProductId((prev) => {
-          const list = prev[productId];
+          const list = prev[pid];
           if (!list) return prev;
-          const idx = list.findIndex((v) => v.id === variantId);
+          const idx = list.findIndex((v) => v.id === vid);
           if (idx < 0) return prev;
-          const old = list[idx].stock ?? 0;
-          if (delta < 0 && old < 1) return prev;
+          const row = list[idx];
+          if (!row) return prev;
+          const oldRaw = Number(row.stock);
+          const old = Number.isFinite(oldRaw) ? oldRaw : 0;
+          if (d < 0 && old < 1) return prev;
           changed = true;
-          const next = Math.max(0, old + delta);
+          const next = Math.max(0, old + d);
           const nl = [...list];
-          nl[idx] = { ...list[idx], stock: next };
-          return { ...prev, [productId]: nl };
+          nl[idx] = { ...row, stock: next };
+          return { ...prev, [pid]: nl };
         });
       });
 
       if (!changed) {
-        logStockAdjust("variant_click_skip_no_state_change", { key, productId, variantId, delta });
+        logStockAdjust("variant_click_skip_no_state_change", { key, productId: pid, variantId: vid, delta: d });
         return;
       }
 
       const m = variantStockFlushRef.current;
       let b = m.get(key);
       if (!b) {
-        b = { pendingDelta: 0, running: false, productId };
+        b = { pendingDelta: 0, running: false, productId: pid };
         m.set(key, b);
       } else {
-        b.productId = productId;
+        b.productId = pid;
       }
-      b.pendingDelta += delta;
+      b.pendingDelta += d;
       logStockAdjust("variant_pendingDelta_after_click", {
         key,
-        productId,
-        variantId,
-        delta,
+        productId: pid,
+        variantId: vid,
+        delta: d,
         pendingDelta: b.pendingDelta,
         running: b.running,
       });
-      runVariantStockFlushLoop(key, productId, variantId);
+      runVariantStockFlushLoop(key, pid, vid);
     },
     [runVariantStockFlushLoop]
   );
@@ -1405,6 +1528,9 @@ export function ProductsClient({
     [products]
   );
 
+  variantsDigestLiveRef.current = variantsSyncDigest;
+  productsSigLiveRef.current = productsServerSig;
+
   const serverPropsSnapshotRef = useRef({ products, variantsByProductId });
   serverPropsSnapshotRef.current = { products, variantsByProductId };
 
@@ -1566,22 +1692,30 @@ export function ProductsClient({
   }, [orderedAfterCategory, search, localVariantsByProductId]);
 
   /** 화면: 정규화 SKU당 1카드/1그룹 — DB에 동일 SKU product가 여러 개여도 합쳐서 표시 */
-  const skuDisplayGroups = useMemo(
-    () =>
-      buildSkuDisplayGroups(filtered, orderedAfterCategory, localVariantsByProductId, {
+  const skuDisplayGroups = useMemo(() => {
+    try {
+      return buildSkuDisplayGroups(filtered, orderedAfterCategory, localVariantsByProductId, {
         debugDisplayGroups,
         traceProductId:
           debugVariantTrace && traceProductId.trim() ? traceProductId.trim() : undefined,
-      }),
-    [
-      filtered,
-      orderedAfterCategory,
-      localVariantsByProductId,
-      debugDisplayGroups,
-      debugVariantTrace,
-      traceProductId,
-    ]
-  );
+      });
+    } catch (e) {
+      logStockAdjust("buildSkuDisplayGroups_throw", {
+        message: e instanceof Error ? e.message : String(e),
+      });
+      if (typeof console !== "undefined" && console.error) {
+        console.error("[ProductsClient] buildSkuDisplayGroups", e);
+      }
+      return [];
+    }
+  }, [
+    filtered,
+    orderedAfterCategory,
+    localVariantsByProductId,
+    debugDisplayGroups,
+    debugVariantTrace,
+    traceProductId,
+  ]);
 
   /** 검색·카테고리·병합 후 → 총재고 0 그룹 제외(옵션 합 또는 단일 상품 stock) */
   const skuDisplayGroupsForView = useMemo(() => {

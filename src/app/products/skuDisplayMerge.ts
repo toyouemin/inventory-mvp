@@ -59,6 +59,15 @@ export type BuildSkuDisplayGroupsOptions = {
  * 동일 `normSku` 그룹 안에서만 (color,gender,size) 병합.
  * 맵 키에 normSku를 넣어 다른 SKU 슬립인 방지.
  */
+function compareVariantIdsStable(a: ProductVariant, b: ProductVariant): number {
+  const ida = String(a?.id ?? "").trim();
+  const idb = String(b?.id ?? "").trim();
+  if (!ida && !idb) return 0;
+  if (!ida) return 1;
+  if (!idb) return -1;
+  return ida.localeCompare(idb);
+}
+
 function mergeVariantsForSameCompositeKey(
   variants: ProductVariant[],
   canonicalProductId: string,
@@ -66,6 +75,7 @@ function mergeVariantsForSameCompositeKey(
 ): ProductVariant[] {
   const map = new Map<string, ProductVariant[]>();
   for (const v of variants) {
+    if (!v || !String(v.id ?? "").trim()) continue;
     if (!variantMatchesNormSku(v, normSku)) continue;
     const k = `${normSku}\0${variantCompositeKey(v.color, v.gender, v.size)}`;
     const arr = map.get(k) ?? [];
@@ -74,14 +84,15 @@ function mergeVariantsForSameCompositeKey(
   }
   const out: ProductVariant[] = [];
   for (const [, bucket] of map) {
+    if (bucket.length === 0) continue;
     if (bucket.length === 1) {
       out.push(bucket[0]!);
       continue;
     }
     const preferred = bucket.filter((v) => v.productId === canonicalProductId);
     const primary =
-      [...preferred].sort((a, b) => a.id.localeCompare(b.id))[0] ??
-      [...bucket].sort((a, b) => a.id.localeCompare(b.id))[0]!;
+      [...preferred].sort(compareVariantIdsStable)[0] ?? [...bucket].sort(compareVariantIdsStable)[0];
+    if (!primary) continue;
     let stock = 0;
     for (const v of bucket) {
       stock += Number.isFinite(Number(v.stock)) ? Math.max(0, Math.trunc(Number(v.stock))) : 0;
@@ -199,6 +210,7 @@ export function buildSkuDisplayGroups(
     }
     for (const p of group) {
       for (const v of variantsByProductId[p.id] ?? []) {
+        if (!v || !String(v.id ?? "").trim()) continue;
         if (traceThisCard && v.productId === traceProductId && typeof console !== "undefined") {
           const ex = explainVariantMatchesNormSku(v, k);
           if (!ex.ok) {

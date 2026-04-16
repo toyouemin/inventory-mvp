@@ -16,8 +16,6 @@ type StatementItemFormRow = {
 };
 
 type TransactionStatementFormData = {
-  supplierName: string;
-  supplierBizNo: string;
   customerName: string;
   customerBizNo: string;
   customerRepresentative: string;
@@ -27,6 +25,15 @@ type TransactionStatementFormData = {
   issueDate: string;
   items: StatementItemFormRow[];
 };
+
+const FIXED_SUPPLIER = {
+  name: "(주)세림통상",
+  bizNo: "131-86-32310",
+  representative: "김영례",
+  address: "인천광역시 남동구 경신상로78 (구월동)",
+  businessType: "도,소매.제조업",
+  businessItem: "스포츠용품",
+} as const;
 
 function makeRow(idSuffix: number): StatementItemFormRow {
   return {
@@ -91,8 +98,6 @@ function normalizeBizNoInput(value: string): string {
 export default function TransactionStatementPage() {
   const statementCaptureRef = useRef<HTMLDivElement | null>(null);
   const [formData, setFormData] = useState<TransactionStatementFormData>({
-    supplierName: "(주)세림통상",
-    supplierBizNo: "131-86-32310",
     customerName: "",
     customerBizNo: "",
     customerRepresentative: "",
@@ -199,7 +204,14 @@ export default function TransactionStatementPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           statement: {
-            supplier: { name: formData.supplierName.trim(), bizNo: formData.supplierBizNo.trim() },
+            supplier: {
+              name: FIXED_SUPPLIER.name,
+              bizNo: FIXED_SUPPLIER.bizNo,
+              representative: FIXED_SUPPLIER.representative,
+              address: FIXED_SUPPLIER.address,
+              businessType: FIXED_SUPPLIER.businessType,
+              businessItem: FIXED_SUPPLIER.businessItem,
+            },
             customer: {
               name: formData.customerName.trim(),
               bizNo: formData.customerBizNo.trim(),
@@ -279,19 +291,6 @@ export default function TransactionStatementPage() {
         </p>
 
         <div className="transaction-form-grid">
-          <label>
-            공급자 상호
-            <input value={formData.supplierName} onChange={(event) => updateFormField("supplierName", event.target.value)} />
-          </label>
-          <label>
-            공급자 사업자번호
-            <input
-              inputMode="numeric"
-              placeholder="예: 131-86-32310"
-              value={formData.supplierBizNo}
-              onChange={(event) => updateFormField("supplierBizNo", normalizeBizNoInput(event.target.value))}
-            />
-          </label>
           <label className="transaction-form-grid__customer">
             공급받는자 상호
             <input value={formData.customerName} onChange={(event) => updateFormField("customerName", event.target.value)} />
@@ -433,29 +432,34 @@ export default function TransactionStatementPage() {
         <div className="transaction-capture-stage">
           <div ref={statementCaptureRef} className="transaction-capture-sheet">
             <div className="transaction-capture-sheet__title">거래명세표</div>
+            <img
+              className="transaction-capture-stamp"
+              src="/images/transaction-template-image1.png"
+              alt="거래명세표 도장"
+            />
             <div className="transaction-capture-meta">
               <section className="transaction-capture-party">
                 <h3>공급자</h3>
                 <div className="transaction-capture-party__grid">
                   <div>
                     <strong>상호</strong>
-                    <span>{formData.supplierName || "-"}</span>
+                    <span>{FIXED_SUPPLIER.name}</span>
                   </div>
                   <div>
                     <strong>사업자번호</strong>
-                    <span>{formData.supplierBizNo || "-"}</span>
+                    <span>{FIXED_SUPPLIER.bizNo}</span>
                   </div>
                   <div>
                     <strong>성명</strong>
-                    <span>-</span>
+                    <span>{FIXED_SUPPLIER.representative || "-"}</span>
                   </div>
                   <div>
                     <strong>업태</strong>
-                    <span>-</span>
+                    <span>{FIXED_SUPPLIER.businessType || "-"}</span>
                   </div>
                   <div>
                     <strong>종목</strong>
-                    <span>-</span>
+                    <span>{FIXED_SUPPLIER.businessItem || "-"}</span>
                   </div>
                   <div>
                     <strong>발행일자</strong>
@@ -463,7 +467,7 @@ export default function TransactionStatementPage() {
                   </div>
                   <div className="transaction-capture-party__full">
                     <strong>사업장주소</strong>
-                    <span>-</span>
+                    <span>{FIXED_SUPPLIER.address || "-"}</span>
                   </div>
                 </div>
               </section>

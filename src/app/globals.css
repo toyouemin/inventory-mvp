@@ -3151,6 +3151,7 @@ label {
 }
 
 .transaction-capture-sheet {
+  position: relative;
   width: min(100%, 794px);
   margin: 0 auto;
   background: #ffffff;
@@ -3159,6 +3160,18 @@ label {
   border-radius: 8px;
   box-shadow: none;
   padding: 16px;
+}
+
+.transaction-capture-stamp {
+  position: absolute;
+  top: 66px;
+  left: 85px;
+  width: 86px;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0.95;
+  z-index: 2;
 }
 
 .transaction-capture-sheet__title {
@@ -3231,15 +3244,20 @@ label {
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 12.5px;
-  line-height: 1.3;
+  line-height: 1.5;
 }
 
 .transaction-capture-table th,
 .transaction-capture-table td {
   border: 1px solid #d7d7d7;
-  padding: 4px 6px;
+  padding: 8px 6px;
   text-align: center;
   word-break: break-word;
+  vertical-align: middle;
+}
+
+.transaction-capture-table tr {
+  min-height: 40px;
 }
 
 .transaction-capture-col--month {
@@ -3346,14 +3364,20 @@ label {
     padding: 12px;
   }
 
+  .transaction-capture-stamp {
+    top: 64px;
+    left: 63px;
+    width: 64px;
+  }
+
   .transaction-capture-table {
     font-size: 12px;
-    line-height: 1.28;
+    line-height: 1.45;
   }
 
   .transaction-capture-table th,
   .transaction-capture-table td {
-    padding: 4px 5px;
+    padding: 7px 5px;
   }
 
   .transaction-capture-col--month {

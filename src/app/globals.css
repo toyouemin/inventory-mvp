@@ -839,6 +839,10 @@ button.download-dropdown__item:disabled {
   overflow: hidden;
 }
 
+.product-card__option-item--zero-muted {
+  opacity: 0.52;
+}
+
 .product-card__option-name {
   min-width: 0;
   font-size: 15px;

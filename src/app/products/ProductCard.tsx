@@ -62,6 +62,8 @@ export type ProductCardProps = {
   displayGroupNormSku?: string;
   /** `?debugVariantSkuMix=1` — 카드에 붙은 각 variant의 product_id·sku·normSku 로그 */
   debugVariantSkuMix?: boolean;
+  /** 재고0 토글 상태(ON + 0수량 + 메모 있음 행 흐림 처리용) */
+  hideZeroStock?: boolean;
   /** 재고 0 숨김 ON인데 옵션이 모두 0일 때 안내 */
   showNoVisibleOptionsHint?: boolean;
   /** 툴바·카드 공통: 메모 본문 전체 표시 여부 */
@@ -82,6 +84,7 @@ export const ProductCard = memo(function ProductCard({
   debugProductsDupes = false,
   displayGroupNormSku = "",
   debugVariantSkuMix = false,
+  hideZeroStock = false,
   showNoVisibleOptionsHint = false,
   memoShowAll,
   onMemoShowAllChange,
@@ -400,8 +403,13 @@ export const ProductCard = memo(function ProductCard({
                   variantMemo && variantMemo2
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
+                const shouldDimZeroMemo = hideZeroStock && qty < 1 && Boolean(variantMemoText);
                 return (
-                  <div className="product-card__option-item" role="listitem" key={variant.id}>
+                  <div
+                    className={`product-card__option-item${shouldDimZeroMemo ? " product-card__option-item--zero-muted" : ""}`}
+                    role="listitem"
+                    key={variant.id}
+                  >
                     <div className="product-card__option-row">
                       <div
                         className="product-card__option-chips-scroll"

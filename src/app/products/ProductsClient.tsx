@@ -45,7 +45,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 function variantsAfterZeroStockFilter(variants: ProductVariant[], hideZeroStock: boolean): ProductVariant[] {
   if (!hideZeroStock) return variants;
-  return variants.filter((v) => Number(v.stock ?? 0) > 0);
+  return variants.filter((v) => {
+    if (Number(v.stock ?? 0) > 0) return true;
+    return Boolean((v.memo ?? "").trim() || (v.memo2 ?? "").trim());
+  });
 }
 
 type StorageOrphanCleanupResult = {
@@ -2581,6 +2584,7 @@ export function ProductsClient({
                   localImageHrefBySkuLower={localImageHrefBySkuLower}
                   variants={displayVars}
                   priceSourceVariants={vars}
+                  hideZeroStock={hideZeroStock}
                   showNoVisibleOptionsHint={showNoVisibleOptionsHint}
                   memoShowAll={cardsMemoVisible}
                   onMemoShowAllChange={setCardsMemoVisible}

@@ -2437,16 +2437,14 @@ export function ProductsClient({
             </div>
           ) : (
             skuDisplayGroupsForView.map(({ normSku, product: p, variants: vars }) => {
-              const displayVars = variantsAfterZeroStockFilter(vars, hideZeroStock);
-              const showNoVisibleOptionsHint = hideZeroStock && vars.length > 0 && displayVars.length === 0;
               return (
                 <ProductCard
                   key={normSku}
                   product={p}
                   displayGroupNormSku={normSku}
                   localImageHrefBySkuLower={localImageHrefBySkuLower}
-                  variants={displayVars}
-                  showNoVisibleOptionsHint={showNoVisibleOptionsHint}
+                  variants={vars}
+                  hideZeroStock={hideZeroStock}
                   memoShowAll={cardsMemoVisible}
                   onMemoShowAllChange={setCardsMemoVisible}
                   onEditClick={openEditById}

@@ -839,6 +839,22 @@ button.download-dropdown__item:disabled {
   overflow: hidden;
 }
 
+.product-card__option-item--zero-muted {
+  opacity: 0.52;
+}
+
+.product-card__option-prices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 10px 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .product-card__option-name {
   min-width: 0;
   font-size: 15px;
@@ -2711,6 +2727,12 @@ label {
   .product-card__option-row {
     padding: 5px 8px;
     gap: 6px;
+  }
+
+  .product-card__option-prices {
+    padding: 0 8px 5px;
+    font-size: 11px;
+    gap: 4px 8px;
   }
 
   .product-card__option-chips-scroll {

@@ -44,6 +44,15 @@ function fmtPrice(n: number | null | undefined) {
   return `${Number(n).toLocaleString()}원`;
 }
 
+function variantResolvedPrices(product: Product, variant: ProductVariant) {
+  return {
+    wholesalePrice: variant.wholesalePrice ?? product.wholesalePrice ?? null,
+    msrpPrice: variant.msrpPrice ?? product.msrpPrice ?? null,
+    salePrice: variant.salePrice ?? product.salePrice ?? null,
+    extraPrice: variant.extraPrice ?? product.extraPrice ?? null,
+  };
+}
+
 export type ProductCardProps = {
   product: Product;
   /** `getLocalImageHrefBySkuLower()` 맵(키 = 정규화 SKU) */
@@ -60,8 +69,8 @@ export type ProductCardProps = {
   displayGroupNormSku?: string;
   /** `?debugVariantSkuMix=1` — 카드에 붙은 각 variant의 product_id·sku·normSku 로그 */
   debugVariantSkuMix?: boolean;
-  /** 재고 0 숨김 ON인데 옵션이 모두 0일 때 안내 */
-  showNoVisibleOptionsHint?: boolean;
+  /** 재고 0 옵션 숨김 토글 ON — 재고 0 행은 흐리게만 표시(가격·옵션은 유지) */
+  hideZeroStock?: boolean;
   /** 툴바·카드 공통: 메모 본문 전체 표시 여부 */
   memoShowAll: boolean;
   onMemoShowAllChange: (next: boolean) => void;
@@ -79,7 +88,7 @@ export const ProductCard = memo(function ProductCard({
   debugProductsDupes = false,
   displayGroupNormSku = "",
   debugVariantSkuMix = false,
-  showNoVisibleOptionsHint = false,
+  hideZeroStock = false,
   memoShowAll,
   onMemoShowAllChange,
 }: ProductCardProps) {
@@ -361,15 +370,7 @@ export const ProductCard = memo(function ProductCard({
               메모
             </button>
           ) : null}
-          {showNoVisibleOptionsHint ? (
-            <div
-              className="product-card__option-list product-card__option-list--novis"
-              role="status"
-              aria-live="polite"
-            >
-              <p className="product-card__no-visible-options muted">표시할 옵션 없음</p>
-            </div>
-          ) : hasVariants ? (
+          {hasVariants ? (
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               {sortedVariants.map((variant) => {
                 const qty = variant?.stock ?? 0;
@@ -380,8 +381,14 @@ export const ProductCard = memo(function ProductCard({
                   variantMemo && variantMemo2
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
+                const vp = variantResolvedPrices(product, variant);
+                const zeroMuted = hideZeroStock && Number(qty) < 1;
                 return (
-                  <div className="product-card__option-item" role="listitem" key={variant.id}>
+                  <div
+                    className={`product-card__option-item${zeroMuted ? " product-card__option-item--zero-muted" : ""}`}
+                    role="listitem"
+                    key={variant.id}
+                  >
                     <div className="product-card__option-row">
                       <div
                         className="product-card__option-chips-scroll"
@@ -434,6 +441,20 @@ export const ProductCard = memo(function ProductCard({
                           </button>
                         </div>
                       </div>
+                    </div>
+                    <div className="product-card__option-prices" aria-label="옵션별 가격">
+                      <span>
+                        <PriceLabel full="출고가:" mobile="출:" /> {fmtPrice(vp.wholesalePrice)}
+                      </span>
+                      <span>
+                        <PriceLabel full="소비자가:" mobile="소:" /> {fmtPrice(vp.msrpPrice)}
+                      </span>
+                      <span>
+                        <PriceLabel full="실판매가:" mobile="실:" /> {fmtPrice(vp.salePrice)}
+                      </span>
+                      <span>
+                        <PriceLabel full="매장:" mobile="매:" /> {fmtPrice(vp.extraPrice)}
+                      </span>
                     </div>
                     {editingMemoVariantId === variant.id ? (
                       <div className="product-card__memo-editor">

@@ -12,7 +12,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "verify:thp": "npx tsx scripts/verify-thp-sku.mts",
-    "debug:stock-e2e": "node scripts/stock-adjust-e2e.mjs"
+    "debug:stock-e2e": "node scripts/stock-adjust-e2e.mjs",
+    "test:amount-to-korean": "npx tsx src/features/transactionStatement/amountToKoreanText.test.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -21,6 +22,8 @@
     "@prisma/client": "^5.20.0",
     "@supabase/supabase-js": "^2.97.0",
     "dayjs": "^1.11.20",
+    "exceljs": "^4.4.0",
+    "html2canvas": "^1.4.1",
     "next": "^14.2.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

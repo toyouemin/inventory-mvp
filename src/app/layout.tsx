@@ -36,23 +36,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </header>
           <nav>
             <a href="/products">상품</a>
-            {/*href="/moves">재고 변동</a>*/}
             <a href="/status">재고 현황</a>
             <AdaptiveHomepageLink />
-            <a
-              href="https://tagosports.cafe24.com/intro/member.html?returnUrl=%2Findex.html"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              도매몰
-            </a>
-            <a
-              href="https://login.ecount.com/Login/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              이카운트
-            </a>
+            <a href="/transaction-statement">거래명세서</a>
+            {/*href="/moves">재고 변동</a>*/}
           </nav>
         </div>
         {children}

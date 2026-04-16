@@ -71,7 +71,7 @@ main {
 nav {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 16px;
   padding: 12px 16px;
   width: 100%;
@@ -3039,7 +3039,7 @@ label {
 .transaction-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 4px 8px;
+  gap: 2px;
   margin-bottom: 6px;
 }
 
@@ -3105,14 +3105,14 @@ label {
 .transaction-item-row__grid label {
   margin-bottom: 0;
   font-size: 12px;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .transaction-item-row__grid input {
-  margin-top: 1px;
-  padding-top: 3px;
-  padding-bottom: 3px;
-  min-height: 28px;
+  margin-top: 2px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  min-height: 34px;
 }
 
 .transaction-item-row__actions {
@@ -3124,9 +3124,11 @@ label {
 .transaction-summary {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 8px 12px;
   font-weight: 700;
-  margin-top: 12px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  line-height: 1.25;
 }
 
 .transaction-actions {
@@ -3183,20 +3185,20 @@ label {
 
 .transaction-capture-meta {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-bottom: 6px;
 }
 
 .transaction-capture-party {
   border: 1px solid #e1e1e1;
   border-radius: 7px;
-  padding: 6px 8px;
+  padding: 5px 7px;
   background: #fff;
 }
 
 .transaction-capture-party h3 {
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   font-size: 12px;
   font-weight: 700;
 }
@@ -3204,7 +3206,7 @@ label {
 .transaction-capture-party__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
+  gap: 4px 8px;
 }
 
 .transaction-capture-party__grid > div {
@@ -3308,11 +3310,13 @@ label {
 }
 
 .transaction-capture-total {
-  margin-top: 10px;
+  margin-top: 4px;
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 14px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: 13px;
+  line-height: 1.25;
   font-weight: 700;
 }
 
@@ -3322,7 +3326,7 @@ label {
   }
 
   .transaction-form-grid {
-    gap: 12px;
+    gap: 2px;
   }
 
   .transaction-items {
@@ -3414,11 +3418,11 @@ label {
 
   .transaction-capture-meta {
     grid-template-columns: 1fr;
-    gap: 6px;
+    gap: 4px;
   }
 
   .transaction-capture-party {
-    padding: 6px;
+    padding: 5px;
   }
 
   .transaction-capture-party__grid {
@@ -3437,5 +3441,9 @@ label {
   .transaction-capture-total {
     flex-direction: column;
     align-items: flex-start;
+    gap: 1px;
+    margin-top: 3px;
+    font-size: 12px;
+    line-height: 1.2;
   }
 }

@@ -299,7 +299,6 @@ export default function TransactionStatementPage() {
             공급받는자 사업자번호
             <input
               inputMode="numeric"
-              placeholder="입력"
               value={formData.customerBizNo}
               onChange={(event) => updateFormField("customerBizNo", normalizeBizNoInput(event.target.value))}
             />
@@ -307,7 +306,6 @@ export default function TransactionStatementPage() {
           <label className="transaction-form-grid__customer">
             공급받는자 성명
             <input
-              placeholder="입력"
               value={formData.customerRepresentative}
               onChange={(event) => updateFormField("customerRepresentative", event.target.value)}
             />
@@ -315,7 +313,6 @@ export default function TransactionStatementPage() {
           <label className="transaction-form-grid__customer">
             공급받는자 사업장주소
             <input
-              placeholder="입력"
               value={formData.customerAddress}
               onChange={(event) => updateFormField("customerAddress", event.target.value)}
             />
@@ -323,7 +320,6 @@ export default function TransactionStatementPage() {
           <label className="transaction-form-grid__customer">
             공급받는자 업태
             <input
-              placeholder="입력"
               value={formData.customerBusinessType}
               onChange={(event) => updateFormField("customerBusinessType", event.target.value)}
             />
@@ -331,7 +327,6 @@ export default function TransactionStatementPage() {
           <label className="transaction-form-grid__customer">
             공급받는자 종목
             <input
-              placeholder="입력"
               value={formData.customerBusinessItem}
               onChange={(event) => updateFormField("customerBusinessItem", event.target.value)}
             />

@@ -44,15 +44,6 @@ function fmtPrice(n: number | null | undefined) {
   return `${Number(n).toLocaleString()}원`;
 }
 
-function variantResolvedPrices(product: Product, variant: ProductVariant) {
-  return {
-    wholesalePrice: variant.wholesalePrice ?? product.wholesalePrice ?? null,
-    msrpPrice: variant.msrpPrice ?? product.msrpPrice ?? null,
-    salePrice: variant.salePrice ?? product.salePrice ?? null,
-    extraPrice: variant.extraPrice ?? product.extraPrice ?? null,
-  };
-}
-
 export type ProductCardProps = {
   product: Product;
   /** `getLocalImageHrefBySkuLower()` 맵(키 = 정규화 SKU) */
@@ -390,7 +381,6 @@ export const ProductCard = memo(function ProductCard({
                   variantMemo && variantMemo2
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
-                const vp = variantResolvedPrices(product, variant);
                 const zeroMuted = hideZeroStock && qty < 1;
                 return (
                   <div
@@ -450,20 +440,6 @@ export const ProductCard = memo(function ProductCard({
                           </button>
                         </div>
                       </div>
-                    </div>
-                    <div className="product-card__option-prices" aria-label="옵션별 가격">
-                      <span>
-                        <PriceLabel full="출고가:" mobile="출:" /> {fmtPrice(vp.wholesalePrice)}
-                      </span>
-                      <span>
-                        <PriceLabel full="소비자가:" mobile="소:" /> {fmtPrice(vp.msrpPrice)}
-                      </span>
-                      <span>
-                        <PriceLabel full="실판매가:" mobile="실:" /> {fmtPrice(vp.salePrice)}
-                      </span>
-                      <span>
-                        <PriceLabel full="매장:" mobile="매:" /> {fmtPrice(vp.extraPrice)}
-                      </span>
                     </div>
                     {editingMemoVariantId === variant.id ? (
                       <div className="product-card__memo-editor">

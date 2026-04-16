@@ -60,8 +60,8 @@ export type ProductCardProps = {
   displayGroupNormSku?: string;
   /** `?debugVariantSkuMix=1` — 카드에 붙은 각 variant의 product_id·sku·normSku 로그 */
   debugVariantSkuMix?: boolean;
-  /** 재고 0 옵션 숨김 토글 ON — 재고 0 행은 흐리게만 표시(가격·옵션은 유지) */
-  hideZeroStock?: boolean;
+  /** 재고 0 숨김 ON인데 옵션이 모두 0일 때 안내 */
+  showNoVisibleOptionsHint?: boolean;
   /** 툴바·카드 공통: 메모 본문 전체 표시 여부 */
   memoShowAll: boolean;
   onMemoShowAllChange: (next: boolean) => void;
@@ -79,7 +79,7 @@ export const ProductCard = memo(function ProductCard({
   debugProductsDupes = false,
   displayGroupNormSku = "",
   debugVariantSkuMix = false,
-  hideZeroStock = false,
+  showNoVisibleOptionsHint = false,
   memoShowAll,
   onMemoShowAllChange,
 }: ProductCardProps) {
@@ -369,7 +369,15 @@ export const ProductCard = memo(function ProductCard({
               메모
             </button>
           ) : null}
-          {hasVariants ? (
+          {showNoVisibleOptionsHint ? (
+            <div
+              className="product-card__option-list product-card__option-list--novis"
+              role="status"
+              aria-live="polite"
+            >
+              <p className="product-card__no-visible-options muted">표시할 옵션 없음</p>
+            </div>
+          ) : hasVariants ? (
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               {sortedVariants.map((variant) => {
                 const qtyRaw = Number(variant?.stock);
@@ -381,13 +389,8 @@ export const ProductCard = memo(function ProductCard({
                   variantMemo && variantMemo2
                     ? `${variantMemo} / ${variantMemo2}`
                     : variantMemo || variantMemo2;
-                const zeroMuted = hideZeroStock && qty < 1;
                 return (
-                  <div
-                    className={`product-card__option-item${zeroMuted ? " product-card__option-item--zero-muted" : ""}`}
-                    role="listitem"
-                    key={variant.id}
-                  >
+                  <div className="product-card__option-item" role="listitem" key={variant.id}>
                     <div className="product-card__option-row">
                       <div
                         className="product-card__option-chips-scroll"

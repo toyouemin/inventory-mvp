@@ -704,7 +704,7 @@ export function ProductsClient({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("");
-  const [hideZeroStock, setHideZeroStock] = useState(true);
+  const [hideZeroStock, setHideZeroStock] = useState(false);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   /** 카드 메모 본문 전역 표시(툴바 메모ON·카드 메모 버튼 공유). PC/모바일 공통 ON으로 시작 */
   const [cardsMemoVisible, setCardsMemoVisible] = useState(true);
@@ -2571,14 +2571,16 @@ export function ProductsClient({
             </div>
           ) : (
             skuDisplayGroupsForView.map(({ normSku, product: p, variants: vars }) => {
+              const displayVars = variantsAfterZeroStockFilter(vars, hideZeroStock);
+              const showNoVisibleOptionsHint = hideZeroStock && vars.length > 0 && displayVars.length === 0;
               return (
                 <ProductCard
                   key={normSku}
                   product={p}
                   displayGroupNormSku={normSku}
                   localImageHrefBySkuLower={localImageHrefBySkuLower}
-                  variants={vars}
-                  hideZeroStock={hideZeroStock}
+                  variants={displayVars}
+                  showNoVisibleOptionsHint={showNoVisibleOptionsHint}
                   memoShowAll={cardsMemoVisible}
                   onMemoShowAllChange={setCardsMemoVisible}
                   onEditClick={openEditById}

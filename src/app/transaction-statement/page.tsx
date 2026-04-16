@@ -543,6 +543,51 @@ export default function TransactionStatementPage() {
               </tbody>
             </table>
 
+            <div className="transaction-capture-items-mobile">
+              {computedRows
+                .filter((row) => row.name.trim() !== "")
+                .map((row) => (
+                  <div key={`capture-mobile-${row.id}`} className="transaction-capture-item-mobile">
+                    <div className="transaction-capture-item-mobile__row transaction-capture-item-mobile__row--top">
+                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--month">
+                        <strong>월</strong>
+                        <span>{row.month || ""}</span>
+                      </div>
+                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--day">
+                        <strong>일</strong>
+                        <span>{row.day || ""}</span>
+                      </div>
+                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--name">
+                        <strong>품목명</strong>
+                        <span>{row.name}</span>
+                      </div>
+                    </div>
+                    <div className="transaction-capture-item-mobile__row transaction-capture-item-mobile__row--bottom">
+                      <div className="transaction-capture-item-mobile__cell">
+                        <strong>규격</strong>
+                        <span>{row.spec}</span>
+                      </div>
+                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--num">
+                        <strong>수량</strong>
+                        <span>{row.qtyNumber.toLocaleString("ko-KR")}</span>
+                      </div>
+                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--num">
+                        <strong>단가</strong>
+                        <span>{row.unitPriceNumber.toLocaleString("ko-KR")}</span>
+                      </div>
+                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--num">
+                        <strong>금액</strong>
+                        <span>{row.amount.toLocaleString("ko-KR")}</span>
+                      </div>
+                      <div className="transaction-capture-item-mobile__cell">
+                        <strong>비고</strong>
+                        <span>{row.note || ""}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
             <div className="transaction-capture-total">
               <span>총수량: {totals.totalQty.toLocaleString("ko-KR")}</span>
               <span>공급가액: {settlement.supplyAmount.toLocaleString("ko-KR")}원</span>

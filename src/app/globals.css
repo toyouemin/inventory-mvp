@@ -3309,6 +3309,10 @@ label {
   text-align: left;
 }
 
+.transaction-capture-items-mobile {
+  display: none;
+}
+
 .transaction-capture-total {
   margin-top: 4px;
   display: flex;
@@ -3414,6 +3418,67 @@ label {
 
   .transaction-capture-col--note {
     width: 5%;
+  }
+
+  .transaction-capture-table {
+    display: none;
+  }
+
+  .transaction-capture-items-mobile {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .transaction-capture-item-mobile {
+    border: 1px solid #d7d7d7;
+    border-radius: 6px;
+    padding: 8px;
+    background: #fff;
+  }
+
+  .transaction-capture-item-mobile__row {
+    display: grid;
+    gap: 8px;
+  }
+
+  .transaction-capture-item-mobile__row--top {
+    grid-template-columns: 48px 48px minmax(0, 1fr);
+    margin-bottom: 6px;
+  }
+
+  .transaction-capture-item-mobile__row--bottom {
+    grid-template-columns: minmax(0, 1.2fr) 0.8fr 1fr 1fr minmax(0, 1fr);
+  }
+
+  .transaction-capture-item-mobile__cell {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.4;
+    font-size: 12px;
+  }
+
+  .transaction-capture-item-mobile__cell strong {
+    font-size: 10px;
+    color: #555;
+    font-weight: 700;
+  }
+
+  .transaction-capture-item-mobile__cell span {
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .transaction-capture-item-mobile__cell--num {
+    text-align: right;
+  }
+
+  .transaction-capture-item-mobile__cell--num span {
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
   .transaction-capture-meta {

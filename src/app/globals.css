@@ -840,7 +840,20 @@ button.download-dropdown__item:disabled {
 }
 
 .product-card__option-item--zero-muted {
+  /* 행 전체를 흐리되, 메모 텍스트는 제외하고 선명하게 유지 */
+}
+
+.product-card__option-item--zero-muted .product-card__option-chips-scroll,
+.product-card__option-item--zero-muted .product-card__stock-label,
+.product-card__option-item--zero-muted .product-card__option-qty,
+.product-card__option-item--zero-muted .product-card__memo-btn,
+.product-card__option-item--zero-muted .product-card__adjust,
+.product-card__option-item--zero-muted .product-card__memo-editor {
   opacity: 0.52;
+}
+
+.product-card__option-item--zero-muted .product-card__memo--keep-visible {
+  opacity: 1;
 }
 
 .product-card__option-name {

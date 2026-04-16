@@ -432,7 +432,7 @@ export const ProductCard = memo(function ProductCard({
                           <span
                             className={`product-card__memo product-card__memo--filled product-card__memo--by-qty${
                               memoShowAll ? " product-card__memo--expanded" : ""
-                            }`}
+                            }${shouldDimZeroMemo ? " product-card__memo--keep-visible" : ""}`}
                           >
                             {variantMemoText}
                           </span>

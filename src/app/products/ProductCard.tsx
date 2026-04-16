@@ -386,7 +386,7 @@ export const ProductCard = memo(function ProductCard({
               role="status"
               aria-live="polite"
             >
-              <p className="product-card__no-visible-options muted">표시할 옵션 없음</p>
+              <p className="product-card__no-visible-options muted">재고 없음</p>
             </div>
           ) : hasVariants ? (
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">

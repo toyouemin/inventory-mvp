@@ -197,7 +197,6 @@ export default function TransactionStatementPage() {
   const printLines = useMemo(
     () =>
       computedRows
-        .filter((row) => row.name.trim() !== "")
         .map((row) => ({
           id: row.id,
           name: row.name,

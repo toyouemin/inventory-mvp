@@ -410,19 +410,6 @@ export default function TransactionStatementPage() {
           아래에서 입력한 뒤 요약을 확인하고, 출력 양식은 미리보기에서만 확인할 수 있습니다.
         </p>
 
-        <TransactionStatementScreenPanel
-          issueDate={formData.issueDate}
-          tradeDateYmd={printTradeDateYmd}
-          customerName={formData.customerName}
-          lines={screenLines}
-          totalQty={totals.totalQty}
-          supplyAmount={settlement.supplyAmount}
-          taxAmount={settlement.taxAmount}
-          totalAmount={totals.totalAmount}
-          amountKoreanText={settlement.amountKoreanText}
-          onOpenPrintPreview={() => previewDialogRef.current?.showModal()}
-        />
-
         <div className="transaction-form-grid">
           <label className="transaction-form-grid__customer">
             공급받는자 상호
@@ -548,6 +535,19 @@ export default function TransactionStatementPage() {
             ))}
           </div>
         </div>
+
+        <TransactionStatementScreenPanel
+          issueDate={formData.issueDate}
+          tradeDateYmd={printTradeDateYmd}
+          customerName={formData.customerName}
+          lines={screenLines}
+          totalQty={totals.totalQty}
+          supplyAmount={settlement.supplyAmount}
+          taxAmount={settlement.taxAmount}
+          totalAmount={totals.totalAmount}
+          amountKoreanText={settlement.amountKoreanText}
+          onOpenPrintPreview={() => previewDialogRef.current?.showModal()}
+        />
 
         <div ref={printCaptureRef} className="transaction-print-hidden-host" aria-hidden="true">
           <TransactionStatementPrintSheet {...printSheetProps} />

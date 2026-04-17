@@ -3150,7 +3150,7 @@ label {
   left: -14000px;
   top: 0;
   box-sizing: border-box;
-  width: 850px;
+  width: 790px;
   padding: 34px 40px 38px;
   background: #ffffff;
   max-width: none;
@@ -3208,22 +3208,28 @@ label {
   -webkit-overflow-scrolling: touch;
 }
 
+/* 숨김 캡처 원본 DOM은 어떤 경우에도 축소/이동 변형 금지 */
+.transaction-print-hidden-host [data-ts-print-sheet] {
+  transform: none !important;
+  transform-origin: initial !important;
+}
+
 /*
   미리보기 안에서만 A4폭(1123) 시트를 뷰포트에 맞게 축소.
   clamp(하한, 비율, 1): 너무 작아지지 않게 하한을 두고, 넓은 화면에서는 원크기에 가깝게.
 */
-.transaction-preview-dialog__scroll [data-ts-print-sheet] {
+.transaction-preview-dialog .transaction-preview-dialog__scroll > [data-ts-print-sheet] {
   flex-shrink: 0;
   width: 1123px;
   max-width: none;
   margin-inline: auto;
   transform-origin: top center;
-  transform: scale(clamp(0.52, calc((100vw - 80px) / 1123), 1));
+  transform: scale(clamp(0.68, calc((100vw - 64px) / 1123), 1));
 }
 
 @media (max-width: 400px) {
-  .transaction-preview-dialog__scroll [data-ts-print-sheet] {
-    transform: scale(clamp(0.48, calc((100vw - 56px) / 1123), 1));
+  .transaction-preview-dialog .transaction-preview-dialog__scroll > [data-ts-print-sheet] {
+    transform: scale(clamp(0.6, calc((100vw - 48px) / 1123), 1));
   }
 }
 

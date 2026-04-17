@@ -232,13 +232,15 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
               ))}
             </div>
             <div className={styles.printFooterRight}>
-              {footer.rightLogoImageSrc ? (
-                <img src={footer.rightLogoImageSrc} alt="" className={styles.printFooterLogo} decoding="async" />
-              ) : footer.rightLogoText ? (
-                <span className={styles.printFooterBrand}>{footer.rightLogoText}</span>
-              ) : null}
               {footer.bankLine ? <p className={styles.printFooterMeta}>{footer.bankLine}</p> : null}
-              {footer.website ? <p className={styles.printFooterMeta}>{footer.website}</p> : null}
+              <div className={styles.printFooterBrandRow}>
+                {footer.rightLogoImageSrc ? (
+                  <img src={footer.rightLogoImageSrc} alt="" className={styles.printFooterLogo} decoding="async" />
+                ) : footer.rightLogoText ? (
+                  <span className={styles.printFooterBrand}>{footer.rightLogoText}</span>
+                ) : null}
+                {footer.website ? <p className={styles.printFooterMeta}>{footer.website}</p> : null}
+              </div>
             </div>
           </footer>
         ) : null}

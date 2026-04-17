@@ -39,7 +39,7 @@ const FIXED_SUPPLIER = {
   businessItem: "스포츠용품",
 } as const;
 
-const TRANSACTION_STATEMENT_GUIDE_TEXT = "빈칸 입력후 요약확인, 출력 양식은 미리보기에서 확인 후 저장";
+const TRANSACTION_STATEMENT_GUIDE_TEXT = "정보 입력→명세서 미리보기→JPG 저장";
 
 /** 출력 푸터(은행·URL 등은 사업 정보에 맞게 수정) */
 const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
@@ -79,18 +79,18 @@ function formatYmd(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function parseDownloadName(contentDisposition: string | null, fallback: string): string {
-  if (!contentDisposition) return fallback;
-  return contentDisposition.match(/filename="([^"]+)"/)?.[1] ?? fallback;
+function sanitizeFileNamePart(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "상호미입력";
+  return trimmed.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
 }
 
-/** 예: 거래명세표-20260417-1430.jpg (날짜는 발행일자, 시분은 저장 시각) */
-function buildStatementJpgFileName(issueDateYmd: string): string {
-  const now = new Date();
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mm = String(now.getMinutes()).padStart(2, "0");
-  const datePart = issueDateYmd.replace(/-/g, "");
-  return `거래명세표-${datePart}-${hh}${mm}.jpg`;
+/** 형식: 상호-거래명세표-260417 */
+function buildStatementBaseFileName(customerName: string, issueDateYmd: string): string {
+  const name = sanitizeFileNamePart(customerName);
+  const digits = issueDateYmd.replace(/-/g, "");
+  const yyMMdd = digits.length >= 8 ? digits.slice(2, 8) : digits;
+  return `${name}-거래명세표-${yyMMdd}`;
 }
 
 /** 숨김 캡처 호스트와 동일한 가로(860+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
@@ -363,8 +363,8 @@ export default function TransactionStatementPage() {
       }
 
       const blob = await response.blob();
-      const fallback = `transaction-statement-${formData.issueDate.replace(/-/g, "")}.xlsx`;
-      const filename = parseDownloadName(response.headers.get("content-disposition"), fallback);
+      const fallback = `${buildStatementBaseFileName(formData.customerName, formData.issueDate)}.xlsx`;
+      const filename = fallback;
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
@@ -432,7 +432,7 @@ export default function TransactionStatementPage() {
         scrollY: STATEMENT_JPG_HTML2CANVAS_VIEW.scrollY,
       });
       const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      const fileName = buildStatementJpgFileName(formData.issueDate);
+      const fileName = `${buildStatementBaseFileName(formData.customerName, formData.issueDate)}.jpg`;
       const anchor = document.createElement("a");
       anchor.href = dataUrl;
       anchor.download = fileName;

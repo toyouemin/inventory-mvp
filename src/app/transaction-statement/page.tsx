@@ -458,7 +458,7 @@ export default function TransactionStatementPage() {
             <input value={formData.customerName} onChange={(event) => updateFormField("customerName", event.target.value)} />
           </label>
           <label className="transaction-form-grid__customer">
-            사업자번호
+            사업자번호/핸드폰
             <input
               inputMode="numeric"
               value={formData.customerBizNo}
@@ -579,6 +579,7 @@ export default function TransactionStatementPage() {
           issueDate={formData.issueDate}
           tradeDateYmd={formData.tradeDate || formData.issueDate}
           customerName={formData.customerName}
+          customerRepresentative={formData.customerRepresentative}
           lines={screenLines}
           totalQty={totals.totalQty}
           supplyAmount={settlement.supplyAmount}

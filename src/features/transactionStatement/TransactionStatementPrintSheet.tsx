@@ -87,6 +87,8 @@ const PartyBlock = ({
     <div className={styles.partyBody}>
       {PARTY_FIELDS.map(({ key, label }) => {
         const raw = (party[key] || "").trim() || "—";
+        const normalizedDigits = key === "bizNo" ? raw.replace(/\D/g, "") : "";
+        const displayLabel = key === "bizNo" && normalizedDigits.length === 11 ? "핸드폰 번호" : label;
         const valueClass =
           key === "bizNo"
             ? `${styles.partyValue} ${styles.partyValueBizNo}`
@@ -95,7 +97,7 @@ const PartyBlock = ({
               : styles.partyValue;
         return (
           <div key={key} className={styles.partyRow}>
-            <span className={styles.partyLabel}>{label}</span>
+            <span className={styles.partyLabel}>{displayLabel}</span>
             <span className={styles.partyColon}>:</span>
             <span className={valueClass}>{raw}</span>
           </div>

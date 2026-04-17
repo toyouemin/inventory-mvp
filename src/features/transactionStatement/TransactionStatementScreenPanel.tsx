@@ -13,6 +13,7 @@ export type TransactionStatementScreenPanelProps = {
   issueDate: string;
   tradeDateYmd: string;
   customerName: string;
+  customerRepresentative: string;
   lines: TransactionStatementScreenLine[];
   totalQty: number;
   supplyAmount: number;
@@ -26,6 +27,7 @@ export function TransactionStatementScreenPanel({
   issueDate,
   tradeDateYmd,
   customerName,
+  customerRepresentative,
   lines,
   totalQty,
   supplyAmount,
@@ -48,6 +50,9 @@ export function TransactionStatementScreenPanel({
         </span>
         <span className={styles.summaryItem}>
           <strong>공급받는자 상호</strong> {customerName.trim() || "—"}
+        </span>
+        <span className={styles.summaryItem}>
+          <strong>성명</strong> {customerRepresentative.trim() || "—"}
         </span>
       </div>
 
@@ -81,7 +86,7 @@ export function TransactionStatementScreenPanel({
       <div className={styles.totals}>
         <div className={styles.totalsPrimary}>
           <span className={styles.totalsAmount}>
-            합계 금액 {totalAmount.toLocaleString("ko-KR")}원
+            합계 금액 <span className={styles.totalsVat}>(VAT포함)</span> {totalAmount.toLocaleString("ko-KR")}원
             <span className={styles.totalsAmountKorean}> ({amountKoreanText})</span>
           </span>
           <span className={styles.totalsMeta}>

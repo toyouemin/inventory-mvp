@@ -127,7 +127,7 @@
 /* 약 20mm(96dpi ≈ 75px) 인감 — 공급자 박스 하단 라인에 맞춰 내부 고정 */
 .stamp {
   position: absolute;
-  right: 22%;
+  right: 10%;
   bottom: 8px;
   top: auto;
   transform: none;
@@ -507,7 +507,7 @@
   }
 
   .sheet:not(.ts-print-capture-fixed) .stamp {
-    right: 22%;
+    right: 10%;
     bottom: 8px;
     top: auto;
     width: 76px;

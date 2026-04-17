@@ -224,7 +224,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
               <span className={styles.totalLineValue}>{supplyAmount.toLocaleString("ko-KR")}</span>
             </div>
             <div className={styles.totalLine}>
-              <span className={styles.totalLineLabel}>세액</span>
+              <span className={styles.totalLineLabel}>세액(VAT)</span>
               <span className={styles.totalLineValue}>{taxAmount.toLocaleString("ko-KR")}</span>
             </div>
           </div>

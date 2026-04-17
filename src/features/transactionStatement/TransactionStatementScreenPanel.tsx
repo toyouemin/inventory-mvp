@@ -86,7 +86,7 @@ export function TransactionStatementScreenPanel({
       <div className={styles.totals}>
         <div className={styles.totalsPrimary}>
           <span className={styles.totalsAmount}>
-            합계 금액 <span className={styles.totalsVat}>(VAT포함)</span> {totalAmount.toLocaleString("ko-KR")}원
+            합계 금액 {totalAmount.toLocaleString("ko-KR")}원 <span className={styles.totalsVat}>(VAT포함)</span>
             <span className={styles.totalsAmountKorean}> ({amountKoreanText})</span>
           </span>
           <span className={styles.totalsMeta}>

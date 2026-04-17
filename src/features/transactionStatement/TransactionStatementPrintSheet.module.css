@@ -124,12 +124,13 @@
   gap: 3px;
 }
 
-/* 약 20mm(96dpi ≈ 75px) 인감 — 상호(세림통상) 오른쪽과 사업자번호(…32310) 사이쯤 */
+/* 약 20mm(96dpi ≈ 75px) 인감 — 공급자 박스 하단 라인에 맞춰 내부 고정 */
 .stamp {
   position: absolute;
   right: 22%;
-  top: 40%;
-  transform: translateY(-50%);
+  bottom: 8px;
+  top: auto;
+  transform: none;
   width: 76px;
   max-width: 76px;
   height: auto;
@@ -218,7 +219,8 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
+  min-width: 100%;
   font-size: 16px;
   line-height: 1.35;
 }
@@ -252,42 +254,46 @@
 
 .table td {
   text-align: center;
-  word-break: break-word;
+  word-break: keep-all;
+  overflow-wrap: normal;
   background: #fff;
 }
 
 .colName {
-  width: 22%;
-  min-width: 88px;
+  width: auto;
+  min-width: 0;
 }
 
 .colSpec {
-  width: 10%;
-  min-width: 44px;
+  width: auto;
+  min-width: 0;
 }
 
 .colQty {
-  width: 8%;
-  min-width: 42px;
+  width: 1%;
+  min-width: 56px;
 }
 
 .colUnitPrice {
-  width: 19%;
-  min-width: 80px;
+  width: 1%;
+  min-width: 92px;
 }
 
 .colAmount {
-  width: 20%;
-  min-width: 88px;
+  width: 1%;
+  min-width: 108px;
 }
 
 .colNote {
-  width: 13%;
-  min-width: 68px;
+  width: auto;
+  min-width: 0;
 }
 
 .cellName {
   text-align: left;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 .cellNum {
@@ -308,7 +314,9 @@
 
 .cellNote {
   text-align: left;
-  word-break: break-word;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
   padding-left: 10px;
   padding-right: 10px;
   line-height: 1.45;
@@ -500,7 +508,8 @@
 
   .sheet:not(.ts-print-capture-fixed) .stamp {
     right: 22%;
-    top: 40%;
+    bottom: 8px;
+    top: auto;
     width: 76px;
     max-width: 76px;
   }

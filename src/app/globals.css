@@ -3280,7 +3280,7 @@ label {
   color: #666 !important;
 }
 
-/* JPG 캡처: 인감 약 20mm + 상호·사업자번호 사이 위치 고정 */
+/* JPG 캡처: 인감을 공급자 박스 하단 라인에 맞춰 내부 고정 */
 .transaction-print-hidden-host img.ts-print-stamp {
   width: 76px !important;
   max-width: 76px !important;
@@ -3288,8 +3288,9 @@ label {
   height: auto !important;
   object-fit: contain !important;
   right: 22% !important;
-  top: 40% !important;
-  transform: translateY(-50%) !important;
+  bottom: 8px !important;
+  top: auto !important;
+  transform: none !important;
 }
 
 .transaction-preview-dialog .transaction-preview-dialog__scroll > [data-ts-print-sheet] {

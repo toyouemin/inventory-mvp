@@ -354,9 +354,24 @@ button:hover {
 }
 
 .products-category-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 0 0 auto;
   flex-shrink: 0;
   min-width: 72px;
+}
+
+.toolbar-row--search .products-category-select-wrap .products-category-all-btn {
+  white-space: nowrap;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.toolbar-row--search .products-category-select-wrap .products-category-all-btn.is-active {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  border-color: color-mix(in srgb, var(--accent) 60%, #000);
 }
 
 .toolbar-row--search .products-category-select-wrap .products-category-select {
@@ -2642,6 +2657,12 @@ label {
 
   .products-category-select-wrap {
     min-width: 64px;
+    gap: 4px;
+  }
+
+  .toolbar-row--search .products-category-select-wrap .products-category-all-btn {
+    padding-left: 8px;
+    padding-right: 8px;
   }
 
   .toolbar-row--search .products-category-select-wrap .products-category-select {

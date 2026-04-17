@@ -1419,7 +1419,7 @@ export function ProductsClient({
     }
   }, [deleteConfirmTargetId, deleteConfirmWorking, router, editingProduct?.id]);
 
-  const categorySelectDisplayedLabel = categoryFilter === "" ? "전체" : categoryFilter;
+  const categorySelectDisplayedLabel = categoryFilter === "" ? "카테고리" : categoryFilter;
 
   useLayoutEffect(() => {
     const sel = categorySelectRef.current;
@@ -2287,6 +2287,15 @@ export function ProductsClient({
               검색
             </button>
             <div className="products-category-select-wrap">
+              <button
+                type="button"
+                className={`btn btn-secondary btn-compact products-category-all-btn${categoryFilter === "" ? " is-active" : ""}`}
+                onClick={() => setCategoryFilter("")}
+                aria-pressed={categoryFilter === ""}
+                title="전체 카테고리 보기"
+              >
+                전체
+              </button>
               <select
                 ref={categorySelectRef}
                 className="btn btn-secondary btn-compact products-category-select"
@@ -2295,7 +2304,7 @@ export function ProductsClient({
                 aria-label="카테고리 필터"
                 title={categorySelectDisplayedLabel}
               >
-                <option value="">전체</option>
+                <option value="">카테고리</option>
                 {categories.map((c) => (
                   <option key={c} value={c}>
                     {c}

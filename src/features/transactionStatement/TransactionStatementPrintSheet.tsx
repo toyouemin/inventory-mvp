@@ -145,7 +145,10 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
         <header className={styles.header}>
           <div className={styles.headerSpacer} aria-hidden />
           <h1 className={`${styles.title}${titleCaptureCls}`}>거 래 명 세 표</h1>
-          <div className={`${styles.issueDate}${issueCaptureCls}`}>발행일자 {issueDate || "—"}</div>
+          <div className={`${styles.issueDate}${issueCaptureCls}`}>
+            <span className={styles.issueDatePurpose}>(공급받는자용)</span>
+            <span>발행일자 {issueDate || "—"}</span>
+          </div>
         </header>
 
         <div className={styles.parties}>

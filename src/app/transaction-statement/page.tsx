@@ -137,6 +137,12 @@ function normalizeNumericInput(value: string): string {
   return normalizeDigitsOnly(value);
 }
 
+function formatThousandsWithComma(value: string): string {
+  const digits = normalizeDigitsOnly(value);
+  if (!digits) return "";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 function normalizeBizNoInput(value: string): string {
   const digits = normalizeDigitsOnly(value).slice(0, 11);
 
@@ -274,7 +280,10 @@ export default function TransactionStatementPage() {
       ...prev,
       items: prev.items.map((row) => {
         if (row.id !== id) return row;
-        if (key === "month" || key === "day" || key === "qty" || key === "unitPrice") {
+        if (key === "unitPrice") {
+          return { ...row, unitPrice: formatThousandsWithComma(value) };
+        }
+        if (key === "month" || key === "day" || key === "qty") {
           return { ...row, [key]: normalizeNumericInput(value) };
         }
         return { ...row, [key]: value };

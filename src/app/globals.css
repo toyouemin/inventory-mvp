@@ -3237,9 +3237,20 @@ label {
   font-size: 13px !important;
   line-height: 1.15 !important;
   font-weight: 600 !important;
-  top: 50% !important;
+  bottom: 2px !important;
   right: 0 !important;
-  transform: translateY(-50%) !important;
+  top: auto !important;
+  transform: none !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+}
+
+.transaction-print-hidden-host .ts-print-issue-date .issueDatePurpose {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 1.05 !important;
+  color: #666 !important;
 }
 
 /* JPG 캡처: 인감 약 20mm + 상호·사업자번호 사이 위치 고정 */

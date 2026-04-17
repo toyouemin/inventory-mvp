@@ -46,9 +46,9 @@ const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
     "본 거래명세표는 거래 내역 확인용이며, 세금계산서와 별개로 발행될 수 있습니다.",
     "부가가치세법에 따른 세금계산서는 별도로 수취해 주시기 바랍니다.",
   ],
-  centerText: "(주)세림통상",
-  bankLine: "",
-  website: "",
+  rightLogoText: "TAGO",
+  bankLine: "신한은행 100-030-255130  주식회사 세림통상",
+  website: "www.tagosports.co.kr",
 };
 
 function buildTradeDateYmd(issueDate: string, rows: { month: string; day: string; name: string }[]): string {
@@ -549,8 +549,8 @@ export default function TransactionStatementPage() {
           </div>
         </div>
 
-        <div className="transaction-print-hidden-host" aria-hidden="true">
-          <TransactionStatementPrintSheet ref={printCaptureRef} {...printSheetProps} />
+        <div ref={printCaptureRef} className="transaction-print-hidden-host" aria-hidden="true">
+          <TransactionStatementPrintSheet {...printSheetProps} />
         </div>
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">

@@ -3149,7 +3149,10 @@ label {
   position: fixed;
   left: -14000px;
   top: 0;
-  width: 1123px;
+  box-sizing: border-box;
+  width: 850px;
+  padding: 34px 40px 38px;
+  background: #ffffff;
   max-width: none;
   pointer-events: none;
   z-index: -30;

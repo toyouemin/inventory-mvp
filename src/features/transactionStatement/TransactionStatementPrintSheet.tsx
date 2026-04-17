@@ -25,9 +25,9 @@ export type TransactionStatementPrintLine = {
 export type TransactionStatementPrintFooter = {
   /** 푸터 왼쪽 안내 (2줄 정도) */
   legalLeftLines: string[];
-  /** 가운데 브랜드 텍스트(로고 대체) */
-  centerText?: string;
-  centerImageSrc?: string;
+  /** 우측 로고(없으면 rightLogoText 사용) */
+  rightLogoImageSrc?: string;
+  rightLogoText?: string;
   bankLine?: string;
   website?: string;
 };
@@ -108,7 +108,7 @@ const DEFAULT_FOOTER: TransactionStatementPrintFooter = {
     "본 거래명세표는 거래 내역 확인용이며, 세금계산서와 별개로 발행될 수 있습니다.",
     "부가가치세법에 따른 세금계산서는 별도로 수취해 주시기 바랍니다.",
   ],
-  centerText: "(주)세림통상",
+  rightLogoText: "(주)세림통상",
   bankLine: "",
   website: "",
 };
@@ -231,14 +231,12 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
                 </p>
               ))}
             </div>
-            <div className={styles.printFooterCenter}>
-              {footer.centerImageSrc ? (
-                <img src={footer.centerImageSrc} alt="" className={styles.printFooterLogo} decoding="async" />
-              ) : footer.centerText ? (
-                <span className={styles.printFooterBrand}>{footer.centerText}</span>
-              ) : null}
-            </div>
             <div className={styles.printFooterRight}>
+              {footer.rightLogoImageSrc ? (
+                <img src={footer.rightLogoImageSrc} alt="" className={styles.printFooterLogo} decoding="async" />
+              ) : footer.rightLogoText ? (
+                <span className={styles.printFooterBrand}>{footer.rightLogoText}</span>
+              ) : null}
               {footer.bankLine ? <p className={styles.printFooterMeta}>{footer.bankLine}</p> : null}
               {footer.website ? <p className={styles.printFooterMeta}>{footer.website}</p> : null}
             </div>

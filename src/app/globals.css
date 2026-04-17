@@ -3144,12 +3144,84 @@ label {
   font-weight: 600;
 }
 
-.transaction-capture-stage {
-  margin-top: 14px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #f3eee7;
+/* 출력용 시트: 화면 밖 고정폭 캡처 영역(html2canvas 등에서 ref 타깃) */
+.transaction-print-hidden-host {
+  position: fixed;
+  left: -14000px;
+  top: 0;
+  width: 1123px;
+  max-width: none;
+  pointer-events: none;
+  z-index: -30;
+}
+
+.transaction-preview-dialog {
+  margin: auto;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  max-width: min(calc(100vw - 24px), 1140px);
+  width: 100%;
+  max-height: min(92vh, 920px);
+  background: #fff;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+}
+
+.transaction-preview-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.transaction-preview-dialog__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: #fafafa;
+}
+
+.transaction-preview-dialog__toolbar h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.transaction-preview-dialog__toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.transaction-preview-dialog__scroll {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 12px 22px;
+  overflow: auto;
+  max-height: calc(92vh - 58px);
+  -webkit-overflow-scrolling: touch;
+}
+
+/*
+  미리보기 안에서만 A4폭(1123) 시트를 뷰포트에 맞게 축소.
+  clamp(하한, 비율, 1): 너무 작아지지 않게 하한을 두고, 넓은 화면에서는 원크기에 가깝게.
+*/
+.transaction-preview-dialog__scroll [data-ts-print-sheet] {
+  flex-shrink: 0;
+  width: 1123px;
+  max-width: none;
+  margin-inline: auto;
+  transform-origin: top center;
+  transform: scale(clamp(0.52, calc((100vw - 80px) / 1123), 1));
+}
+
+@media (max-width: 400px) {
+  .transaction-preview-dialog__scroll [data-ts-print-sheet] {
+    transform: scale(clamp(0.48, calc((100vw - 56px) / 1123), 1));
+  }
 }
 
 @media (max-width: 960px) {
@@ -3192,7 +3264,4 @@ label {
     width: 100%;
   }
 
-  .transaction-capture-stage {
-    padding: 8px;
-  }
 }

@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import html2canvas from "html2canvas";
+import { useMemo, useRef, useState } from "react";
 import { amountToKoreanText } from "@/features/transactionStatement/amountToKoreanText";
 import {
   TransactionStatementPrintSheet,
   type TransactionStatementPrintFooter,
 } from "@/features/transactionStatement/TransactionStatementPrintSheet";
+import { TransactionStatementScreenPanel } from "@/features/transactionStatement/TransactionStatementScreenPanel";
 
 type StatementItemFormRow = {
   id: string;
@@ -92,6 +94,15 @@ function parseDownloadName(contentDisposition: string | null, fallback: string):
   return contentDisposition.match(/filename="([^"]+)"/)?.[1] ?? fallback;
 }
 
+/** 예: 거래명세표-20260417-1430.jpg (날짜는 발행일자, 시분은 저장 시각) */
+function buildStatementJpgFileName(issueDateYmd: string): string {
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const datePart = issueDateYmd.replace(/-/g, "");
+  return `거래명세표-${datePart}-${hh}${mm}.jpg`;
+}
+
 function normalizeDigitsOnly(value: string): string {
   const normalized = value
     // 전각 숫자(０-９)를 반각 숫자(0-9)로 변환
@@ -119,6 +130,8 @@ function normalizeBizNoInput(value: string): string {
 }
 
 export default function TransactionStatementPage() {
+  const printCaptureRef = useRef<HTMLDivElement>(null);
+  const previewDialogRef = useRef<HTMLDialogElement>(null);
   const [formData, setFormData] = useState<TransactionStatementFormData>({
     customerName: "",
     customerBizNo: "",
@@ -130,6 +143,7 @@ export default function TransactionStatementPage() {
     items: [makeRow(1)],
   });
   const [downloading, setDownloading] = useState(false);
+  const [jpgSaving, setJpgSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const computedRows = useMemo(
@@ -180,6 +194,57 @@ export default function TransactionStatementPage() {
   const printTradeDateYmd = useMemo(
     () => buildTradeDateYmd(formData.issueDate, computedRows),
     [formData.issueDate, computedRows]
+  );
+
+  const screenLines = useMemo(
+    () => printLines.map((row) => ({ id: row.id, name: row.name, qty: row.qty, amount: row.amount })),
+    [printLines]
+  );
+
+  const printSheetProps = useMemo(
+    () => ({
+      supplier: {
+        name: FIXED_SUPPLIER.name,
+        bizNo: FIXED_SUPPLIER.bizNo,
+        representative: FIXED_SUPPLIER.representative,
+        address: FIXED_SUPPLIER.address,
+        businessType: FIXED_SUPPLIER.businessType,
+        businessItem: FIXED_SUPPLIER.businessItem,
+      },
+      customer: {
+        name: formData.customerName,
+        bizNo: formData.customerBizNo,
+        representative: formData.customerRepresentative,
+        address: formData.customerAddress,
+        businessType: formData.customerBusinessType,
+        businessItem: formData.customerBusinessItem,
+      },
+      issueDate: formData.issueDate,
+      tradeDate: printTradeDateYmd,
+      lines: printLines,
+      totalQty: totals.totalQty,
+      supplyAmount: settlement.supplyAmount,
+      taxAmount: settlement.taxAmount,
+      totalAmount: totals.totalAmount,
+      totalAmountKorean: settlement.amountKoreanText,
+      printFooter: STATEMENT_PRINT_FOOTER,
+    }),
+    [
+      formData.customerName,
+      formData.customerBizNo,
+      formData.customerRepresentative,
+      formData.customerAddress,
+      formData.customerBusinessType,
+      formData.customerBusinessItem,
+      formData.issueDate,
+      printTradeDateYmd,
+      printLines,
+      totals.totalQty,
+      settlement.supplyAmount,
+      settlement.taxAmount,
+      settlement.amountKoreanText,
+      totals.totalAmount,
+    ]
   );
 
   function updateItem(id: string, key: keyof StatementItemFormRow, value: string): void {
@@ -294,13 +359,69 @@ export default function TransactionStatementPage() {
     }
   }
 
+  async function handleJpgSave(): Promise<void> {
+    if (jpgSaving || downloading) return;
+    setErrorMessage("");
+
+    const itemCount = computedRows.filter((row) => row.name.trim() !== "").length;
+    if (!formData.customerName.trim()) {
+      setErrorMessage("공급받는자 상호를 입력해 주세요.");
+      return;
+    }
+    if (itemCount === 0) {
+      setErrorMessage("품목명을 1개 이상 입력해 주세요.");
+      return;
+    }
+
+    const target = printCaptureRef.current;
+    if (!target) {
+      setErrorMessage("출력 캡처 영역을 찾을 수 없습니다.");
+      return;
+    }
+
+    setJpgSaving(true);
+    try {
+      const canvas = await html2canvas(target, {
+        backgroundColor: "#ffffff",
+        scale: 3,
+        useCORS: true,
+        logging: false,
+      });
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
+      const fileName = buildStatementJpgFileName(formData.issueDate);
+      const anchor = document.createElement("a");
+      anchor.href = dataUrl;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "거래명세표 JPG 저장에 실패했습니다.");
+    } finally {
+      setJpgSaving(false);
+    }
+  }
+
   return (
     <main className="transaction-page">
       <section className="card transaction-page__card">
         <h1>거래명세표 작성</h1>
         <p className="muted transaction-page__desc">
-          공급받는자 정보와 품목을 입력한 뒤 거래명세표 엑셀을 다운로드하세요.
+          아래에서 입력한 뒤 요약을 확인하고, 출력 양식은 미리보기에서만 확인할 수 있습니다.
         </p>
+
+        <TransactionStatementScreenPanel
+          issueDate={formData.issueDate}
+          tradeDateYmd={printTradeDateYmd}
+          customerName={formData.customerName}
+          lines={screenLines}
+          totalQty={totals.totalQty}
+          supplyAmount={settlement.supplyAmount}
+          taxAmount={settlement.taxAmount}
+          totalAmount={totals.totalAmount}
+          amountKoreanText={settlement.amountKoreanText}
+          onOpenPrintPreview={() => previewDialogRef.current?.showModal()}
+        />
 
         <div className="transaction-form-grid">
           <label className="transaction-form-grid__customer">
@@ -428,43 +549,35 @@ export default function TransactionStatementPage() {
           </div>
         </div>
 
-        <div className="transaction-summary">
-          <div>총수량: {totals.totalQty.toLocaleString("ko-KR")}</div>
-          <div>공급가액: {settlement.supplyAmount.toLocaleString("ko-KR")}원</div>
-          <div>세액: {settlement.taxAmount.toLocaleString("ko-KR")}원</div>
-          <div>합계금액: {totals.totalAmount.toLocaleString("ko-KR")}원</div>
-          <div>합계금액(한글): {settlement.amountKoreanText}</div>
+        <div className="transaction-print-hidden-host" aria-hidden="true">
+          <TransactionStatementPrintSheet ref={printCaptureRef} {...printSheetProps} />
         </div>
 
-        <div className="transaction-capture-stage">
-          <TransactionStatementPrintSheet
-            supplier={{
-              name: FIXED_SUPPLIER.name,
-              bizNo: FIXED_SUPPLIER.bizNo,
-              representative: FIXED_SUPPLIER.representative,
-              address: FIXED_SUPPLIER.address,
-              businessType: FIXED_SUPPLIER.businessType,
-              businessItem: FIXED_SUPPLIER.businessItem,
-            }}
-            customer={{
-              name: formData.customerName,
-              bizNo: formData.customerBizNo,
-              representative: formData.customerRepresentative,
-              address: formData.customerAddress,
-              businessType: formData.customerBusinessType,
-              businessItem: formData.customerBusinessItem,
-            }}
-            issueDate={formData.issueDate}
-            tradeDate={printTradeDateYmd}
-            lines={printLines}
-            totalQty={totals.totalQty}
-            supplyAmount={settlement.supplyAmount}
-            taxAmount={settlement.taxAmount}
-            totalAmount={totals.totalAmount}
-            totalAmountKorean={settlement.amountKoreanText}
-            printFooter={STATEMENT_PRINT_FOOTER}
-          />
-        </div>
+        <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">
+          <div className="transaction-preview-dialog__toolbar">
+            <h2 id="transaction-preview-title">출력 양식 미리보기</h2>
+            <div className="transaction-preview-dialog__toolbarActions">
+              <button
+                type="button"
+                className="btn btn-primary btn-compact"
+                onClick={() => void handleJpgSave()}
+                disabled={jpgSaving || downloading}
+              >
+                {jpgSaving ? "JPG 저장 중…" : "JPG 저장"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary btn-compact"
+                onClick={() => previewDialogRef.current?.close()}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+          <div className="transaction-preview-dialog__scroll">
+            <TransactionStatementPrintSheet {...printSheetProps} />
+          </div>
+        </dialog>
 
         {errorMessage ? <p className="transaction-error">{errorMessage}</p> : null}
 
@@ -473,9 +586,17 @@ export default function TransactionStatementPage() {
             type="button"
             className="btn btn-primary"
             onClick={handleDownload}
-            disabled={downloading}
+            disabled={downloading || jpgSaving}
           >
             {downloading ? "다운로드 중..." : "거래명세표 Excel 다운로드"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => void handleJpgSave()}
+            disabled={jpgSaving || downloading}
+          >
+            {jpgSaving ? "JPG 저장 중…" : "거래명세표 JPG 저장"}
           </button>
         </div>
       </section>

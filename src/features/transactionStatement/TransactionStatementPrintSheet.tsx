@@ -83,13 +83,22 @@ const PartyBlock = ({
     {stamp ?? null}
     <div className={styles.partyHeader}>{title}</div>
     <div className={styles.partyBody}>
-      {PARTY_FIELDS.map(({ key, label }) => (
-        <div key={key} className={styles.partyRow}>
-          <span className={styles.partyLabel}>{label}</span>
-          <span className={styles.partyColon}>:</span>
-          <span className={styles.partyValue}>{(party[key] || "").trim() || "—"}</span>
-        </div>
-      ))}
+      {PARTY_FIELDS.map(({ key, label }) => {
+        const raw = (party[key] || "").trim() || "—";
+        const valueClass =
+          key === "bizNo"
+            ? `${styles.partyValue} ${styles.partyValueBizNo}`
+            : key === "address"
+              ? `${styles.partyValue} ${styles.partyValueAddress}`
+              : styles.partyValue;
+        return (
+          <div key={key} className={styles.partyRow}>
+            <span className={styles.partyLabel}>{label}</span>
+            <span className={styles.partyColon}>:</span>
+            <span className={valueClass}>{raw}</span>
+          </div>
+        );
+      })}
     </div>
   </div>
 );
@@ -126,7 +135,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
     const footer = printFooter === null ? null : { ...DEFAULT_FOOTER, ...printFooter };
 
     return (
-      <div ref={ref} className={styles.sheet}>
+      <div ref={ref} className={styles.sheet} data-ts-print-sheet>
         <header className={styles.header}>
           <div className={styles.headerSpacer} aria-hidden />
           <h1 className={styles.title}>거 래 명 세 표</h1>
@@ -179,7 +188,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
                   <td className={styles.cellNum}>{row.qty.toLocaleString("ko-KR")}</td>
                   <td className={styles.cellNum}>{row.unitPrice.toLocaleString("ko-KR")}</td>
                   <td className={styles.cellNum}>{row.amount.toLocaleString("ko-KR")}</td>
-                  <td>{row.note}</td>
+                  <td className={styles.cellNote}>{row.note}</td>
                 </tr>
               ))}
             </tbody>

@@ -11,8 +11,6 @@ import { TransactionStatementScreenPanel } from "@/features/transactionStatement
 
 type StatementItemFormRow = {
   id: string;
-  month: string;
-  day: string;
   name: string;
   spec: string;
   qty: string;
@@ -51,20 +49,9 @@ const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
   website: "www.tagosports.co.kr",
 };
 
-function buildTradeDateYmd(issueDate: string, rows: { month: string; day: string; name: string }[]): string {
-  const y = issueDate.split("-")[0] || String(new Date().getFullYear());
-  const dated = rows.find((r) => r.name.trim() !== "" && r.month.trim() !== "" && r.day.trim() !== "");
-  if (!dated) return issueDate;
-  const m = String(Number(dated.month)).padStart(2, "0");
-  const d = String(Number(dated.day)).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 function makeRow(idSuffix: number): StatementItemFormRow {
   return {
     id: `row-${idSuffix}`,
-    month: "",
-    day: "",
     name: "",
     spec: "",
     qty: "",
@@ -219,11 +206,6 @@ export default function TransactionStatementPage() {
     [computedRows]
   );
 
-  const printTradeDateYmd = useMemo(
-    () => buildTradeDateYmd(formData.issueDate, computedRows),
-    [formData.issueDate, computedRows]
-  );
-
   const screenLines = useMemo(
     () => printLines.map((row) => ({ id: row.id, name: row.name, qty: row.qty, amount: row.amount })),
     [printLines]
@@ -248,7 +230,7 @@ export default function TransactionStatementPage() {
         businessItem: formData.customerBusinessItem,
       },
       issueDate: formData.issueDate,
-      tradeDate: printTradeDateYmd,
+      tradeDate: formData.issueDate,
       lines: printLines,
       totalQty: totals.totalQty,
       supplyAmount: settlement.supplyAmount,
@@ -265,7 +247,6 @@ export default function TransactionStatementPage() {
       formData.customerBusinessType,
       formData.customerBusinessItem,
       formData.issueDate,
-      printTradeDateYmd,
       printLines,
       totals.totalQty,
       settlement.supplyAmount,
@@ -283,7 +264,7 @@ export default function TransactionStatementPage() {
         if (key === "unitPrice") {
           return { ...row, unitPrice: formatThousandsWithComma(value) };
         }
-        if (key === "month" || key === "day" || key === "qty") {
+        if (key === "qty") {
           return { ...row, [key]: normalizeNumericInput(value) };
         }
         return { ...row, [key]: value };
@@ -313,11 +294,14 @@ export default function TransactionStatementPage() {
     if (downloading) return;
     setErrorMessage("");
 
+    const [issueYear, issueMonthRaw, issueDayRaw] = formData.issueDate.split("-");
+    const issueMonth = Number(issueMonthRaw) || null;
+    const issueDay = Number(issueDayRaw) || null;
     const payloadItems = computedRows
       .filter((row) => row.name.trim() !== "")
       .map((row) => ({
-        month: row.month.trim() === "" ? null : toNumber(row.month),
-        day: row.day.trim() === "" ? null : toNumber(row.day),
+        month: issueYear ? issueMonth : null,
+        day: issueYear ? issueDay : null,
         name: row.name.trim(),
         spec: row.spec.trim(),
         qty: row.qtyNumber,
@@ -506,7 +490,7 @@ export default function TransactionStatementPage() {
             />
           </label>
           <label>
-            발행일자
+            거래일자
             <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
           </label>
         </div>
@@ -514,32 +498,11 @@ export default function TransactionStatementPage() {
         <div className="transaction-items">
           <div className="transaction-items__header">
             <h2>품목 리스트</h2>
-            <button type="button" className="btn btn-secondary btn-compact" onClick={addRow}>
-              품목 추가
-            </button>
           </div>
           <div className="transaction-items__rows">
             {computedRows.map((row, index) => (
               <div key={row.id} className="transaction-item-row">
                 <div className="transaction-item-row__grid">
-                  <label>
-                    월
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={row.month}
-                      onChange={(event) => updateItem(row.id, "month", event.target.value)}
-                    />
-                  </label>
-                  <label>
-                    일
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={row.day}
-                      onChange={(event) => updateItem(row.id, "day", event.target.value)}
-                    />
-                  </label>
                   <label>
                     품목명
                     <input value={row.name} onChange={(event) => updateItem(row.id, "name", event.target.value)} />
@@ -576,9 +539,12 @@ export default function TransactionStatementPage() {
                   </label>
                 </div>
                 <div className="transaction-item-row__actions">
+                  <button type="button" className="btn btn-primary btn-compact" onClick={addRow}>
+                    품목 추가
+                  </button>
                   <button
                     type="button"
-                    className="btn btn-secondary btn-compact"
+                    className="btn btn-danger btn-compact"
                     onClick={() => removeRow(row.id)}
                     disabled={formData.items.length <= 1}
                   >
@@ -592,7 +558,7 @@ export default function TransactionStatementPage() {
 
         <TransactionStatementScreenPanel
           issueDate={formData.issueDate}
-          tradeDateYmd={printTradeDateYmd}
+          tradeDateYmd={formData.issueDate}
           customerName={formData.customerName}
           lines={screenLines}
           totalQty={totals.totalQty}
@@ -609,7 +575,7 @@ export default function TransactionStatementPage() {
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">
           <div className="transaction-preview-dialog__toolbar">
-            <h2 id="transaction-preview-title">출력 양식 미리보기</h2>
+            <h2 id="transaction-preview-title">출력용 명세서 미리보기</h2>
             <div className="transaction-preview-dialog__toolbarActions">
               <button
                 type="button"
@@ -642,7 +608,7 @@ export default function TransactionStatementPage() {
             onClick={handleDownload}
             disabled={downloading || jpgSaving}
           >
-            {downloading ? "다운로드 중..." : "거래명세표 Excel 다운로드"}
+            {downloading ? "다운로드 중..." : "명세표 Excel다운"}
           </button>
           <button
             type="button"
@@ -650,7 +616,7 @@ export default function TransactionStatementPage() {
             onClick={() => void handleJpgSave()}
             disabled={jpgSaving || downloading}
           >
-            {jpgSaving ? "JPG 저장 중…" : "거래명세표 JPG 저장"}
+            {jpgSaving ? "JPG 저장 중…" : "명세표 이미지 저장"}
           </button>
         </div>
       </section>

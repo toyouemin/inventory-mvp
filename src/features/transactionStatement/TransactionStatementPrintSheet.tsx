@@ -228,7 +228,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
           </div>
           <div className={styles.totalsRight}>
             <div className={styles.totalHighlightTop}>
-              <span className={styles.totalHighlightLabel}>합계금액</span>
+              <span className={styles.totalHighlightLabel}>합계금액 (VAT포함)</span>
               <span className={styles.totalHighlightNum}>{totalAmount.toLocaleString("ko-KR")}원</span>
             </div>
             <div className={styles.totalHighlightBottom}>
@@ -248,7 +248,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
               ))}
             </div>
             <div className={styles.printFooterRight}>
-              {footer.bankLine ? <p className={styles.printFooterMeta}>{footer.bankLine}</p> : null}
+              {footer.bankLine ? <p className={`${styles.printFooterMeta} ${styles.printFooterBankLine}`}>{footer.bankLine}</p> : null}
               <div className={styles.printFooterBrandRow}>
                 {footer.rightLogoImageSrc ? (
                   <img src={footer.rightLogoImageSrc} alt="" className={styles.printFooterLogo} decoding="async" />

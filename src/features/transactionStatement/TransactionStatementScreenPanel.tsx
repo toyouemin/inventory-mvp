@@ -39,20 +39,17 @@ export function TransactionStatementScreenPanel({
       <h2 id="transaction-screen-heading" className={styles.panelTitle}>
         거래 요약
       </h2>
-      <dl className={styles.grid}>
-        <div className={styles.kv}>
-          <dt>발행일자</dt>
-          <dd>{issueDate || "—"}</dd>
-        </div>
-        <div className={styles.kv}>
-          <dt>거래일자</dt>
-          <dd>{tradeDateYmd || "—"}</dd>
-        </div>
-        <div className={`${styles.kv} ${styles.kvFull}`}>
-          <dt>공급받는자 상호</dt>
-          <dd>{customerName.trim() || "—"}</dd>
-        </div>
-      </dl>
+      <div className={styles.summaryInline} role="group" aria-label="거래 요약 기본 정보">
+        <span className={styles.summaryItem}>
+          <strong>발행일자</strong> {issueDate || "—"}
+        </span>
+        <span className={styles.summaryItem}>
+          <strong>거래일자</strong> {tradeDateYmd || "—"}
+        </span>
+        <span className={styles.summaryItem}>
+          <strong>공급받는자 상호</strong> {customerName.trim() || "—"}
+        </span>
+      </div>
 
       <div className={styles.itemsWrap}>
         <table className={styles.itemsTable}>
@@ -83,18 +80,20 @@ export function TransactionStatementScreenPanel({
 
       <div className={styles.totals}>
         <div className={styles.totalsPrimary}>
-          <span className={styles.totalsAmount}>합계 {totalAmount.toLocaleString("ko-KR")}원</span>
+          <span className={styles.totalsAmount}>
+            합계 금액 {totalAmount.toLocaleString("ko-KR")}원
+            <span className={styles.totalsAmountKorean}> ({amountKoreanText})</span>
+          </span>
           <span className={styles.totalsMeta}>
             총수량 {totalQty.toLocaleString("ko-KR")} · 공급 {supplyAmount.toLocaleString("ko-KR")} · 세액{" "}
             {taxAmount.toLocaleString("ko-KR")}
           </span>
         </div>
-        <div className={styles.totalsKorean}>{amountKoreanText}</div>
       </div>
 
       <div className={styles.previewRow}>
         <button type="button" className={`btn btn-secondary ${styles.previewBtn}`} onClick={onOpenPrintPreview}>
-          출력 양식 미리보기
+          출력용 명세서 미리보기
         </button>
       </div>
     </section>

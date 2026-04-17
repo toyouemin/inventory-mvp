@@ -470,6 +470,10 @@
   word-break: break-all;
 }
 
+.printFooterBankLine {
+  color: #111;
+}
+
 .printFooterMeta:last-child {
   margin-bottom: 0;
 }

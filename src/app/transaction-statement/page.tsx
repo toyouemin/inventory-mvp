@@ -103,10 +103,10 @@ function buildStatementJpgFileName(issueDateYmd: string): string {
   return `거래명세표-${datePart}-${hh}${mm}.jpg`;
 }
 
-/** 숨김 캡처 호스트와 동일한 가로(700+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
+/** 숨김 캡처 호스트와 동일한 가로(860+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
 const STATEMENT_JPG_HTML2CANVAS_VIEW = {
   scale: 3,
-  windowWidth: 780,
+  windowWidth: 940,
   windowHeight: 6000,
   scrollX: 0,
   scrollY: 0,
@@ -457,11 +457,11 @@ export default function TransactionStatementPage() {
 
         <div className="transaction-form-grid">
           <label className="transaction-form-grid__customer">
-            공급받는자 상호
+            상호
             <input value={formData.customerName} onChange={(event) => updateFormField("customerName", event.target.value)} />
           </label>
           <label className="transaction-form-grid__customer">
-            공급받는자 사업자번호
+            사업자번호
             <input
               inputMode="numeric"
               value={formData.customerBizNo}
@@ -469,31 +469,31 @@ export default function TransactionStatementPage() {
             />
           </label>
           <label className="transaction-form-grid__customer">
-            공급받는자 성명
+            성명
             <input
               value={formData.customerRepresentative}
               onChange={(event) => updateFormField("customerRepresentative", event.target.value)}
             />
           </label>
           <label className="transaction-form-grid__customer">
-            공급받는자 사업장주소
-            <input
-              value={formData.customerAddress}
-              onChange={(event) => updateFormField("customerAddress", event.target.value)}
-            />
-          </label>
-          <label className="transaction-form-grid__customer">
-            공급받는자 업태
+            업태
             <input
               value={formData.customerBusinessType}
               onChange={(event) => updateFormField("customerBusinessType", event.target.value)}
             />
           </label>
           <label className="transaction-form-grid__customer">
-            공급받는자 종목
+            종목
             <input
               value={formData.customerBusinessItem}
               onChange={(event) => updateFormField("customerBusinessItem", event.target.value)}
+            />
+          </label>
+          <label className="transaction-form-grid__customer">
+            사업장주소
+            <input
+              value={formData.customerAddress}
+              onChange={(event) => updateFormField("customerAddress", event.target.value)}
             />
           </label>
           <label>

@@ -3146,8 +3146,8 @@ label {
 
 /* 출력용 시트: 화면 밖 고정폭 캡처 영역(html2canvas 등에서 ref 타깃) */
 .transaction-print-hidden-host {
-  /* A4 세로 느낌: 시트 700px + 좌우 패딩 40px×2 ≈ 780px 캡처 폭 */
-  --ts-print-sheet-w: 700px;
+  /* 시트 860px + 좌우 패딩 40px×2 ≈ 940px 캡처 폭 */
+  --ts-print-sheet-w: 860px;
   position: fixed;
   left: -14000px;
   top: 0;
@@ -3202,7 +3202,7 @@ label {
 }
 
 .transaction-preview-dialog__scroll {
-  --ts-capture-width: 700px;
+  --ts-capture-width: 860px;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -3256,7 +3256,7 @@ label {
 
 .transaction-preview-dialog .transaction-preview-dialog__scroll > [data-ts-print-sheet] {
   flex-shrink: 0;
-  width: var(--ts-capture-width, 700px);
+  width: var(--ts-capture-width, 860px);
   max-width: none;
   margin-inline: 0;
   transform: none;
@@ -3269,7 +3269,28 @@ label {
   }
 
   .transaction-form-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 2px;
+  }
+
+  /* 모바일 입력란: 2칸(상호/사업자번호) → 3칸(성명/주소/업태) → 1칸(종목) */
+  .transaction-form-grid > .transaction-form-grid__customer:nth-child(1),
+  .transaction-form-grid > .transaction-form-grid__customer:nth-child(2) {
+    grid-column: span 3;
+  }
+
+  .transaction-form-grid > .transaction-form-grid__customer:nth-child(3),
+  .transaction-form-grid > .transaction-form-grid__customer:nth-child(4),
+  .transaction-form-grid > .transaction-form-grid__customer:nth-child(5) {
+    grid-column: span 2;
+  }
+
+  .transaction-form-grid > .transaction-form-grid__customer:nth-child(6) {
+    grid-column: 1 / -1;
+  }
+
+  .transaction-form-grid > label:not(.transaction-form-grid__customer) {
+    grid-column: 1 / -1;
   }
 
   .transaction-items {
@@ -3303,4 +3324,30 @@ label {
     width: 100%;
   }
 
+}
+
+@media (max-width: 768px) {
+  .transaction-page {
+    max-width: none;
+    width: 100%;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .transaction-page__card {
+    margin-left: 0;
+    margin-right: 0;
+    padding-top: 10px;
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+
+  .transaction-page__card > h1 {
+    margin: 0 0 6px;
+  }
+
+  .transaction-page__desc {
+    margin-top: 0;
+    margin-bottom: 7px;
+  }
 }

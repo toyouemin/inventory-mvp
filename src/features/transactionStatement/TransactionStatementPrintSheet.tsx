@@ -46,6 +46,8 @@ export type TransactionStatementPrintSheetProps = {
   totalAmountKorean: string;
   stampSrc?: string;
   printFooter?: TransactionStatementPrintFooter | null;
+  /** 숨김 JPG 캡처용: 뷰포트와 무관한 고정 데스크톱 레이아웃만 적용 */
+  captureFixed?: boolean;
 };
 
 const PARTY_FIELDS: Array<{ key: keyof TransactionStatementPrintParty; label: string }> = [
@@ -128,18 +130,22 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
       totalAmountKorean,
       stampSrc = "/images/transaction-template-image1.png",
       printFooter,
+      captureFixed = false,
     },
     ref
   ) {
     const tradeYmd = ((tradeDate ?? issueDate) || "").trim() || "—";
     const footer = printFooter === null ? null : { ...DEFAULT_FOOTER, ...printFooter };
+    const captureCls = captureFixed ? " ts-print-capture-fixed" : "";
+    const titleCaptureCls = captureFixed ? " ts-print-title" : "";
+    const issueCaptureCls = captureFixed ? " ts-print-issue-date" : "";
 
     return (
-      <div ref={ref} className={styles.sheet} data-ts-print-sheet>
+      <div ref={ref} className={`${styles.sheet}${captureCls}`} data-ts-print-sheet>
         <header className={styles.header}>
           <div className={styles.headerSpacer} aria-hidden />
-          <h1 className={styles.title}>거 래 명 세 표</h1>
-          <div className={styles.issueDate}>발행일자 {issueDate || "—"}</div>
+          <h1 className={`${styles.title}${titleCaptureCls}`}>거 래 명 세 표</h1>
+          <div className={`${styles.issueDate}${issueCaptureCls}`}>발행일자 {issueDate || "—"}</div>
         </header>
 
         <div className={styles.parties}>
@@ -149,7 +155,14 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
             party={supplier}
             className={`${styles.partyCol} ${styles.partyColSupplier}`}
             stamp={
-              <img className={styles.stamp} src={stampSrc} alt="" width={160} height={160} decoding="async" />
+              <img
+                className={captureFixed ? `${styles.stamp} ts-print-stamp` : styles.stamp}
+                src={stampSrc}
+                alt=""
+                width={76}
+                height={76}
+                decoding="async"
+              />
             }
           />
           <PartyBlock title="공급받는자" party={customer} className={`${styles.partyCol} ${styles.partyColCustomer}`} />

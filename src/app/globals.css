@@ -3146,14 +3146,17 @@ label {
 
 /* 출력용 시트: 화면 밖 고정폭 캡처 영역(html2canvas 등에서 ref 타깃) */
 .transaction-print-hidden-host {
+  /* A4 세로 느낌: 시트 700px + 좌우 패딩 40px×2 ≈ 780px 캡처 폭 */
+  --ts-print-sheet-w: 700px;
   position: fixed;
   left: -14000px;
   top: 0;
   box-sizing: border-box;
-  width: 790px;
+  width: calc(var(--ts-print-sheet-w) + 80px) !important;
+  min-width: calc(var(--ts-print-sheet-w) + 80px) !important;
+  max-width: calc(var(--ts-print-sheet-w) + 80px) !important;
   padding: 34px 40px 38px;
   background: #ffffff;
-  max-width: none;
   pointer-events: none;
   z-index: -30;
 }
@@ -3199,9 +3202,10 @@ label {
 }
 
 .transaction-preview-dialog__scroll {
+  --ts-capture-width: 700px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   padding: 10px 12px 22px;
   overflow: auto;
   max-height: calc(92vh - 58px);
@@ -3214,17 +3218,49 @@ label {
   transform-origin: initial !important;
 }
 
-/*
-  미리보기 안에서만 A4폭(1123) 시트를 뷰포트에 맞게 축소.
-  clamp(하한, 비율, 1): 너무 작아지지 않게 하한을 두고, 넓은 화면에서는 원크기에 가깝게.
-*/
+/* JPG 캡처 전용: 기기·미디어쿼리와 무관한 고정 데스크톱 레이아웃 */
+.transaction-print-hidden-host [data-ts-print-sheet].ts-print-capture-fixed {
+  width: var(--ts-print-sheet-w) !important;
+  min-width: var(--ts-print-sheet-w) !important;
+  max-width: var(--ts-print-sheet-w) !important;
+  margin-inline: auto !important;
+}
+
+.transaction-print-hidden-host .ts-print-title {
+  font-size: 40px !important;
+  line-height: 0.9 !important;
+  letter-spacing: 0.22em !important;
+  font-weight: 900 !important;
+}
+
+.transaction-print-hidden-host .ts-print-issue-date {
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+  font-weight: 600 !important;
+  top: 50% !important;
+  right: 0 !important;
+  transform: translateY(-50%) !important;
+}
+
+/* JPG 캡처: 인감 약 20mm + 상호·사업자번호 사이 위치 고정 */
+.transaction-print-hidden-host img.ts-print-stamp {
+  width: 76px !important;
+  max-width: 76px !important;
+  min-width: 0 !important;
+  height: auto !important;
+  object-fit: contain !important;
+  right: 22% !important;
+  top: 40% !important;
+  transform: translateY(-50%) !important;
+}
+
 .transaction-preview-dialog .transaction-preview-dialog__scroll > [data-ts-print-sheet] {
   flex-shrink: 0;
-  width: 1123px;
+  width: var(--ts-capture-width, 700px);
   max-width: none;
-  margin-inline: auto;
-  transform-origin: top center;
-  transform: scale(clamp(0.75, calc((100vw - 40px) / 1123), 1));
+  margin-inline: 0;
+  transform: none;
+  transform-origin: initial;
 }
 
 @media (max-width: 960px) {

@@ -13,7 +13,7 @@
 
   box-sizing: border-box;
   width: 100%;
-  max-width: 1123px;
+  max-width: 700px;
   margin-inline: auto;
   padding: 24px 28px 22px;
   background: #ffffff;
@@ -26,7 +26,7 @@
 .header {
   position: relative;
   display: block;
-  margin-bottom: 0;
+  margin-bottom: 4px;
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -36,10 +36,10 @@
 }
 
 .title {
-  margin: -2px 0 0;
+  margin: 0;
   width: 100%;
   max-width: none;
-  font-size: 72px;
+  font-size: 40px;
   font-weight: 900;
   line-height: 0.9;
   letter-spacing: 0.22em;
@@ -114,12 +114,14 @@
   gap: 3px;
 }
 
+/* 약 20mm(96dpi ≈ 75px) 인감 — 상호(세림통상) 오른쪽과 사업자번호(…32310) 사이쯤 */
 .stamp {
   position: absolute;
-  right: 6%;
-  top: 52%;
+  right: 22%;
+  top: 40%;
   transform: translateY(-50%);
-  width: min(38%, 132px);
+  width: 76px;
+  max-width: 76px;
   height: auto;
   object-fit: contain;
   pointer-events: none;
@@ -246,32 +248,32 @@
 
 .colName {
   width: 22%;
-  min-width: 112px;
+  min-width: 88px;
 }
 
 .colSpec {
   width: 10%;
-  min-width: 52px;
+  min-width: 44px;
 }
 
 .colQty {
   width: 8%;
-  min-width: 50px;
+  min-width: 42px;
 }
 
 .colUnitPrice {
   width: 19%;
-  min-width: 104px;
+  min-width: 80px;
 }
 
 .colAmount {
   width: 20%;
-  min-width: 112px;
+  min-width: 88px;
 }
 
 .colNote {
   width: 13%;
-  min-width: 84px;
+  min-width: 68px;
 }
 
 .cellName {
@@ -400,7 +402,7 @@
   padding-top: 10px;
   border-top: 1px solid var(--ts-border);
   display: grid;
-  grid-template-columns: 1fr minmax(280px, auto);
+  grid-template-columns: 1fr minmax(220px, auto);
   gap: 10px 16px;
   align-items: end;
 }
@@ -463,47 +465,52 @@
 }
 
 @media (max-width: 640px) {
-  .sheet {
+  /* JPG 캡처용 고정 시트(.ts-print-capture-fixed)는 뷰포트와 무관하게 데스크톱 기준 유지 */
+  .sheet:not(.ts-print-capture-fixed) {
     padding: 20px 22px 18px;
   }
 
-  .header {
-    margin-bottom: 4px;
+  .sheet:not(.ts-print-capture-fixed) .header {
+    margin-bottom: 3px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
-  .title {
-    font-size: 64px;
+  .sheet:not(.ts-print-capture-fixed) .title {
+    font-size: 35px;
   }
 
-  .issueDate {
+  .sheet:not(.ts-print-capture-fixed) .issueDate {
     font-size: 13px;
   }
 
-  .stamp {
-    right: 4%;
-    width: min(44%, 100px);
+  .sheet:not(.ts-print-capture-fixed) .stamp {
+    right: 22%;
+    top: 40%;
+    width: 76px;
+    max-width: 76px;
   }
 
-  .partyRow {
+  .sheet:not(.ts-print-capture-fixed) .partyRow {
     grid-template-columns: 5em auto minmax(0, 1fr);
     column-gap: 4px;
     font-size: 15px;
   }
 
-  .table {
+  .sheet:not(.ts-print-capture-fixed) .table {
     font-size: 15px;
   }
 
-  .table th,
-  .table td {
+  .sheet:not(.ts-print-capture-fixed) .table th,
+  .sheet:not(.ts-print-capture-fixed) .table td {
     padding: 7px 6px;
   }
 
-  .totalHighlightNum {
+  .sheet:not(.ts-print-capture-fixed) .totalHighlightNum {
     font-size: 24px;
   }
 
-  .printFooter {
+  .sheet:not(.ts-print-capture-fixed) .printFooter {
     grid-template-columns: 1fr minmax(220px, auto);
   }
 }

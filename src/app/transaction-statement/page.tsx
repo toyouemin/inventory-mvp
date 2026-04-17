@@ -103,6 +103,28 @@ function buildStatementJpgFileName(issueDateYmd: string): string {
   return `거래명세표-${datePart}-${hh}${mm}.jpg`;
 }
 
+/** 숨김 캡처 호스트와 동일한 가로(700+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
+const STATEMENT_JPG_HTML2CANVAS_VIEW = {
+  scale: 3,
+  windowWidth: 780,
+  windowHeight: 6000,
+  scrollX: 0,
+  scrollY: 0,
+} as const;
+
+async function waitForFontsAndNextPaint(): Promise<void> {
+  if (typeof document !== "undefined" && document.fonts?.ready) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      /* 로컬 폰트 로드 실패 시에도 캡처는 진행 */
+    }
+  }
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 function normalizeDigitsOnly(value: string): string {
   const normalized = value
     // 전각 숫자(０-９)를 반각 숫자(0-9)로 변환
@@ -381,11 +403,34 @@ export default function TransactionStatementPage() {
 
     setJpgSaving(true);
     try {
+      await waitForFontsAndNextPaint();
+
+      const sheetEl = target.querySelector("[data-ts-print-sheet]") as HTMLElement | null;
+      const titleEl = target.querySelector(".ts-print-title") as HTMLElement | null;
+      const issueEl = target.querySelector(".ts-print-issue-date") as HTMLElement | null;
+      if (sheetEl && titleEl && issueEl) {
+        const hostWidthPx = Math.round(target.getBoundingClientRect().width);
+        const sheetWidthPx = Math.round(sheetEl.getBoundingClientRect().width);
+        const titleFontSize = getComputedStyle(titleEl).fontSize;
+        const issueDateFontSize = getComputedStyle(issueEl).fontSize;
+        // eslint-disable-next-line no-console -- JPG 캡처 고정 레이아웃 검증(모바일/PC 동일성)
+        console.log("[Statement JPG capture]", {
+          hostWidthPx,
+          sheetWidthPx,
+          titleFontSize,
+          issueDateFontSize,
+        });
+      }
+
       const canvas = await html2canvas(target, {
         backgroundColor: "#ffffff",
-        scale: 3,
         useCORS: true,
         logging: false,
+        scale: STATEMENT_JPG_HTML2CANVAS_VIEW.scale,
+        windowWidth: STATEMENT_JPG_HTML2CANVAS_VIEW.windowWidth,
+        windowHeight: STATEMENT_JPG_HTML2CANVAS_VIEW.windowHeight,
+        scrollX: STATEMENT_JPG_HTML2CANVAS_VIEW.scrollX,
+        scrollY: STATEMENT_JPG_HTML2CANVAS_VIEW.scrollY,
       });
       const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
       const fileName = buildStatementJpgFileName(formData.issueDate);
@@ -550,7 +595,7 @@ export default function TransactionStatementPage() {
         />
 
         <div ref={printCaptureRef} className="transaction-print-hidden-host" aria-hidden="true">
-          <TransactionStatementPrintSheet {...printSheetProps} />
+          <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
         </div>
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">

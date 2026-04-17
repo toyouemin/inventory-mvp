@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import html2canvas from "html2canvas";
+import { useMemo, useState } from "react";
 import { amountToKoreanText } from "@/features/transactionStatement/amountToKoreanText";
+import {
+  TransactionStatementPrintSheet,
+  type TransactionStatementPrintFooter,
+} from "@/features/transactionStatement/TransactionStatementPrintSheet";
 
 type StatementItemFormRow = {
   id: string;
@@ -34,6 +37,26 @@ const FIXED_SUPPLIER = {
   businessType: "도,소매.제조업",
   businessItem: "스포츠용품",
 } as const;
+
+/** 출력 푸터(은행·URL 등은 사업 정보에 맞게 수정) */
+const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
+  legalLeftLines: [
+    "본 거래명세표는 거래 내역 확인용이며, 세금계산서와 별개로 발행될 수 있습니다.",
+    "부가가치세법에 따른 세금계산서는 별도로 수취해 주시기 바랍니다.",
+  ],
+  centerText: "(주)세림통상",
+  bankLine: "",
+  website: "",
+};
+
+function buildTradeDateYmd(issueDate: string, rows: { month: string; day: string; name: string }[]): string {
+  const y = issueDate.split("-")[0] || String(new Date().getFullYear());
+  const dated = rows.find((r) => r.name.trim() !== "" && r.month.trim() !== "" && r.day.trim() !== "");
+  if (!dated) return issueDate;
+  const m = String(Number(dated.month)).padStart(2, "0");
+  const d = String(Number(dated.day)).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 function makeRow(idSuffix: number): StatementItemFormRow {
   return {
@@ -96,7 +119,6 @@ function normalizeBizNoInput(value: string): string {
 }
 
 export default function TransactionStatementPage() {
-  const statementCaptureRef = useRef<HTMLDivElement | null>(null);
   const [formData, setFormData] = useState<TransactionStatementFormData>({
     customerName: "",
     customerBizNo: "",
@@ -108,7 +130,6 @@ export default function TransactionStatementPage() {
     items: [makeRow(1)],
   });
   const [downloading, setDownloading] = useState(false);
-  const [jpgDownloading, setJpgDownloading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const computedRows = useMemo(
@@ -139,6 +160,27 @@ export default function TransactionStatementPage() {
       amountKoreanText: amountToKoreanText(totals.totalAmount),
     };
   }, [totals.totalAmount]);
+
+  const printLines = useMemo(
+    () =>
+      computedRows
+        .filter((row) => row.name.trim() !== "")
+        .map((row) => ({
+          id: row.id,
+          name: row.name,
+          spec: row.spec,
+          qty: row.qtyNumber,
+          unitPrice: row.unitPriceNumber,
+          amount: row.amount,
+          note: row.note,
+        })),
+    [computedRows]
+  );
+
+  const printTradeDateYmd = useMemo(
+    () => buildTradeDateYmd(formData.issueDate, computedRows),
+    [formData.issueDate, computedRows]
+  );
 
   function updateItem(id: string, key: keyof StatementItemFormRow, value: string): void {
     setFormData((prev) => ({
@@ -249,36 +291,6 @@ export default function TransactionStatementPage() {
       setErrorMessage(error instanceof Error ? error.message : "거래명세표 다운로드에 실패했습니다.");
     } finally {
       setDownloading(false);
-    }
-  }
-
-  async function handleJpgDownload(): Promise<void> {
-    if (jpgDownloading) return;
-    if (!statementCaptureRef.current) {
-      setErrorMessage("JPG 캡처 영역을 찾을 수 없습니다.");
-      return;
-    }
-
-    setErrorMessage("");
-    setJpgDownloading(true);
-    try {
-      const canvas = await html2canvas(statementCaptureRef.current, {
-        backgroundColor: "#ffffff",
-        scale: 2.5,
-        useCORS: true,
-      });
-      const jpgDataUrl = canvas.toDataURL("image/jpeg", 0.9);
-      const fileName = `transaction-statement-${formData.issueDate.replace(/-/g, "")}.jpg`;
-      const anchor = document.createElement("a");
-      anchor.href = jpgDataUrl;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : "거래명세표 JPG 다운로드에 실패했습니다.");
-    } finally {
-      setJpgDownloading(false);
     }
   }
 
@@ -425,177 +437,33 @@ export default function TransactionStatementPage() {
         </div>
 
         <div className="transaction-capture-stage">
-          <div ref={statementCaptureRef} className="transaction-capture-sheet">
-            <div className="transaction-capture-sheet__title">거래명세표</div>
-            <img
-              className="transaction-capture-stamp"
-              src="/images/transaction-template-image1.png"
-              alt="거래명세표 도장"
-            />
-            <div className="transaction-capture-meta">
-              <section className="transaction-capture-party">
-                <h3>공급자</h3>
-                <div className="transaction-capture-party__grid">
-                  <div>
-                    <strong>상호</strong>
-                    <span>{FIXED_SUPPLIER.name}</span>
-                  </div>
-                  <div>
-                    <strong>사업자번호</strong>
-                    <span>{FIXED_SUPPLIER.bizNo}</span>
-                  </div>
-                  <div>
-                    <strong>성명</strong>
-                    <span>{FIXED_SUPPLIER.representative || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>업태</strong>
-                    <span>{FIXED_SUPPLIER.businessType || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>종목</strong>
-                    <span>{FIXED_SUPPLIER.businessItem || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>발행일자</strong>
-                    <span>{formData.issueDate || "-"}</span>
-                  </div>
-                  <div className="transaction-capture-party__full">
-                    <strong>사업장주소</strong>
-                    <span>{FIXED_SUPPLIER.address || "-"}</span>
-                  </div>
-                </div>
-              </section>
-
-              <section className="transaction-capture-party">
-                <h3>공급받는자</h3>
-                <div className="transaction-capture-party__grid">
-                  <div>
-                    <strong>상호</strong>
-                    <span>{formData.customerName || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>사업자번호</strong>
-                    <span>{formData.customerBizNo || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>성명</strong>
-                    <span>{formData.customerRepresentative || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>업태</strong>
-                    <span>{formData.customerBusinessType || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>종목</strong>
-                    <span>{formData.customerBusinessItem || "-"}</span>
-                  </div>
-                  <div>
-                    <strong>발행일자</strong>
-                    <span>{formData.issueDate || "-"}</span>
-                  </div>
-                  <div className="transaction-capture-party__full">
-                    <strong>사업장주소</strong>
-                    <span>{formData.customerAddress || "-"}</span>
-                  </div>
-                </div>
-              </section>
-            </div>
-
-            <table className="transaction-capture-table">
-              <colgroup>
-                <col className="transaction-capture-col transaction-capture-col--month" />
-                <col className="transaction-capture-col transaction-capture-col--day" />
-                <col className="transaction-capture-col transaction-capture-col--name" />
-                <col className="transaction-capture-col transaction-capture-col--spec" />
-                <col className="transaction-capture-col transaction-capture-col--qty" />
-                <col className="transaction-capture-col transaction-capture-col--unit-price" />
-                <col className="transaction-capture-col transaction-capture-col--amount" />
-                <col className="transaction-capture-col transaction-capture-col--note" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>월</th>
-                  <th>일</th>
-                  <th>품목명</th>
-                  <th>규격</th>
-                  <th>수량</th>
-                  <th>단가</th>
-                  <th>금액</th>
-                  <th>비고</th>
-                </tr>
-              </thead>
-              <tbody>
-                {computedRows
-                  .filter((row) => row.name.trim() !== "")
-                  .map((row) => (
-                    <tr key={`capture-${row.id}`}>
-                      <td>{row.month || ""}</td>
-                      <td>{row.day || ""}</td>
-                      <td>{row.name}</td>
-                      <td>{row.spec}</td>
-                      <td>{row.qtyNumber.toLocaleString("ko-KR")}</td>
-                      <td>{row.unitPriceNumber.toLocaleString("ko-KR")}</td>
-                      <td>{row.amount.toLocaleString("ko-KR")}</td>
-                      <td>{row.note}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-
-            <div className="transaction-capture-items-mobile">
-              {computedRows
-                .filter((row) => row.name.trim() !== "")
-                .map((row) => (
-                  <div key={`capture-mobile-${row.id}`} className="transaction-capture-item-mobile">
-                    <div className="transaction-capture-item-mobile__row transaction-capture-item-mobile__row--top">
-                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--month">
-                        <strong>월</strong>
-                        <span>{row.month || ""}</span>
-                      </div>
-                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--day">
-                        <strong>일</strong>
-                        <span>{row.day || ""}</span>
-                      </div>
-                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--name">
-                        <strong>품목명</strong>
-                        <span>{row.name}</span>
-                      </div>
-                    </div>
-                    <div className="transaction-capture-item-mobile__row transaction-capture-item-mobile__row--bottom">
-                      <div className="transaction-capture-item-mobile__cell">
-                        <strong>규격</strong>
-                        <span>{row.spec}</span>
-                      </div>
-                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--num">
-                        <strong>수량</strong>
-                        <span>{row.qtyNumber.toLocaleString("ko-KR")}</span>
-                      </div>
-                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--num">
-                        <strong>단가</strong>
-                        <span>{row.unitPriceNumber.toLocaleString("ko-KR")}</span>
-                      </div>
-                      <div className="transaction-capture-item-mobile__cell transaction-capture-item-mobile__cell--num">
-                        <strong>금액</strong>
-                        <span>{row.amount.toLocaleString("ko-KR")}</span>
-                      </div>
-                      <div className="transaction-capture-item-mobile__cell">
-                        <strong>비고</strong>
-                        <span>{row.note || ""}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-
-            <div className="transaction-capture-total">
-              <span>총수량: {totals.totalQty.toLocaleString("ko-KR")}</span>
-              <span>공급가액: {settlement.supplyAmount.toLocaleString("ko-KR")}원</span>
-              <span>세액: {settlement.taxAmount.toLocaleString("ko-KR")}원</span>
-              <span>합계금액: {totals.totalAmount.toLocaleString("ko-KR")}원</span>
-              <span>합계금액(한글): {settlement.amountKoreanText}</span>
-            </div>
-          </div>
+          <TransactionStatementPrintSheet
+            supplier={{
+              name: FIXED_SUPPLIER.name,
+              bizNo: FIXED_SUPPLIER.bizNo,
+              representative: FIXED_SUPPLIER.representative,
+              address: FIXED_SUPPLIER.address,
+              businessType: FIXED_SUPPLIER.businessType,
+              businessItem: FIXED_SUPPLIER.businessItem,
+            }}
+            customer={{
+              name: formData.customerName,
+              bizNo: formData.customerBizNo,
+              representative: formData.customerRepresentative,
+              address: formData.customerAddress,
+              businessType: formData.customerBusinessType,
+              businessItem: formData.customerBusinessItem,
+            }}
+            issueDate={formData.issueDate}
+            tradeDate={printTradeDateYmd}
+            lines={printLines}
+            totalQty={totals.totalQty}
+            supplyAmount={settlement.supplyAmount}
+            taxAmount={settlement.taxAmount}
+            totalAmount={totals.totalAmount}
+            totalAmountKorean={settlement.amountKoreanText}
+            printFooter={STATEMENT_PRINT_FOOTER}
+          />
         </div>
 
         {errorMessage ? <p className="transaction-error">{errorMessage}</p> : null}
@@ -605,17 +473,9 @@ export default function TransactionStatementPage() {
             type="button"
             className="btn btn-primary"
             onClick={handleDownload}
-            disabled={downloading || jpgDownloading}
+            disabled={downloading}
           >
             {downloading ? "다운로드 중..." : "거래명세표 Excel 다운로드"}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={handleJpgDownload}
-            disabled={jpgDownloading || downloading}
-          >
-            {jpgDownloading ? "거래명세표 JPG 생성중..." : "거래명세표 JPG 다운로드"}
           </button>
         </div>
       </section>

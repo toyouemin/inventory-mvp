@@ -493,11 +493,22 @@ export default function TransactionStatementPage() {
               onChange={(event) => updateFormField("customerAddress", event.target.value)}
             />
           </label>
-          <label className="transaction-form-grid__date">
+          <label className="transaction-form-grid__date transaction-form-grid__date--mobile">
             발행일자
             <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
           </label>
-          <label className="transaction-form-grid__date">
+          <label className="transaction-form-grid__date transaction-form-grid__date--mobile">
+            거래일자
+            <input type="date" value={formData.tradeDate} onChange={(event) => updateFormField("tradeDate", event.target.value)} />
+          </label>
+        </div>
+
+        <div className="transaction-date-row" aria-label="거래명세 날짜 입력">
+          <label className="transaction-form-grid__date transaction-form-grid__date--desktop">
+            발행일자
+            <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
+          </label>
+          <label className="transaction-form-grid__date transaction-form-grid__date--desktop">
             거래일자
             <input type="date" value={formData.tradeDate} onChange={(event) => updateFormField("tradeDate", event.target.value)} />
           </label>
@@ -583,7 +594,7 @@ export default function TransactionStatementPage() {
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">
           <div className="transaction-preview-dialog__toolbar">
-            <h2 id="transaction-preview-title">출력용 명세서 미리보기</h2>
+            <h2 id="transaction-preview-title">출력 명세서 미리보기</h2>
             <div className="transaction-preview-dialog__toolbarActions">
               <button
                 type="button"

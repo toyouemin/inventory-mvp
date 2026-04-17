@@ -93,7 +93,7 @@ export function TransactionStatementScreenPanel({
 
       <div className={styles.previewRow}>
         <button type="button" className={`btn btn-secondary ${styles.previewBtn}`} onClick={onOpenPrintPreview}>
-          출력용 명세서 미리보기
+          출력 명세서 미리보기
         </button>
       </div>
     </section>

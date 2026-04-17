@@ -3070,6 +3070,22 @@ label {
   border: 1px solid color-mix(in srgb, var(--accent) 35%, #ffffff);
 }
 
+/* PC: 날짜 입력 2열을 공급자 입력 아래(품목 리스트 위)에 배치 */
+.transaction-date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 0 0 6px;
+}
+
+.transaction-form-grid__date--mobile {
+  display: none;
+}
+
+.transaction-form-grid__date--desktop {
+  display: block;
+}
+
 .transaction-items {
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -3313,6 +3329,18 @@ label {
 
   .transaction-form-grid > .transaction-form-grid__date {
     grid-column: span 3;
+  }
+
+  .transaction-date-row {
+    display: none;
+  }
+
+  .transaction-form-grid__date--mobile {
+    display: block;
+  }
+
+  .transaction-form-grid__date--desktop {
+    display: none;
   }
 
   .transaction-form-grid > label:not(.transaction-form-grid__customer):not(.transaction-form-grid__date) {

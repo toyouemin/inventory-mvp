@@ -354,24 +354,9 @@ button:hover {
 }
 
 .products-category-select-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   flex: 0 0 auto;
   flex-shrink: 0;
   min-width: 72px;
-}
-
-.toolbar-row--search .products-category-select-wrap .products-category-all-btn {
-  white-space: nowrap;
-  padding-left: 10px;
-  padding-right: 10px;
-}
-
-.toolbar-row--search .products-category-select-wrap .products-category-all-btn.is-active {
-  background: var(--accent);
-  color: var(--accent-contrast, #fff);
-  border-color: color-mix(in srgb, var(--accent) 60%, #000);
 }
 
 .toolbar-row--search .products-category-select-wrap .products-category-select {
@@ -515,6 +500,10 @@ button.download-dropdown__item:disabled {
   gap: 8px;
   align-items: center;
   flex-wrap: nowrap;
+}
+
+.nav-tabs {
+  margin-bottom: 6px;
 }
 
 /* ========== CARDS ========== */
@@ -2657,12 +2646,6 @@ label {
 
   .products-category-select-wrap {
     min-width: 64px;
-    gap: 4px;
-  }
-
-  .toolbar-row--search .products-category-select-wrap .products-category-all-btn {
-    padding-left: 8px;
-    padding-right: 8px;
   }
 
   .toolbar-row--search .products-category-select-wrap .products-category-select {
@@ -3043,12 +3026,13 @@ label {
 /* ========== Transaction Statement Page ========== */
 .transaction-page {
   max-width: 1080px;
-  margin: 24px auto 80px;
+  margin: 5px auto 80px;
   padding: 0 16px;
 }
 
 .transaction-page__card {
   padding: 18px;
+  margin-top: 6px;
 }
 
 .transaction-page__desc {
@@ -3327,7 +3311,11 @@ label {
     grid-column: 1 / -1;
   }
 
-  .transaction-form-grid > label:not(.transaction-form-grid__customer) {
+  .transaction-form-grid > .transaction-form-grid__date {
+    grid-column: span 3;
+  }
+
+  .transaction-form-grid > label:not(.transaction-form-grid__customer):not(.transaction-form-grid__date) {
     grid-column: 1 / -1;
   }
 

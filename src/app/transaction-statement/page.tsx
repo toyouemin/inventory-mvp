@@ -26,6 +26,7 @@ type TransactionStatementFormData = {
   customerBusinessType: string;
   customerBusinessItem: string;
   issueDate: string;
+  tradeDate: string;
   items: StatementItemFormRow[];
 };
 
@@ -37,6 +38,8 @@ const FIXED_SUPPLIER = {
   businessType: "도,소매.제조업",
   businessItem: "스포츠용품",
 } as const;
+
+const TRANSACTION_STATEMENT_GUIDE_TEXT = "빈칸 입력후 요약확인, 출력 양식은 미리보기에서 확인 후 저장";
 
 /** 출력 푸터(은행·URL 등은 사업 정보에 맞게 수정) */
 const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
@@ -155,6 +158,7 @@ export default function TransactionStatementPage() {
     customerBusinessType: "",
     customerBusinessItem: "",
     issueDate: formatYmd(new Date()),
+    tradeDate: formatYmd(new Date()),
     items: [makeRow(1)],
   });
   const [downloading, setDownloading] = useState(false);
@@ -230,7 +234,7 @@ export default function TransactionStatementPage() {
         businessItem: formData.customerBusinessItem,
       },
       issueDate: formData.issueDate,
-      tradeDate: formData.issueDate,
+      tradeDate: formData.tradeDate || formData.issueDate,
       lines: printLines,
       totalQty: totals.totalQty,
       supplyAmount: settlement.supplyAmount,
@@ -247,6 +251,7 @@ export default function TransactionStatementPage() {
       formData.customerBusinessType,
       formData.customerBusinessItem,
       formData.issueDate,
+      formData.tradeDate,
       printLines,
       totals.totalQty,
       settlement.supplyAmount,
@@ -294,14 +299,15 @@ export default function TransactionStatementPage() {
     if (downloading) return;
     setErrorMessage("");
 
-    const [issueYear, issueMonthRaw, issueDayRaw] = formData.issueDate.split("-");
-    const issueMonth = Number(issueMonthRaw) || null;
-    const issueDay = Number(issueDayRaw) || null;
+    const tradeDateForItems = formData.tradeDate || formData.issueDate;
+    const [tradeYear, tradeMonthRaw, tradeDayRaw] = tradeDateForItems.split("-");
+    const tradeMonth = Number(tradeMonthRaw) || null;
+    const tradeDay = Number(tradeDayRaw) || null;
     const payloadItems = computedRows
       .filter((row) => row.name.trim() !== "")
       .map((row) => ({
-        month: issueYear ? issueMonth : null,
-        day: issueYear ? issueDay : null,
+        month: tradeYear ? tradeMonth : null,
+        day: tradeYear ? tradeDay : null,
         name: row.name.trim(),
         spec: row.spec.trim(),
         qty: row.qtyNumber,
@@ -444,9 +450,7 @@ export default function TransactionStatementPage() {
     <main className="transaction-page">
       <section className="card transaction-page__card">
         <h1>거래명세표 작성</h1>
-        <p className="muted transaction-page__desc">
-          아래에서 입력한 뒤 요약을 확인하고, 출력 양식은 미리보기에서만 확인할 수 있습니다.
-        </p>
+        <p className="muted transaction-page__desc">{TRANSACTION_STATEMENT_GUIDE_TEXT}</p>
 
         <div className="transaction-form-grid">
           <label className="transaction-form-grid__customer">
@@ -489,9 +493,13 @@ export default function TransactionStatementPage() {
               onChange={(event) => updateFormField("customerAddress", event.target.value)}
             />
           </label>
-          <label>
-            거래일자
+          <label className="transaction-form-grid__date">
+            발행일자
             <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
+          </label>
+          <label className="transaction-form-grid__date">
+            거래일자
+            <input type="date" value={formData.tradeDate} onChange={(event) => updateFormField("tradeDate", event.target.value)} />
           </label>
         </div>
 
@@ -558,7 +566,7 @@ export default function TransactionStatementPage() {
 
         <TransactionStatementScreenPanel
           issueDate={formData.issueDate}
-          tradeDateYmd={formData.issueDate}
+          tradeDateYmd={formData.tradeDate || formData.issueDate}
           customerName={formData.customerName}
           lines={screenLines}
           totalQty={totals.totalQty}

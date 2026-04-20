@@ -109,7 +109,7 @@ function rangesIntersect(a: string, b: string): boolean {
 }
 
 function ensureAmountKoreanMerge(worksheet: ExcelJS.Worksheet): void {
-  const targetRange = "F11:P11";
+  const targetRange = "F11:P12";
   const modelMerges = ((worksheet as unknown as { model?: { merges?: string[] } }).model?.merges ?? []).slice();
 
   for (const mergeRange of modelMerges) {

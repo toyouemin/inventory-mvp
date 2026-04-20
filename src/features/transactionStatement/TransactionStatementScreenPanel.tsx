@@ -81,7 +81,7 @@ export function TransactionStatementScreenPanel({
           <span className={styles.summaryItem}>
             <strong>발행일자</strong> {issueDate || "—"}
           </span>
-          <span className={styles.summaryItem}>
+          <span className={`${styles.summaryItem} ${styles.summaryItemTradeDate}`}>
             <strong>거래일자</strong> {tradeDateYmd || "—"}
           </span>
         </div>

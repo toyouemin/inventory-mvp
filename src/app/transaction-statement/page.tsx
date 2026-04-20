@@ -612,8 +612,19 @@ export default function TransactionStatementPage() {
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">
           <div className="transaction-preview-dialog__toolbar">
-            <h2 id="transaction-preview-title">출력 명세서 미리보기</h2>
+            <h2 id="transaction-preview-title">출력명세서</h2>
             <div className="transaction-preview-dialog__toolbarActions">
+              <button
+                type="button"
+                className={`btn btn-compact transaction-preview-dialog__vatBtn${
+                  showVatIncluded ? " transaction-preview-dialog__vatBtn--active" : ""
+                }`}
+                onClick={() => setShowVatIncluded((prev) => !prev)}
+                disabled={jpgSaving || downloading}
+                aria-pressed={showVatIncluded}
+              >
+                VAT
+              </button>
               <button
                 type="button"
                 className="btn btn-primary btn-compact"

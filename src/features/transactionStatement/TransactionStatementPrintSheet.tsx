@@ -84,6 +84,7 @@ const PartyBlock = ({
   stamp?: ReactNode;
 }) => (
   <div className={className}>
+    {stamp ?? null}
     <div className={styles.partyHeader}>{title}</div>
     <div className={styles.partyBody}>
       {PARTY_FIELDS.map(({ key, label }) => {
@@ -96,22 +97,11 @@ const PartyBlock = ({
             : key === "address"
               ? `${styles.partyValue} ${styles.partyValueAddress}`
               : styles.partyValue;
-        const valueCell =
-          key === "bizNo" && stamp ? (
-            <span className={styles.partyValueWithStamp}>
-              <span className={valueClass}>{raw}</span>
-              {stamp}
-            </span>
-          ) : (
-            <span className={valueClass}>{raw}</span>
-          );
-        const rowClass =
-          key === "bizNo" && stamp ? `${styles.partyRow} ${styles.partyRowStampLine}` : styles.partyRow;
         return (
-          <div key={key} className={rowClass}>
+          <div key={key} className={styles.partyRow}>
             <span className={styles.partyLabel}>{displayLabel}</span>
             <span className={styles.partyColon}>:</span>
-            {valueCell}
+            <span className={valueClass}>{raw}</span>
           </div>
         );
       })}
@@ -176,7 +166,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
             className={`${styles.partyCol} ${styles.partyColSupplier}`}
             stamp={
               <img
-                className={captureFixed ? `${styles.stampBesideBiz} ts-print-stamp` : styles.stampBesideBiz}
+                className={captureFixed ? `${styles.stampOverlay} ts-print-stamp` : styles.stampOverlay}
                 src={stampSrc}
                 alt=""
                 width={76}

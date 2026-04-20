@@ -3206,24 +3206,43 @@ label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 8px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   background: #fafafa;
 }
 
 .transaction-preview-dialog__toolbar h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.96rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .transaction-preview-dialog__toolbarActions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-wrap: nowrap;
+  gap: 6px;
   align-items: center;
   justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.transaction-preview-dialog__toolbarActions .btn {
+  padding: 4px 10px;
+}
+
+.transaction-preview-dialog__vatBtn {
+  border-color: var(--border, #d6d0c8);
+  background: #f1efea;
+  color: #6f6a63;
+  font-weight: 700;
+}
+
+.transaction-preview-dialog__vatBtn--active {
+  border-color: #4f7f62;
+  background: #5f8f72;
+  color: #fff;
 }
 
 .transaction-preview-dialog__scroll {
@@ -3280,17 +3299,17 @@ label {
   color: #666 !important;
 }
 
-/* JPG 캡처: 인감은 사업자번호 값 옆(인라인), 절대좌표 금지 */
+/* JPG 캡처: 인감은 공급자 텍스트 위로 오버랩 */
 .transaction-print-hidden-host img.ts-print-stamp {
-  position: static !important;
+  position: absolute !important;
   width: 76px !important;
   max-width: 76px !important;
   min-width: 0 !important;
   height: auto !important;
   object-fit: contain !important;
-  right: auto !important;
+  right: 10px !important;
   bottom: auto !important;
-  top: auto !important;
+  top: 42px !important;
   left: auto !important;
   transform: none !important;
 }

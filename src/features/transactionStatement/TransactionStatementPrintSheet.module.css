@@ -124,23 +124,12 @@
   gap: 2px;
 }
 
-/* 인감: 사업자번호 값 끝에 바로 붙임(공급자 상·하·성명 3줄 중 번호 행) */
-.partyValueWithStamp {
-  grid-column: 3;
-  display: inline-flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-
-.partyValueWithStamp > .partyValue {
-  grid-column: unset;
-}
-
-.stampBesideBiz {
-  display: block;
-  flex: 0 0 76px;
+/* 인감: 공급자 텍스트와 분리해서 우측 상단 오버랩 배치 */
+.stampOverlay {
+  position: absolute;
+  right: 10px;
+  top: 42px;
+  z-index: 4;
   width: 76px;
   max-width: 76px;
   height: auto;
@@ -156,11 +145,6 @@
   align-items: start;
   line-height: 1.32;
   font-size: 16px;
-}
-
-/* 인감이 있는 사업자번호 행: 라벨·콜론·값+도장 세로 가운데 정렬 */
-.partyRowStampLine {
-  align-items: center;
 }
 
 /* 상호/사업자번호/성명 3줄은 여백을 더 타이트하게 */

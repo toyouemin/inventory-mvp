@@ -50,21 +50,15 @@ function setCellValue(
 }
 
 function adjustVatLabelInWorksheet(worksheet: ExcelJS.Worksheet, showVatIncluded: boolean): void {
+  const vatLabel = showVatIncluded ? "부가세 포함 표시" : "";
+  // 템플릿에서 해당 문구가 표시되는 병합 대표 셀(A11)을 토글 상태에 맞춰 강제 반영한다.
+  setCellValue(worksheet, "A11", vatLabel);
+
   worksheet.eachRow((row) => {
     row.eachCell((cell) => {
       if (typeof cell.value !== "string") return;
-      if (!cell.value.includes("VAT포함")) return;
-      const compact = cell.value.replace(/\s+/g, "");
-      if (!compact.includes("합계금액(VAT포함)")) return;
-
-      if (showVatIncluded) {
-        // 기존 템플릿 문구를 최대한 유지하고, VAT 포함 표시만 보장한다.
-        cell.value = cell.value.includes("(VAT포함)")
-          ? cell.value
-          : cell.value.replace("합계금액", "합계금액 (VAT포함)");
-      } else {
-        cell.value = cell.value.replace(/\s*\(VAT포함\)/g, "");
-      }
+      if (!cell.value.includes("부가세 포함")) return;
+      cell.value = vatLabel;
     });
   });
 }

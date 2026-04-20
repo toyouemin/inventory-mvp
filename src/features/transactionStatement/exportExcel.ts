@@ -51,8 +51,8 @@ function setCellValue(
 
 function adjustVatLabelInWorksheet(worksheet: ExcelJS.Worksheet, showVatIncluded: boolean): void {
   const vatLabel = showVatIncluded ? "부가세 포함 표시" : "";
-  // 템플릿에서 해당 문구가 표시되는 병합 대표 셀(A11)을 토글 상태에 맞춰 강제 반영한다.
-  setCellValue(worksheet, "A11", vatLabel);
+  // 템플릿에서 부가세 포함 문구 위치로 사용하는 셀(AA11)을 토글 상태에 맞춰 반영한다.
+  setCellValue(worksheet, "AA11", vatLabel);
 
   worksheet.eachRow((row) => {
     row.eachCell((cell) => {

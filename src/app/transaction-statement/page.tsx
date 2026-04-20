@@ -623,7 +623,7 @@ export default function TransactionStatementPage() {
                 disabled={jpgSaving || downloading}
                 aria-pressed={showVatIncluded}
               >
-                VAT
+                {showVatIncluded ? "VAT 포함" : "VAT 미포함"}
               </button>
               <button
                 type="button"

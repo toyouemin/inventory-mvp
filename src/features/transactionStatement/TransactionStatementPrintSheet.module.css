@@ -127,7 +127,7 @@
 /* 인감: 공급자 텍스트와 분리해서 우측 상단 오버랩 배치 */
 .stampOverlay {
   position: absolute;
-  right: 10px;
+  right: 40px;
   top: 42px;
   z-index: 4;
   width: 76px;

@@ -63,6 +63,18 @@ function adjustVatLabelInWorksheet(worksheet: ExcelJS.Worksheet, showVatIncluded
   });
 }
 
+function adjustAmountKoreanFontSize(worksheet: ExcelJS.Worksheet, amountKoreanText: string): void {
+  const targetCell = worksheet.getCell(transactionStatementTemplateMap.totals.amountKoreanText);
+  const textLength = amountKoreanText.trim().length;
+
+  const nextSize = textLength >= 24 ? 8 : textLength >= 20 ? 9 : textLength >= 16 ? 10 : 11;
+
+  targetCell.font = {
+    ...targetCell.font,
+    size: nextSize,
+  };
+}
+
 function computeSupplyAndTax(totalAmount: number): { supplyAmount: number; taxAmount: number } {
   const safeTotal = Number.isFinite(totalAmount) ? totalAmount : 0;
   const supplyAmount = Math.round(safeTotal / 1.1);
@@ -142,7 +154,9 @@ export async function exportTransactionStatementExcelFromTemplateBuffer(
   const showVatIncluded = data.showVatIncluded !== false;
   adjustVatLabelInWorksheet(worksheet, showVatIncluded);
   const { supplyAmount, taxAmount } = computeSupplyAndTax(data.totalAmount);
-  setCellValue(worksheet, transactionStatementTemplateMap.totals.amountKoreanText, amountToKoreanText(data.totalAmount));
+  const amountKoreanText = amountToKoreanText(data.totalAmount);
+  setCellValue(worksheet, transactionStatementTemplateMap.totals.amountKoreanText, amountKoreanText);
+  adjustAmountKoreanFontSize(worksheet, amountKoreanText);
   setCellValue(worksheet, transactionStatementTemplateMap.totals.amountInParentheses, data.totalAmount);
   setCellValue(worksheet, transactionStatementTemplateMap.totals.totalQty, data.totalQty);
   if (showVatIncluded) {

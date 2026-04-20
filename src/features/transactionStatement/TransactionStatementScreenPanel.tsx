@@ -66,6 +66,7 @@ export function TransactionStatementScreenPanel({
           거래 요약
         </h2>
         <label className={styles.vatToggle}>
+          <span className={styles.vatToggleLabel}>부가세 포함 표시</span>
           <input
             type="checkbox"
             className={styles.vatToggleInput}
@@ -73,7 +74,6 @@ export function TransactionStatementScreenPanel({
             onChange={(e) => onShowVatIncludedChange(e.target.checked)}
           />
           <span className={styles.vatToggleTrack} aria-hidden />
-          <span className={styles.vatToggleLabel}>부가세 포함 표시</span>
         </label>
       </div>
       <div className={styles.summaryStack} role="group" aria-label="거래 요약 기본 정보">

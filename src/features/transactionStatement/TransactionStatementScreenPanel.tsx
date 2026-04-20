@@ -77,27 +77,27 @@ export function TransactionStatementScreenPanel({
             <strong>거래일자</strong> {tradeDateYmd || "—"}
           </span>
         </div>
-        <div className={styles.summaryPartyLine}>
-          <span className={styles.summaryItem}>
-            <strong>공급자</strong> {supplierName.trim() || "—"}
-          </span>
-          <span className={styles.summaryItem}>
-            <strong>사업자번호</strong> {supplierBizNo.trim() || "—"}
-          </span>
-          <span className={styles.summaryItem}>
-            <strong>성명</strong> {supplierRepresentative.trim() || "—"}
-          </span>
-        </div>
-        <div className={styles.summaryPartyLine}>
-          <span className={styles.summaryItem}>
-            <strong>공급받는자</strong> {customerName.trim() || "—"}
-          </span>
-          <span className={styles.summaryItem}>
-            <strong>사업자번호</strong> {customerBizNo.trim() || "—"}
-          </span>
-          <span className={styles.summaryItem}>
-            <strong>성명</strong> {customerRepresentative.trim() || "—"}
-          </span>
+        <div className={styles.summaryPartyGrid}>
+          <div className={styles.summaryPartyCol}>
+            <span className={styles.summaryPartyTitle}>공급자</span>
+            <span className={styles.summaryItem}>{supplierName.trim() || "—"}</span>
+            <span className={styles.summaryItem}>
+              <strong>사업자번호</strong> {supplierBizNo.trim() || "—"}
+            </span>
+            <span className={styles.summaryItem}>
+              <strong>성명</strong> {supplierRepresentative.trim() || "—"}
+            </span>
+          </div>
+          <div className={`${styles.summaryPartyCol} ${styles.summaryPartyColRight}`}>
+            <span className={styles.summaryPartyTitle}>공급받는자</span>
+            <span className={styles.summaryItem}>{customerName.trim() || "—"}</span>
+            <span className={styles.summaryItem}>
+              <strong>사업자번호</strong> {customerBizNo.trim() || "—"}
+            </span>
+            <span className={styles.summaryItem}>
+              <strong>성명</strong> {customerRepresentative.trim() || "—"}
+            </span>
+          </div>
         </div>
       </div>
 

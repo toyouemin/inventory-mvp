@@ -8,6 +8,8 @@ const nextConfig = {
    */
   outputFileTracingIncludes: {
     "/api/documents/transaction-statement/xlsx": ["./public/templates/**/*.xlsx"],
+    "/api/documents/transaction-statement/xlsx/route": ["./public/templates/**/*.xlsx"],
+    "/*": ["./public/templates/**/*.xlsx"],
   },
   images: {
     remotePatterns: [

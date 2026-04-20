@@ -49,6 +49,26 @@ function setCellValue(
   worksheet.getCell(cellAddress).value = value ?? "";
 }
 
+function adjustVatLabelInWorksheet(worksheet: ExcelJS.Worksheet, showVatIncluded: boolean): void {
+  worksheet.eachRow((row) => {
+    row.eachCell((cell) => {
+      if (typeof cell.value !== "string") return;
+      if (!cell.value.includes("VAT포함")) return;
+      const compact = cell.value.replace(/\s+/g, "");
+      if (!compact.includes("합계금액(VAT포함)")) return;
+
+      if (showVatIncluded) {
+        // 기존 템플릿 문구를 최대한 유지하고, VAT 포함 표시만 보장한다.
+        cell.value = cell.value.includes("(VAT포함)")
+          ? cell.value
+          : cell.value.replace("합계금액", "합계금액 (VAT포함)");
+      } else {
+        cell.value = cell.value.replace(/\s*\(VAT포함\)/g, "");
+      }
+    });
+  });
+}
+
 function computeSupplyAndTax(totalAmount: number): { supplyAmount: number; taxAmount: number } {
   const safeTotal = Number.isFinite(totalAmount) ? totalAmount : 0;
   const supplyAmount = Math.round(safeTotal / 1.1);
@@ -126,6 +146,7 @@ export async function exportTransactionStatementExcelFromTemplateBuffer(
   }
 
   const showVatIncluded = data.showVatIncluded !== false;
+  adjustVatLabelInWorksheet(worksheet, showVatIncluded);
   const { supplyAmount, taxAmount } = computeSupplyAndTax(data.totalAmount);
   setCellValue(worksheet, transactionStatementTemplateMap.totals.amountKoreanText, amountToKoreanText(data.totalAmount));
   setCellValue(worksheet, transactionStatementTemplateMap.totals.amountInParentheses, data.totalAmount);

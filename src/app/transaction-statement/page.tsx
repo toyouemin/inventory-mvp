@@ -1,7 +1,7 @@
 "use client";
 
 import html2canvas from "html2canvas";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { amountToKoreanText } from "@/features/transactionStatement/amountToKoreanText";
 import {
   TransactionStatementPrintSheet,
@@ -93,10 +93,10 @@ function buildStatementBaseFileName(customerName: string, issueDateYmd: string):
   return `${name}-거래명세표-${yyMMdd}`;
 }
 
-/** 숨김 캡처 호스트 가로(2300)와 동일; 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
+/** 숨김 캡처 호스트와 동일한 가로(860+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
 const STATEMENT_JPG_HTML2CANVAS_VIEW = {
   scale: 3,
-  windowWidth: 2300,
+  windowWidth: 940,
   windowHeight: 6000,
   scrollX: 0,
   scrollY: 0,
@@ -149,7 +149,6 @@ function normalizeBizNoInput(value: string): string {
 
 export default function TransactionStatementPage() {
   const printCaptureRef = useRef<HTMLDivElement>(null);
-  const printCaptureOuterRef = useRef<HTMLDivElement>(null);
   const previewDialogRef = useRef<HTMLDialogElement>(null);
   const [formData, setFormData] = useState<TransactionStatementFormData>({
     customerName: "",
@@ -271,13 +270,6 @@ export default function TransactionStatementPage() {
       showVatIncluded,
     ]
   );
-
-  useLayoutEffect(() => {
-    const outer = printCaptureOuterRef.current;
-    const sheet = outer?.querySelector("[data-ts-print-sheet]") as HTMLElement | null;
-    if (!outer || !sheet) return;
-    outer.style.setProperty("--ts-capture-sheet-h", `${Math.ceil(sheet.offsetHeight)}px`);
-  }, [printSheetProps, showVatIncluded]);
 
   function updateItem(id: string, key: keyof StatementItemFormRow, value: string): void {
     setFormData((prev) => ({
@@ -615,11 +607,7 @@ export default function TransactionStatementPage() {
         />
 
         <div ref={printCaptureRef} className="transaction-print-hidden-host" aria-hidden="true">
-          <div ref={printCaptureOuterRef} className="transaction-print-capture-a4-outer">
-            <div className="transaction-print-capture-a4-scale">
-              <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
-            </div>
-          </div>
+          <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
         </div>
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">

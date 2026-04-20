@@ -14,6 +14,7 @@ export type TransactionStatementScreenPanelProps = {
   issueDate: string;
   tradeDateYmd: string;
   /** 고정 공급자 */
+  supplierName: string;
   supplierBizNo: string;
   supplierRepresentative: string;
   customerName: string;
@@ -34,6 +35,7 @@ export type TransactionStatementScreenPanelProps = {
 export function TransactionStatementScreenPanel({
   issueDate,
   tradeDateYmd,
+  supplierName,
   supplierBizNo,
   supplierRepresentative,
   customerName,
@@ -77,7 +79,7 @@ export function TransactionStatementScreenPanel({
         </div>
         <div className={styles.summaryPartyLine}>
           <span className={styles.summaryItem}>
-            <strong>공급자</strong>
+            <strong>공급자</strong> {supplierName.trim() || "—"}
           </span>
           <span className={styles.summaryItem}>
             <strong>사업자번호</strong> {supplierBizNo.trim() || "—"}

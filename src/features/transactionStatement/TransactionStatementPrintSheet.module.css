@@ -121,7 +121,7 @@
   padding: 8px 12px 6px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
 
 /* 인감: 사업자번호 값 끝에 바로 붙임(공급자 상·하·성명 3줄 중 번호 행) */
@@ -154,13 +154,18 @@
   grid-template-columns: 5.5em auto minmax(0, 1fr);
   column-gap: 6px;
   align-items: start;
-  line-height: 1.45;
+  line-height: 1.32;
   font-size: 16px;
 }
 
 /* 인감이 있는 사업자번호 행: 라벨·콜론·값+도장 세로 가운데 정렬 */
 .partyRowStampLine {
   align-items: center;
+}
+
+/* 상호/사업자번호/성명 3줄은 여백을 더 타이트하게 */
+.partyBody .partyRow:nth-child(-n + 3) {
+  line-height: 1.24;
 }
 
 .partyLabel {

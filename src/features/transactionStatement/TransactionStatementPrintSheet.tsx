@@ -151,7 +151,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
   ) {
     const tradeYmd = ((tradeDate ?? issueDate) || "").trim() || "—";
     const footer = printFooter === null ? null : { ...DEFAULT_FOOTER, ...printFooter };
-    const legalLines = showVatIncluded ? (footer?.legalLeftLines ?? []) : [];
+    const legalLines = footer?.legalLeftLines ?? [];
     const hasLegalFooter = legalLines.length > 0;
     const captureCls = captureFixed ? " ts-print-capture-fixed" : "";
     const titleCaptureCls = captureFixed ? " ts-print-title" : "";

@@ -465,7 +465,7 @@ export default function TransactionStatementPage() {
 
         <div className="transaction-form-grid">
           <label className="transaction-form-grid__customer">
-            상호
+            상호/클럽
             <input value={formData.customerName} onChange={(event) => updateFormField("customerName", event.target.value)} />
           </label>
           <label className="transaction-form-grid__customer">
@@ -589,6 +589,7 @@ export default function TransactionStatementPage() {
         <TransactionStatementScreenPanel
           issueDate={formData.issueDate}
           tradeDateYmd={formData.tradeDate || formData.issueDate}
+          supplierName={FIXED_SUPPLIER.name}
           supplierBizNo={FIXED_SUPPLIER.bizNo}
           supplierRepresentative={FIXED_SUPPLIER.representative}
           customerName={formData.customerName}

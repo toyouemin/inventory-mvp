@@ -3232,6 +3232,13 @@ label {
   padding: 4px 10px;
 }
 
+/* PC에서만 상단 메뉴(제목+버튼군) 가운데 정렬 */
+@media (min-width: 961px) {
+  .transaction-preview-dialog__toolbar {
+    justify-content: center;
+  }
+}
+
 .transaction-preview-dialog__vatBtn {
   border-color: var(--border, #d6d0c8);
   background: #f1efea;

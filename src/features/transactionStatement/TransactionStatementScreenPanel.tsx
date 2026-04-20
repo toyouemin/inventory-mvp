@@ -32,6 +32,10 @@ export type TransactionStatementScreenPanelProps = {
   onOpenPrintPreview: () => void;
 };
 
+function digitsOnly(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
 export function TransactionStatementScreenPanel({
   issueDate,
   tradeDateYmd,
@@ -51,6 +55,10 @@ export function TransactionStatementScreenPanel({
   onShowVatIncludedChange,
   onOpenPrintPreview,
 }: TransactionStatementScreenPanelProps) {
+  const customerBizNoDigits = digitsOnly(customerBizNo);
+  const customerBizNoFieldLabel =
+    customerBizNoDigits.length === 11 ? "핸드폰 번호" : "사업자번호";
+
   return (
     <section className={styles.panel} aria-labelledby="transaction-screen-heading">
       <div className={styles.panelHeader}>
@@ -92,7 +100,7 @@ export function TransactionStatementScreenPanel({
             <span className={styles.summaryPartyTitle}>공급받는자</span>
             <span className={styles.summaryItem}>{customerName.trim() || "—"}</span>
             <span className={styles.summaryItem}>
-              <strong>사업자번호</strong> {customerBizNo.trim() || "—"}
+              <strong>{customerBizNoFieldLabel}</strong> {customerBizNo.trim() || "—"}
             </span>
             <span className={styles.summaryItem}>
               <strong>성명</strong> {customerRepresentative.trim() || "—"}

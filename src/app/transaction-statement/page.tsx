@@ -93,10 +93,10 @@ function buildStatementBaseFileName(customerName: string, issueDateYmd: string):
   return `${name}-거래명세표-${yyMMdd}`;
 }
 
-/** 숨김 캡처 호스트와 동일한 가로(860+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
+/** 숨김 캡처 호스트 가로(2300)와 동일; 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
 const STATEMENT_JPG_HTML2CANVAS_VIEW = {
   scale: 3,
-  windowWidth: 940,
+  windowWidth: 2300,
   windowHeight: 6000,
   scrollX: 0,
   scrollY: 0,
@@ -607,7 +607,9 @@ export default function TransactionStatementPage() {
         />
 
         <div ref={printCaptureRef} className="transaction-print-hidden-host" aria-hidden="true">
-          <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
+          <div className="transaction-print-capture-a4-scale">
+            <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
+          </div>
         </div>
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">

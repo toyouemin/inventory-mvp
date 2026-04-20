@@ -3171,19 +3171,33 @@ label {
 
 /* 출력용 시트: 화면 밖 고정폭 캡처 영역(html2canvas 등에서 ref 타깃) */
 .transaction-print-hidden-host {
-  /* 시트 860px + 좌우 패딩 40px×2 ≈ 940px 캡처 폭 */
+  /* 캡처 시트 폭(내부) — scale 분자와 반드시 일치 */
   --ts-print-sheet-w: 860px;
+  /* A4 등 목표 출력 가로(px) */
+  --ts-capture-output-w: 2300px;
   position: fixed;
   left: -14000px;
   top: 0;
   box-sizing: border-box;
-  width: calc(var(--ts-print-sheet-w) + 80px) !important;
-  min-width: calc(var(--ts-print-sheet-w) + 80px) !important;
-  max-width: calc(var(--ts-print-sheet-w) + 80px) !important;
-  padding: 34px 40px 38px;
+  width: var(--ts-capture-output-w) !important;
+  min-width: var(--ts-capture-output-w) !important;
+  max-width: var(--ts-capture-output-w) !important;
+  padding: 0;
+  overflow: hidden;
   background: #ffffff;
   pointer-events: none;
   z-index: -30;
+}
+
+/* scale = 목표 가로 / 시트 width, 레이아웃(줄바꿈)은 시트 원본 기준 유지 */
+.transaction-print-capture-a4-scale {
+  display: inline-block;
+  vertical-align: top;
+  box-sizing: border-box;
+  width: var(--ts-print-sheet-w);
+  max-width: var(--ts-print-sheet-w);
+  transform: scale(calc(var(--ts-capture-output-w) / var(--ts-print-sheet-w)));
+  transform-origin: top left;
 }
 
 .transaction-preview-dialog {

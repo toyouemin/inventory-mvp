@@ -6,11 +6,97 @@
   background: var(--card, #fff);
 }
 
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
 .panelTitle {
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 0.9375rem;
   font-weight: 700;
   color: var(--text, #1f1f1f);
+  line-height: 1.3;
+  flex: 1;
+  min-width: 0;
+}
+
+.vatToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  margin-top: 1px;
+}
+
+.vatToggleInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.vatToggleTrack {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: #c9c4bc;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.vatToggleTrack::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease;
+}
+
+.vatToggleInput:focus-visible + .vatToggleTrack {
+  outline: 2px solid var(--focus, #2563eb);
+  outline-offset: 2px;
+}
+
+.vatToggleInput:checked + .vatToggleTrack {
+  background: #6f9a6a;
+}
+
+.vatToggleInput:checked + .vatToggleTrack::after {
+  transform: translateX(16px);
+}
+
+.vatToggleLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted, #6f6a63);
+  max-width: 7.5rem;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.summaryStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .summaryInline {
@@ -18,8 +104,13 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: 4px 12px;
-  font-size: 12px;
-  line-height: 1.35;
+}
+
+.summaryPartyLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
 }
 
 .summaryItem {
@@ -44,16 +135,35 @@
 
 .itemsTable {
   width: 100%;
-  min-width: 260px;
+  min-width: 280px;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 12.5px;
+}
+
+/* 품목·규격은 남은 폭을 나눠 쓰고, 수량·금액은 좁게 고정 비율 */
+.colProduct {
+  width: 36%;
+}
+
+.colSpec {
+  width: 36%;
+}
+
+.colQty {
+  width: 10%;
+}
+
+.colAmount {
+  width: 18%;
 }
 
 .itemsTable th,
 .itemsTable td {
   border: 1px solid var(--border, #e3ddd6);
-  padding: 6px 8px;
+  padding: 5px 6px;
   text-align: left;
+  vertical-align: top;
 }
 
 .itemsTable th {
@@ -66,11 +176,29 @@
   color: var(--muted, #6f6a63);
 }
 
-.itemsTable td:nth-child(2),
-.itemsTable td:nth-child(3) {
+.itemsTable thead th {
+  text-align: center;
+}
+
+.cellProduct,
+.cellSpec {
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.cellQty,
+.cellAmount {
+  padding-left: 3px;
+  padding-right: 4px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.cellAmount {
+  letter-spacing: -0.02em;
 }
 
 .totals {
@@ -142,9 +270,22 @@
     padding: 10px 10px 10px;
   }
 
+  .vatToggleLabel {
+    max-width: 5.5rem;
+    font-size: 10.5px;
+  }
+
+  .summaryStack {
+    font-size: 11.5px;
+    gap: 5px;
+  }
+
   .summaryInline {
     gap: 3px 8px;
-    font-size: 11.5px;
+  }
+
+  .summaryPartyLine {
+    gap: 3px 10px;
   }
 
   .itemsWrap {

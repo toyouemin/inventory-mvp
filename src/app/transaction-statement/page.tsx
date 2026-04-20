@@ -39,7 +39,7 @@ const FIXED_SUPPLIER = {
   businessItem: "스포츠용품",
 } as const;
 
-const TRANSACTION_STATEMENT_GUIDE_TEXT = "정보 입력→명세서 미리보기→JPG 저장";
+const TRANSACTION_STATEMENT_GUIDE_TEXT = "정보 입력→명세표 미리보기→JPG 저장→발송";
 
 /** 출력 푸터(은행·URL 등은 사업 정보에 맞게 수정) */
 const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
@@ -164,6 +164,8 @@ export default function TransactionStatementPage() {
   const [downloading, setDownloading] = useState(false);
   const [jpgSaving, setJpgSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  /** 거래 요약 토글과 동일: 끄면 미리보기·JPG에도 부가세 관련 문구·공급/세액 숨김 */
+  const [showVatIncluded, setShowVatIncluded] = useState(true);
 
   const computedRows = useMemo(
     () =>
@@ -210,7 +212,14 @@ export default function TransactionStatementPage() {
   );
 
   const screenLines = useMemo(
-    () => printLines.map((row) => ({ id: row.id, name: row.name, qty: row.qty, amount: row.amount })),
+    () =>
+      printLines.map((row) => ({
+        id: row.id,
+        name: row.name,
+        spec: row.spec,
+        qty: row.qty,
+        amount: row.amount,
+      })),
     [printLines]
   );
 
@@ -241,6 +250,7 @@ export default function TransactionStatementPage() {
       totalAmount: totals.totalAmount,
       totalAmountKorean: settlement.amountKoreanText,
       printFooter: STATEMENT_PRINT_FOOTER,
+      showVatIncluded,
     }),
     [
       formData.customerName,
@@ -257,6 +267,7 @@ export default function TransactionStatementPage() {
       settlement.taxAmount,
       settlement.amountKoreanText,
       totals.totalAmount,
+      showVatIncluded,
     ]
   );
 
@@ -352,6 +363,7 @@ export default function TransactionStatementPage() {
             totalQty: payloadItems.reduce((sum: number, row: { qty: number }) => sum + row.qty, 0),
             totalAmount: payloadItems.reduce((sum: number, row: { amount: number }) => sum + row.amount, 0),
             footerMemo: "",
+            showVatIncluded,
           },
         }),
       });
@@ -577,7 +589,10 @@ export default function TransactionStatementPage() {
         <TransactionStatementScreenPanel
           issueDate={formData.issueDate}
           tradeDateYmd={formData.tradeDate || formData.issueDate}
+          supplierBizNo={FIXED_SUPPLIER.bizNo}
+          supplierRepresentative={FIXED_SUPPLIER.representative}
           customerName={formData.customerName}
+          customerBizNo={formData.customerBizNo}
           customerRepresentative={formData.customerRepresentative}
           lines={screenLines}
           totalQty={totals.totalQty}
@@ -585,6 +600,8 @@ export default function TransactionStatementPage() {
           taxAmount={settlement.taxAmount}
           totalAmount={totals.totalAmount}
           amountKoreanText={settlement.amountKoreanText}
+          showVatIncluded={showVatIncluded}
+          onShowVatIncludedChange={setShowVatIncluded}
           onOpenPrintPreview={() => previewDialogRef.current?.showModal()}
         />
 

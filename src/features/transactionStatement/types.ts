@@ -27,6 +27,8 @@ export type TransactionStatementData = {
   totalAmount: number;
   totalQty: number;
   footerMemo?: string;
+  /** false면 엑셀에서 공급가액·세액 칸을 비움(화면 부가세 표시 토글과 동일) */
+  showVatIncluded?: boolean;
 };
 
 export type TransactionStatementOrderInput = {

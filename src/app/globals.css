@@ -3280,16 +3280,18 @@ label {
   color: #666 !important;
 }
 
-/* JPG 캡처: 인감을 공급자 박스 하단 라인에 맞춰 내부 고정 */
+/* JPG 캡처: 인감은 사업자번호 값 옆(인라인), 절대좌표 금지 */
 .transaction-print-hidden-host img.ts-print-stamp {
+  position: static !important;
   width: 76px !important;
   max-width: 76px !important;
   min-width: 0 !important;
   height: auto !important;
   object-fit: contain !important;
-  right: 10% !important;
-  bottom: 8px !important;
+  right: auto !important;
+  bottom: auto !important;
   top: auto !important;
+  left: auto !important;
   transform: none !important;
 }
 

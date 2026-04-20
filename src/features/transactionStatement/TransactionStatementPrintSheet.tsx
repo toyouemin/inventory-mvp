@@ -46,6 +46,8 @@ export type TransactionStatementPrintSheetProps = {
   totalAmountKorean: string;
   stampSrc?: string;
   printFooter?: TransactionStatementPrintFooter | null;
+  /** false면 공급가액·세액·VAT문구·푸터 세금 안내 등 부가세 관련 표시 숨김 */
+  showVatIncluded?: boolean;
   /** 숨김 JPG 캡처용: 뷰포트와 무관한 고정 데스크톱 레이아웃만 적용 */
   captureFixed?: boolean;
 };
@@ -82,7 +84,6 @@ const PartyBlock = ({
   stamp?: ReactNode;
 }) => (
   <div className={className}>
-    {stamp ?? null}
     <div className={styles.partyHeader}>{title}</div>
     <div className={styles.partyBody}>
       {PARTY_FIELDS.map(({ key, label }) => {
@@ -95,11 +96,22 @@ const PartyBlock = ({
             : key === "address"
               ? `${styles.partyValue} ${styles.partyValueAddress}`
               : styles.partyValue;
+        const valueCell =
+          key === "bizNo" && stamp ? (
+            <span className={styles.partyValueWithStamp}>
+              <span className={valueClass}>{raw}</span>
+              {stamp}
+            </span>
+          ) : (
+            <span className={valueClass}>{raw}</span>
+          );
+        const rowClass =
+          key === "bizNo" && stamp ? `${styles.partyRow} ${styles.partyRowStampLine}` : styles.partyRow;
         return (
-          <div key={key} className={styles.partyRow}>
+          <div key={key} className={rowClass}>
             <span className={styles.partyLabel}>{displayLabel}</span>
             <span className={styles.partyColon}>:</span>
-            <span className={valueClass}>{raw}</span>
+            {valueCell}
           </div>
         );
       })}
@@ -132,12 +144,15 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
       totalAmountKorean,
       stampSrc = "/images/transaction-template-image1.png",
       printFooter,
+      showVatIncluded = true,
       captureFixed = false,
     },
     ref
   ) {
     const tradeYmd = ((tradeDate ?? issueDate) || "").trim() || "—";
     const footer = printFooter === null ? null : { ...DEFAULT_FOOTER, ...printFooter };
+    const legalLines = showVatIncluded ? (footer?.legalLeftLines ?? []) : [];
+    const hasLegalFooter = legalLines.length > 0;
     const captureCls = captureFixed ? " ts-print-capture-fixed" : "";
     const titleCaptureCls = captureFixed ? " ts-print-title" : "";
     const issueCaptureCls = captureFixed ? " ts-print-issue-date" : "";
@@ -161,7 +176,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
             className={`${styles.partyCol} ${styles.partyColSupplier}`}
             stamp={
               <img
-                className={captureFixed ? `${styles.stamp} ts-print-stamp` : styles.stamp}
+                className={captureFixed ? `${styles.stampBesideBiz} ts-print-stamp` : styles.stampBesideBiz}
                 src={stampSrc}
                 alt=""
                 width={76}
@@ -219,18 +234,24 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
               <span className={styles.totalLineLabel}>총수량</span>
               <span className={styles.totalLineValue}>{totalQty.toLocaleString("ko-KR")}</span>
             </div>
-            <div className={styles.totalLine}>
-              <span className={styles.totalLineLabel}>공급가액</span>
-              <span className={styles.totalLineValue}>{supplyAmount.toLocaleString("ko-KR")}</span>
-            </div>
-            <div className={styles.totalLine}>
-              <span className={styles.totalLineLabel}>세액(VAT)</span>
-              <span className={styles.totalLineValue}>{taxAmount.toLocaleString("ko-KR")}</span>
-            </div>
+            {showVatIncluded ? (
+              <>
+                <div className={styles.totalLine}>
+                  <span className={styles.totalLineLabel}>공급가액</span>
+                  <span className={styles.totalLineValue}>{supplyAmount.toLocaleString("ko-KR")}</span>
+                </div>
+                <div className={styles.totalLine}>
+                  <span className={styles.totalLineLabel}>세액(VAT)</span>
+                  <span className={styles.totalLineValue}>{taxAmount.toLocaleString("ko-KR")}</span>
+                </div>
+              </>
+            ) : null}
           </div>
           <div className={styles.totalsRight}>
             <div className={styles.totalHighlightTop}>
-              <span className={styles.totalHighlightLabel}>합계금액 (VAT포함)</span>
+              <span className={styles.totalHighlightLabel}>
+                {showVatIncluded ? "합계금액 (VAT포함)" : "합계금액"}
+              </span>
               <span className={styles.totalHighlightNum}>{totalAmount.toLocaleString("ko-KR")}원</span>
             </div>
             <div className={styles.totalHighlightBottom}>
@@ -241,14 +262,16 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
         </div>
 
         {footer ? (
-          <footer className={styles.printFooter}>
-            <div className={styles.printFooterLeft}>
-              {footer.legalLeftLines.map((line, i) => (
-                <p key={i} className={styles.printFooterLegal}>
-                  {line}
-                </p>
-              ))}
-            </div>
+          <footer className={`${styles.printFooter}${hasLegalFooter ? "" : ` ${styles.printFooterRightOnly}`}`}>
+            {hasLegalFooter ? (
+              <div className={styles.printFooterLeft}>
+                {legalLines.map((line, i) => (
+                  <p key={i} className={styles.printFooterLegal}>
+                    {line}
+                  </p>
+                ))}
+              </div>
+            ) : null}
             <div className={styles.printFooterRight}>
               {footer.bankLine ? <p className={`${styles.printFooterMeta} ${styles.printFooterBankLine}`}>{footer.bankLine}</p> : null}
               <div className={styles.printFooterBrandRow}>

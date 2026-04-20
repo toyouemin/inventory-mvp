@@ -5,6 +5,7 @@ import styles from "./TransactionStatementScreenPanel.module.css";
 export type TransactionStatementScreenLine = {
   id: string;
   name: string;
+  spec: string;
   qty: number;
   amount: number;
 };
@@ -12,7 +13,11 @@ export type TransactionStatementScreenLine = {
 export type TransactionStatementScreenPanelProps = {
   issueDate: string;
   tradeDateYmd: string;
+  /** 고정 공급자 */
+  supplierBizNo: string;
+  supplierRepresentative: string;
   customerName: string;
+  customerBizNo: string;
   customerRepresentative: string;
   lines: TransactionStatementScreenLine[];
   totalQty: number;
@@ -20,13 +25,19 @@ export type TransactionStatementScreenPanelProps = {
   taxAmount: number;
   totalAmount: number;
   amountKoreanText: string;
+  /** 체크 시 부가세·공급/세액 요약 표시(출력·이미지와 동일) */
+  showVatIncluded: boolean;
+  onShowVatIncludedChange: (value: boolean) => void;
   onOpenPrintPreview: () => void;
 };
 
 export function TransactionStatementScreenPanel({
   issueDate,
   tradeDateYmd,
+  supplierBizNo,
+  supplierRepresentative,
   customerName,
+  customerBizNo,
   customerRepresentative,
   lines,
   totalQty,
@@ -34,33 +45,72 @@ export function TransactionStatementScreenPanel({
   taxAmount,
   totalAmount,
   amountKoreanText,
+  showVatIncluded,
+  onShowVatIncludedChange,
   onOpenPrintPreview,
 }: TransactionStatementScreenPanelProps) {
   return (
     <section className={styles.panel} aria-labelledby="transaction-screen-heading">
-      <h2 id="transaction-screen-heading" className={styles.panelTitle}>
-        거래 요약
-      </h2>
-      <div className={styles.summaryInline} role="group" aria-label="거래 요약 기본 정보">
-        <span className={styles.summaryItem}>
-          <strong>발행일자</strong> {issueDate || "—"}
-        </span>
-        <span className={styles.summaryItem}>
-          <strong>거래일자</strong> {tradeDateYmd || "—"}
-        </span>
-        <span className={styles.summaryItem}>
-          <strong>공급받는자 상호</strong> {customerName.trim() || "—"}
-        </span>
-        <span className={styles.summaryItem}>
-          <strong>성명</strong> {customerRepresentative.trim() || "—"}
-        </span>
+      <div className={styles.panelHeader}>
+        <h2 id="transaction-screen-heading" className={styles.panelTitle}>
+          거래 요약
+        </h2>
+        <label className={styles.vatToggle}>
+          <input
+            type="checkbox"
+            className={styles.vatToggleInput}
+            checked={showVatIncluded}
+            onChange={(e) => onShowVatIncludedChange(e.target.checked)}
+          />
+          <span className={styles.vatToggleTrack} aria-hidden />
+          <span className={styles.vatToggleLabel}>부가세 포함 표시</span>
+        </label>
+      </div>
+      <div className={styles.summaryStack} role="group" aria-label="거래 요약 기본 정보">
+        <div className={styles.summaryInline}>
+          <span className={styles.summaryItem}>
+            <strong>발행일자</strong> {issueDate || "—"}
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>거래일자</strong> {tradeDateYmd || "—"}
+          </span>
+        </div>
+        <div className={styles.summaryPartyLine}>
+          <span className={styles.summaryItem}>
+            <strong>공급자</strong>
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>사업자번호</strong> {supplierBizNo.trim() || "—"}
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>성명</strong> {supplierRepresentative.trim() || "—"}
+          </span>
+        </div>
+        <div className={styles.summaryPartyLine}>
+          <span className={styles.summaryItem}>
+            <strong>공급받는자</strong> {customerName.trim() || "—"}
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>사업자번호</strong> {customerBizNo.trim() || "—"}
+          </span>
+          <span className={styles.summaryItem}>
+            <strong>성명</strong> {customerRepresentative.trim() || "—"}
+          </span>
+        </div>
       </div>
 
       <div className={styles.itemsWrap}>
         <table className={styles.itemsTable}>
+          <colgroup>
+            <col className={styles.colProduct} />
+            <col className={styles.colSpec} />
+            <col className={styles.colQty} />
+            <col className={styles.colAmount} />
+          </colgroup>
           <thead>
             <tr>
               <th>품목명</th>
+              <th>규격</th>
               <th>수량</th>
               <th>금액</th>
             </tr>
@@ -68,14 +118,15 @@ export function TransactionStatementScreenPanel({
           <tbody>
             {lines.length === 0 ? (
               <tr>
-                <td colSpan={3}>입력된 품목이 없습니다.</td>
+                <td colSpan={4}>입력된 품목이 없습니다.</td>
               </tr>
             ) : (
               lines.map((row) => (
                 <tr key={row.id}>
-                  <td>{row.name}</td>
-                  <td>{row.qty.toLocaleString("ko-KR")}</td>
-                  <td>{row.amount.toLocaleString("ko-KR")}원</td>
+                  <td className={styles.cellProduct}>{row.name}</td>
+                  <td className={styles.cellSpec}>{row.spec}</td>
+                  <td className={styles.cellQty}>{row.qty.toLocaleString("ko-KR")}</td>
+                  <td className={styles.cellAmount}>{row.amount.toLocaleString("ko-KR")}원</td>
                 </tr>
               ))
             )}
@@ -86,13 +137,18 @@ export function TransactionStatementScreenPanel({
       <div className={styles.totals}>
         <div className={styles.totalsPrimary}>
           <span className={styles.totalsAmount}>
-            합계 금액 {totalAmount.toLocaleString("ko-KR")}원 <span className={styles.totalsVat}>(VAT포함)</span>
+            합계 금액 {totalAmount.toLocaleString("ko-KR")}원
+            {showVatIncluded ? <span className={styles.totalsVat}>(VAT포함)</span> : null}
             <span className={styles.totalsAmountKorean}> ({amountKoreanText})</span>
           </span>
-          <span className={styles.totalsMeta}>
-            총수량 {totalQty.toLocaleString("ko-KR")} · 공급 {supplyAmount.toLocaleString("ko-KR")} · 세액{" "}
-            {taxAmount.toLocaleString("ko-KR")}
-          </span>
+          {showVatIncluded ? (
+            <span className={styles.totalsMeta}>
+              총수량 {totalQty.toLocaleString("ko-KR")} · 공급 {supplyAmount.toLocaleString("ko-KR")} · 세액{" "}
+              {taxAmount.toLocaleString("ko-KR")}
+            </span>
+          ) : (
+            <span className={styles.totalsMeta}>총수량 {totalQty.toLocaleString("ko-KR")}</span>
+          )}
         </div>
       </div>
 

@@ -66,6 +66,7 @@ function fromOrderInput(order: TransactionStatementOrderInput): TransactionState
     totalAmount,
     totalQty,
     footerMemo: (order.notes ?? "").trim(),
+    showVatIncluded: true,
   };
 }
 
@@ -97,6 +98,7 @@ function fromStatementInput(statement: Partial<TransactionStatementData>): Trans
     totalQty,
     totalAmount,
     footerMemo: (statement.footerMemo ?? "").trim(),
+    showVatIncluded: statement.showVatIncluded ?? true,
   };
 }
 

@@ -95,12 +95,18 @@ export async function exportTransactionStatementExcel(data: TransactionStatement
     setCellValue(worksheet, `${transactionStatementTemplateMap.items.columns.note}${row}`, item.note);
   }
 
+  const showVatIncluded = data.showVatIncluded !== false;
   const { supplyAmount, taxAmount } = computeSupplyAndTax(data.totalAmount);
   setCellValue(worksheet, transactionStatementTemplateMap.totals.amountKoreanText, amountToKoreanText(data.totalAmount));
   setCellValue(worksheet, transactionStatementTemplateMap.totals.amountInParentheses, data.totalAmount);
   setCellValue(worksheet, transactionStatementTemplateMap.totals.totalQty, data.totalQty);
-  setCellValue(worksheet, transactionStatementTemplateMap.totals.supplyAmount, supplyAmount);
-  setCellValue(worksheet, transactionStatementTemplateMap.totals.taxAmount, taxAmount);
+  if (showVatIncluded) {
+    setCellValue(worksheet, transactionStatementTemplateMap.totals.supplyAmount, supplyAmount);
+    setCellValue(worksheet, transactionStatementTemplateMap.totals.taxAmount, taxAmount);
+  } else {
+    setCellValue(worksheet, transactionStatementTemplateMap.totals.supplyAmount, "");
+    setCellValue(worksheet, transactionStatementTemplateMap.totals.taxAmount, "");
+  }
   setCellValue(worksheet, transactionStatementTemplateMap.totals.totalAmount, data.totalAmount);
   if (transactionStatementTemplateMap.totals.footerMemo && data.footerMemo) {
     setCellValue(worksheet, transactionStatementTemplateMap.totals.footerMemo, data.footerMemo);

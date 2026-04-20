@@ -3183,10 +3183,19 @@ label {
   min-width: var(--ts-capture-output-w) !important;
   max-width: var(--ts-capture-output-w) !important;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   background: #ffffff;
   pointer-events: none;
   z-index: -30;
+}
+
+/* 원본 시트 높이 × scale — JS에서 --ts-capture-sheet-h 설정 */
+.transaction-print-capture-a4-outer {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--ts-capture-output-w);
+  overflow: visible;
+  height: calc(var(--ts-capture-sheet-h, 3200px) * (var(--ts-capture-output-w) / var(--ts-print-sheet-w)));
 }
 
 /* scale = 목표 가로 / 시트 width, 레이아웃(줄바꿈)은 시트 원본 기준 유지 */

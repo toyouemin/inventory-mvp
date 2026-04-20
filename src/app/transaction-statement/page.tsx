@@ -1,7 +1,7 @@
 "use client";
 
 import html2canvas from "html2canvas";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { amountToKoreanText } from "@/features/transactionStatement/amountToKoreanText";
 import {
   TransactionStatementPrintSheet,
@@ -149,6 +149,7 @@ function normalizeBizNoInput(value: string): string {
 
 export default function TransactionStatementPage() {
   const printCaptureRef = useRef<HTMLDivElement>(null);
+  const printCaptureOuterRef = useRef<HTMLDivElement>(null);
   const previewDialogRef = useRef<HTMLDialogElement>(null);
   const [formData, setFormData] = useState<TransactionStatementFormData>({
     customerName: "",
@@ -270,6 +271,13 @@ export default function TransactionStatementPage() {
       showVatIncluded,
     ]
   );
+
+  useLayoutEffect(() => {
+    const outer = printCaptureOuterRef.current;
+    const sheet = outer?.querySelector("[data-ts-print-sheet]") as HTMLElement | null;
+    if (!outer || !sheet) return;
+    outer.style.setProperty("--ts-capture-sheet-h", `${Math.ceil(sheet.offsetHeight)}px`);
+  }, [printSheetProps, showVatIncluded]);
 
   function updateItem(id: string, key: keyof StatementItemFormRow, value: string): void {
     setFormData((prev) => ({
@@ -607,8 +615,10 @@ export default function TransactionStatementPage() {
         />
 
         <div ref={printCaptureRef} className="transaction-print-hidden-host" aria-hidden="true">
-          <div className="transaction-print-capture-a4-scale">
-            <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
+          <div ref={printCaptureOuterRef} className="transaction-print-capture-a4-outer">
+            <div className="transaction-print-capture-a4-scale">
+              <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
+            </div>
           </div>
         </div>
 

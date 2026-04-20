@@ -75,6 +75,59 @@ function adjustAmountKoreanFontSize(worksheet: ExcelJS.Worksheet, amountKoreanTe
   };
 }
 
+function colToNumber(col: string): number {
+  let value = 0;
+  for (const ch of col.toUpperCase()) {
+    value = value * 26 + (ch.charCodeAt(0) - 64);
+  }
+  return value;
+}
+
+function parseCellAddress(address: string): { row: number; col: number } | null {
+  const match = address.match(/^([A-Z]+)(\d+)$/i);
+  if (!match) return null;
+  return { col: colToNumber(match[1]), row: Number(match[2]) };
+}
+
+function parseRange(range: string): { s: { row: number; col: number }; e: { row: number; col: number } } | null {
+  const [start, end] = range.split(":");
+  if (!start || !end) return null;
+  const s = parseCellAddress(start);
+  const e = parseCellAddress(end);
+  if (!s || !e) return null;
+  return {
+    s: { row: Math.min(s.row, e.row), col: Math.min(s.col, e.col) },
+    e: { row: Math.max(s.row, e.row), col: Math.max(s.col, e.col) },
+  };
+}
+
+function rangesIntersect(a: string, b: string): boolean {
+  const ra = parseRange(a);
+  const rb = parseRange(b);
+  if (!ra || !rb) return false;
+  return !(ra.e.row < rb.s.row || rb.e.row < ra.s.row || ra.e.col < rb.s.col || rb.e.col < ra.s.col);
+}
+
+function ensureAmountKoreanMerge(worksheet: ExcelJS.Worksheet): void {
+  const targetRange = "F11:P11";
+  const modelMerges = ((worksheet as unknown as { model?: { merges?: string[] } }).model?.merges ?? []).slice();
+
+  for (const mergeRange of modelMerges) {
+    if (!rangesIntersect(mergeRange, targetRange)) continue;
+    try {
+      worksheet.unMergeCells(mergeRange);
+    } catch {
+      /* 이미 해제됐거나 비정상 병합은 무시 */
+    }
+  }
+
+  try {
+    worksheet.mergeCells(targetRange);
+  } catch {
+    /* 병합 실패 시 기존 템플릿 상태 유지 */
+  }
+}
+
 function computeSupplyAndTax(totalAmount: number): { supplyAmount: number; taxAmount: number } {
   const safeTotal = Number.isFinite(totalAmount) ? totalAmount : 0;
   const supplyAmount = Math.round(safeTotal / 1.1);
@@ -153,6 +206,7 @@ export async function exportTransactionStatementExcelFromTemplateBuffer(
 
   const showVatIncluded = data.showVatIncluded !== false;
   adjustVatLabelInWorksheet(worksheet, showVatIncluded);
+  ensureAmountKoreanMerge(worksheet);
   const { supplyAmount, taxAmount } = computeSupplyAndTax(data.totalAmount);
   const amountKoreanText = amountToKoreanText(data.totalAmount);
   setCellValue(worksheet, transactionStatementTemplateMap.totals.amountKoreanText, amountKoreanText);

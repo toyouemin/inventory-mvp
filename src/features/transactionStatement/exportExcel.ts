@@ -8,6 +8,14 @@ import { amountToKoreanText } from "./amountToKoreanText";
 import { TRANSACTION_STATEMENT_TEMPLATE_RELATIVE_PATH, transactionStatementTemplateMap } from "./templateMap";
 import type { TransactionStatementData } from "./types";
 
+type ErrorWithCode = Error & {
+  code?: string;
+  errno?: number;
+  syscall?: string;
+  path?: string;
+  cause?: unknown;
+};
+
 export class TransactionTemplateFileMissingError extends Error {
   constructor(public readonly resolvedPath: string) {
     super(`거래명세표 템플릿 파일을 찾을 수 없습니다: ${resolvedPath}`);
@@ -48,20 +56,42 @@ function computeSupplyAndTax(totalAmount: number): { supplyAmount: number; taxAm
   return { supplyAmount, taxAmount };
 }
 
-export async function exportTransactionStatementExcel(data: TransactionStatementData): Promise<Uint8Array> {
-  ensureTemplateCapacity(data.items.length);
+function logTemplateStageError(stage: string, templatePath: string, error: unknown): void {
+  const err = error instanceof Error ? (error as ErrorWithCode) : null;
+  console.error("[transaction-statement:xlsx] template stage failed", {
+    stage,
+    templatePath,
+    message: err?.message ?? String(error),
+    stack: err?.stack,
+    cause: err?.cause,
+    code: err?.code,
+    errno: err?.errno,
+    syscall: err?.syscall,
+    path: err?.path,
+  });
+}
 
-  const templatePath = resolveTemplateAbsolutePath();
-  try {
-    await access(templatePath);
-  } catch {
-    throw new TransactionTemplateFileMissingError(templatePath);
-  }
-
+async function buildWorkbookFromTemplateBuffer(templateBuffer: Uint8Array, templatePath: string): Promise<ExcelJS.Workbook> {
   const workbook = new ExcelJS.Workbook();
-  const templateBuffer = await readFile(templatePath);
   const loadInput = Buffer.from(templateBuffer) as unknown as Parameters<(typeof workbook.xlsx)["load"]>[0];
-  await workbook.xlsx.load(loadInput);
+  try {
+    console.info("[transaction-statement:xlsx] workbook load start", { templatePath });
+    await workbook.xlsx.load(loadInput);
+    console.info("[transaction-statement:xlsx] workbook load success", { templatePath });
+  } catch (error) {
+    logTemplateStageError("workbook.load", templatePath, error);
+    throw error;
+  }
+  return workbook;
+}
+
+export async function exportTransactionStatementExcelFromTemplateBuffer(
+  data: TransactionStatementData,
+  templateBuffer: Uint8Array,
+  templatePathForLog = "template-buffer"
+): Promise<Uint8Array> {
+  ensureTemplateCapacity(data.items.length);
+  const workbook = await buildWorkbookFromTemplateBuffer(templateBuffer, templatePathForLog);
 
   const worksheet =
     workbook.getWorksheet(transactionStatementTemplateMap.sheetName) ??
@@ -114,4 +144,33 @@ export async function exportTransactionStatementExcel(data: TransactionStatement
 
   const output = await workbook.xlsx.writeBuffer();
   return output instanceof Uint8Array ? output : new Uint8Array(output);
+}
+
+export async function exportTransactionStatementExcel(data: TransactionStatementData): Promise<Uint8Array> {
+  const templatePath = resolveTemplateAbsolutePath();
+  try {
+    console.info("[transaction-statement:xlsx] access start", { templatePath });
+    await access(templatePath);
+  } catch (error) {
+    logTemplateStageError("access", templatePath, error);
+    if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "ENOENT") {
+      throw new TransactionTemplateFileMissingError(templatePath);
+    }
+    throw error;
+  }
+
+  let templateBuffer: Awaited<ReturnType<typeof readFile>>;
+  try {
+    console.info("[transaction-statement:xlsx] readFile start", { templatePath });
+    templateBuffer = await readFile(templatePath);
+    console.info("[transaction-statement:xlsx] readFile success", { templatePath, byteLength: templateBuffer.byteLength });
+  } catch (error) {
+    logTemplateStageError("readFile", templatePath, error);
+    if (error && typeof error === "object" && "code" in error && (error as { code?: string }).code === "ENOENT") {
+      throw new TransactionTemplateFileMissingError(templatePath);
+    }
+    throw error;
+  }
+
+  return exportTransactionStatementExcelFromTemplateBuffer(data, templateBuffer, templatePath);
 }

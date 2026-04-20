@@ -1,12 +1,16 @@
 import { buildTransactionStatementData } from "@/features/transactionStatement/buildData";
 import {
   exportTransactionStatementExcel,
+  exportTransactionStatementExcelFromTemplateBuffer,
   TransactionTemplateFileMissingError,
 } from "@/features/transactionStatement/exportExcel";
 import type { TransactionStatementRequestBody } from "@/features/transactionStatement/types";
+import { existsSync } from "node:fs";
+import path from "node:path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+const TEMPLATE_RELATIVE_PATH = "public/templates/transaction.xlsx";
 
 function formatFileDate(date: Date): string {
   const yyyy = String(date.getFullYear());
@@ -24,8 +28,38 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   try {
+    const cwd = process.cwd();
+    const templateAbsolutePath = path.resolve(cwd, TEMPLATE_RELATIVE_PATH);
+    console.info("[transaction-statement:xlsx] runtime template check", {
+      cwd,
+      templateAbsolutePath,
+      templateExists: existsSync(templateAbsolutePath),
+    });
+
     const statementData = buildTransactionStatementData(body);
-    const buffer = await exportTransactionStatementExcel(statementData);
+    let buffer: Uint8Array;
+    try {
+      buffer = await exportTransactionStatementExcel(statementData);
+    } catch (error) {
+      if (!(error instanceof TransactionTemplateFileMissingError)) throw error;
+
+      const templateUrl = new URL(`/${TEMPLATE_RELATIVE_PATH.replace(/^public\//, "")}`, req.url);
+      console.warn("[transaction-statement:xlsx] fs template missing; trying HTTP fallback", {
+        templateUrl: templateUrl.toString(),
+      });
+
+      const templateResponse = await fetch(templateUrl, { cache: "no-store" });
+      if (!templateResponse.ok) {
+        throw new Error(`템플릿 HTTP fallback 실패: ${templateResponse.status} ${templateResponse.statusText}`);
+      }
+      const templateArrayBuffer = await templateResponse.arrayBuffer();
+      buffer = await exportTransactionStatementExcelFromTemplateBuffer(
+        statementData,
+        new Uint8Array(templateArrayBuffer),
+        `http-fallback:${templateUrl.toString()}`
+      );
+    }
+
     const fileName = `transaction-statement-${formatFileDate(new Date())}.xlsx`;
 
     return new Response(new Uint8Array(buffer), {
@@ -38,6 +72,13 @@ export async function POST(req: Request): Promise<Response> {
       },
     });
   } catch (error) {
+    const err = error instanceof Error ? error : null;
+    console.error("[transaction-statement:xlsx] route error", {
+      message: err?.message ?? String(error),
+      stack: err?.stack,
+      cause: err && "cause" in err ? (err as Error & { cause?: unknown }).cause : undefined,
+    });
+
     if (error instanceof TransactionTemplateFileMissingError) {
       return new Response(error.message, { status: 500 });
     }

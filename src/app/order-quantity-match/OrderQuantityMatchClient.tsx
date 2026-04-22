@@ -24,6 +24,23 @@ const IS_DEV = process.env.NODE_ENV === "development";
 const GENERAL_ITEM_PRESETS = ["라켓", "가방"] as const;
 const SIZE_CATEGORY_FALLBACK_PRESETS = ["티셔츠", "바람막이", "맨투맨", "오버핏", "트레이닝복", "7부바지"] as const;
 
+/** 개발 시 어느 배열에 섞였는지 추적 (운영 빌드에서는 미사용) */
+const OQM_DEBUG_CATEGORY_NEEDLE = "슬리브";
+
+/**
+ * 일반 물품 datalist·행 시드: 프리셋 + `buildOqmCategoryProfile`의 generalItems(현재 카테고리 재고의 표시명)만 사용.
+ * `products.category` 전체 목록과 **동일한 문자열**은 물품 후보에서 제외(슬리브 등 카테고리명이 물품 자동완성에 뜨는 것 방지).
+ */
+function buildOqmGeneralItemUiOptions(allDbCategories: readonly string[], profileGeneralItems: readonly string[]): string[] {
+  const catSet = new Set(allDbCategories.map((c) => c.trim()).filter(Boolean));
+  const fromProfile = profileGeneralItems
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((g) => !catSet.has(g));
+  const merged = new Set<string>([...GENERAL_ITEM_PRESETS, ...fromProfile]);
+  return [...merged].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
 function safeScrollDomIdSegment(s: string): string {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
@@ -152,13 +169,11 @@ export function OrderQuantityMatchClient({
     () => [...new Set(categories.map((c) => c.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
     [categories]
   );
-  /** 일반(사이즈 없음) 물품 입력 자동완성 — 의류 `products.category` 전체를 넣지 않음(슬리브 등 혼동 방지) */
-  const generalItemDatalistOptions = useMemo(() => {
-    const fromProfile =
-      categoryProfile.generalItems.length > 0 ? categoryProfile.generalItems : [...GENERAL_ITEM_PRESETS];
-    const merged = new Set<string>([...GENERAL_ITEM_PRESETS, ...fromProfile].map((s) => s.trim()).filter(Boolean));
-    return [...merged].sort((a, b) => a.localeCompare(b, "ko"));
-  }, [categoryProfile.generalItems]);
+  /** 일반(사이즈 없음) 물품: 프리셋 + 현재 범주 generalItems — DB 카테고리명과 동일한 토큰은 제외 */
+  const generalItemDatalistOptions = useMemo(
+    () => buildOqmGeneralItemUiOptions(categories, categoryProfile.generalItems),
+    [categories, categoryProfile.generalItems]
+  );
   /** 빠른 입력 첫 카테고리: 사이즈 입력이 가능한 카테고리만 노출 */
   const sizedCategorySuggestions = useMemo(() => {
     const sizedFromStock = new Set(
@@ -175,6 +190,15 @@ export function OrderQuantityMatchClient({
     for (const p of SIZE_CATEGORY_FALLBACK_PRESETS) merged.add(p);
     return [...merged].sort((a, b) => a.localeCompare(b, "ko"));
   }, [inventoryCategorySuggestions, stockLines]);
+
+  useEffect(() => {
+    setQuickCategory((prev) => {
+      const t = prev.trim();
+      if (!t) return prev;
+      if (sizedCategorySuggestions.includes(t)) return prev;
+      return sizedCategorySuggestions[0] ?? "";
+    });
+  }, [sizedCategorySuggestions]);
 
   const displayedCategory = quickCategory;
   const quickScopeProductOptions = useMemo(() => {
@@ -236,6 +260,12 @@ export function OrderQuantityMatchClient({
     saveCategoryPolicyStore(next);
   }
 
+  function clearAllQuickQuantities() {
+    setApparelQtyByKey({});
+    setTrainingSetQtyByKey({});
+    setGeneralEntries((prev) => prev.map((e) => ({ ...e, quantity: "" })));
+  }
+
   useEffect(() => {
     if (canShowUnisexInput && canShowGenderSplitInput) return;
     if (canShowGenderSplitInput) {
@@ -258,12 +288,32 @@ export function OrderQuantityMatchClient({
     if (next.length !== quickProductScopeIds.length) setQuickProductScopeIds(next);
   }, [quickProductScopeIds, quickScopeProductOptions]);
 
-  const generalItemsKey = useMemo(() => categoryProfile.generalItems.join("\x1f"), [categoryProfile.generalItems]);
   useEffect(() => {
     if (quickCategoryKind !== "general") return;
-    const items = categoryProfile.generalItems.length > 0 ? categoryProfile.generalItems : [...GENERAL_ITEM_PRESETS];
-    setGeneralEntries(items.map((name) => quickEntry(name)));
-  }, [quickCategory, quickCategoryKind, generalItemsKey]);
+    const resolved =
+      generalItemDatalistOptions.length > 0 ? generalItemDatalistOptions : [...GENERAL_ITEM_PRESETS];
+    setGeneralEntries(resolved.map((name) => quickEntry(name)));
+  }, [quickCategory, quickCategoryKind, generalItemDatalistOptions]);
+
+  useEffect(() => {
+    if (!IS_DEV) return;
+    const n = OQM_DEBUG_CATEGORY_NEEDLE;
+    const pick = (arr: readonly string[]) => arr.filter((x) => x.includes(n));
+    const hits = {
+      inventoryCategorySuggestions: pick(inventoryCategorySuggestions),
+      sizedCategorySuggestions: pick(sizedCategorySuggestions),
+      generalItemDatalistOptions: pick(generalItemDatalistOptions),
+      categoryProfile_generalItems: pick(categoryProfile.generalItems),
+    };
+    if (Object.values(hits).some((a) => a.length > 0)) {
+      console.info(`[OQM] '${n}' 포함 배열(어느 경로에서 노출되는지 확인)`, hits);
+    }
+  }, [
+    inventoryCategorySuggestions,
+    sizedCategorySuggestions,
+    generalItemDatalistOptions,
+    categoryProfile.generalItems,
+  ]);
 
   const quickRequestInputs = useMemo(
     () =>
@@ -351,6 +401,7 @@ export function OrderQuantityMatchClient({
             generalEntries={generalEntries}
             setGeneralEntries={setGeneralEntries}
             onConfirmCategoryPolicy={confirmCategoryPolicy}
+            onClearAllQuantities={clearAllQuickQuantities}
           />
 
           <p className="oqm-input-summary">
@@ -446,6 +497,7 @@ function QuickInputPanel(props: {
   generalEntries: QuickEntry[];
   setGeneralEntries: (v: QuickEntry[]) => void;
   onConfirmCategoryPolicy: (policy: SizePolicy) => void;
+  onClearAllQuantities: () => void;
 }) {
   const {
     categories,
@@ -468,10 +520,10 @@ function QuickInputPanel(props: {
     generalEntries,
     setGeneralEntries,
     onConfirmCategoryPolicy,
+    onClearAllQuantities,
   } = props;
   const selectedCategoryValue =
-    quickCategory.trim() !== "" && categories.includes(quickCategory.trim()) ? quickCategory.trim() : "__custom__";
-  const isCustomCategory = selectedCategoryValue === "__custom__";
+    quickCategory.trim() !== "" && categories.includes(quickCategory.trim()) ? quickCategory.trim() : "__empty__";
   const [productPickerValue, setProductPickerValue] = useState("");
   useEffect(() => {
     setProductPickerValue("");
@@ -492,7 +544,6 @@ function QuickInputPanel(props: {
                   setQuickCategory("");
                   return;
                 }
-                if (v === "__custom__") return;
                 setQuickCategory(v);
               }}
             >
@@ -502,7 +553,6 @@ function QuickInputPanel(props: {
                   {c}
                 </option>
               ))}
-              <option value="__custom__">기타 직접입력</option>
             </select>
           </label>
           {quickCategory.trim() !== "" ? (
@@ -534,17 +584,6 @@ function QuickInputPanel(props: {
             )
           ) : null}
         </div>
-        {isCustomCategory ? (
-          <label className="oqm-field oqm-field--category-custom">
-            <span className="oqm-field__label">직접입력</span>
-            <input
-              className="oqm-input"
-              value={quickCategory}
-              onChange={(e) => setQuickCategory(e.target.value)}
-              placeholder="카테고리 직접입력"
-            />
-          </label>
-        ) : null}
       </div>
       <p className="oqm-muted oqm-category-hint">
         재고 카테고리 추천 {categories.length}개
@@ -635,6 +674,7 @@ function QuickInputPanel(props: {
             profile={categoryProfile}
             qtyByKey={apparelQtyByKey}
             onChange={(id, value) => setApparelQtyByKey({ ...apparelQtyByKey, [id]: value })}
+            onClearAllQuantities={onClearAllQuantities}
           />
         </>
       ) : null}
@@ -652,6 +692,7 @@ function QuickInputPanel(props: {
             profile={categoryProfile}
             qtyByKey={trainingSetQtyByKey}
             onChange={(id, value) => setTrainingSetQtyByKey({ ...trainingSetQtyByKey, [id]: value })}
+            onClearAllQuantities={onClearAllQuantities}
           />
         </>
       ) : null}
@@ -667,6 +708,7 @@ function QuickInputPanel(props: {
               setGeneralEntries(updateQuickEntriesByIndex(generalEntries, index, { id: value }))
             }
             onAdd={() => setGeneralEntries([...generalEntries, quickEntry(`물품-${generalEntries.length + 1}`)])}
+            onClearAllQuantities={onClearAllQuantities}
         />
       ) : null}
     </div>
@@ -680,6 +722,7 @@ function ApparelMatrix({
   profile,
   qtyByKey,
   onChange,
+  onClearAllQuantities,
 }: {
   apparelSizeType: ApparelSizeType;
   canShowUnisexInput: boolean;
@@ -687,6 +730,7 @@ function ApparelMatrix({
   profile: CategoryProfile;
   qtyByKey: Record<string, string>;
   onChange: (id: string, value: string) => void;
+  onClearAllQuantities: () => void;
 }) {
   if (!canShowUnisexInput && !canShowGenderSplitInput) {
     return (
@@ -715,9 +759,12 @@ function ApparelMatrix({
     }
     const colFemale =
       femaleSizes.length > 0
-        ? `var(--oqm-apparel-lab, 2.6rem) repeat(${femaleSizes.length}, minmax(2.1rem, 1fr))`
+        ? `max-content repeat(${femaleSizes.length}, minmax(1.55rem, 1fr))`
         : "";
-    const colMale = maleSizes.length > 0 ? `var(--oqm-apparel-lab, 2.6rem) repeat(${maleSizes.length}, minmax(2.1rem, 1fr))` : "";
+    const colMale =
+      maleSizes.length > 0
+        ? `max-content repeat(${maleSizes.length}, minmax(1.55rem, 1fr))`
+        : "";
     return (
       <div className="oqm-matrix-wrap oqm-matrix-wrap--compact">
         <div className="oqm-apparel-matrix">
@@ -778,9 +825,19 @@ function ApparelMatrix({
             </div>
           ) : null}
         </div>
-        <p className="oqm-quick-total oqm-quick-total--tight" role="status">
-          총 합계: {total.toLocaleString()}
-        </p>
+        <div className="oqm-quick-total-row oqm-quick-total-row--tight">
+          <p className="oqm-quick-total oqm-quick-total--tight" role="status">
+            총 합계: {total.toLocaleString()}
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary oqm-btn-clear-quantities"
+            onClick={onClearAllQuantities}
+            aria-label="입력한 수량 전부 삭제"
+          >
+            수량 전체 삭제
+          </button>
+        </div>
       </div>
     );
   }
@@ -794,7 +851,7 @@ function ApparelMatrix({
         <div className="oqm-apparel-scroll" role="group" aria-labelledby="oqm-unisex-hd" aria-label="공용 수량">
           <div
             className="oqm-apparel-grid oqm-apparel-grid--nolab"
-            style={{ gridTemplateColumns: `repeat(${unisexSizes.length}, minmax(2.1rem, 1fr))` }}
+            style={{ gridTemplateColumns: `repeat(${unisexSizes.length}, minmax(1.55rem, 1fr))` }}
           >
             {unisexSizes.map((size) => (
               <div key={`h-공-${size}`} className="oqm-apparel-grid__size oqm-apparel-grid__size--unisex">
@@ -814,9 +871,19 @@ function ApparelMatrix({
           </div>
         </div>
       </div>
-      <p className="oqm-quick-total oqm-quick-total--tight" role="status" aria-label={`총 합계 ${total.toLocaleString()}`}>
-        총 합계: {total.toLocaleString()}
-      </p>
+      <div className="oqm-quick-total-row oqm-quick-total-row--tight">
+        <p className="oqm-quick-total oqm-quick-total--tight" role="status" aria-label={`총 합계 ${total.toLocaleString()}`}>
+          총 합계: {total.toLocaleString()}
+        </p>
+        <button
+          type="button"
+          className="btn btn-secondary oqm-btn-clear-quantities"
+          onClick={onClearAllQuantities}
+          aria-label="입력한 수량 전부 삭제"
+        >
+          수량 전체 삭제
+        </button>
+      </div>
     </div>
   );
 }
@@ -825,10 +892,12 @@ function TrainingSetMatrix({
   profile,
   qtyByKey,
   onChange,
+  onClearAllQuantities,
 }: {
   profile: CategoryProfile;
   qtyByKey: Record<string, string>;
   onChange: (id: string, value: string) => void;
+  onClearAllQuantities: () => void;
 }) {
   const femaleSizes = profile.femaleSizes;
   const maleSizes = profile.maleSizes;
@@ -869,7 +938,17 @@ function TrainingSetMatrix({
           );
         })}
       </div>
-      <p className="oqm-quick-total">세트 총합: {Object.values(qtyByKey).reduce((s, v) => s + parseQty(v), 0).toLocaleString()}</p>
+      <div className="oqm-quick-total-row">
+        <p className="oqm-quick-total">세트 총합: {Object.values(qtyByKey).reduce((s, v) => s + parseQty(v), 0).toLocaleString()}</p>
+        <button
+          type="button"
+          className="btn btn-secondary oqm-btn-clear-quantities"
+          onClick={onClearAllQuantities}
+          aria-label="입력한 수량 전부 삭제"
+        >
+          수량 전체 삭제
+        </button>
+      </div>
     </div>
   );
 }
@@ -880,6 +959,7 @@ function GeneralQuickPanel({
   onQuantityChange,
   onCategoryChange,
   onAdd,
+  onClearAllQuantities,
 }: {
   /** 자동완성·힌트용 (의류 DB 카테고리 전체가 아님) */
   suggestionPreview: string[];
@@ -887,6 +967,7 @@ function GeneralQuickPanel({
   onQuantityChange: (index: number, value: string) => void;
   onCategoryChange: (index: number, value: string) => void;
   onAdd: () => void;
+  onClearAllQuantities: () => void;
 }) {
   return (
     <div className="oqm-matrix-wrap">
@@ -921,7 +1002,17 @@ function GeneralQuickPanel({
       {suggestionPreview.length > 0 ? (
         <p className="oqm-muted oqm-general-hint">참고 물품명: {suggestionPreview.slice(0, 8).join(", ")}</p>
       ) : null}
-      <p className="oqm-quick-total">총 합계: {quickTotal(entries).toLocaleString()}</p>
+      <div className="oqm-quick-total-row">
+        <p className="oqm-quick-total">총 합계: {quickTotal(entries).toLocaleString()}</p>
+        <button
+          type="button"
+          className="btn btn-secondary oqm-btn-clear-quantities"
+          onClick={onClearAllQuantities}
+          aria-label="입력한 수량 전부 삭제"
+        >
+          수량 전체 삭제
+        </button>
+      </div>
     </div>
   );
 }
@@ -972,7 +1063,7 @@ function ResultCards({
   return (
     <>
       {items.length === 0 ? (
-        <p className="oqm-muted">표시할 주문이 없습니다. 행을 추가하고 수량을 입력하세요.</p>
+        <p className="oqm-muted oqm-result-empty">표시할 주문이 없습니다. 행을 추가하고 수량을 입력하세요.</p>
       ) : (
         <ul className="oqm-result-list" role="list">
           {items.map((item) => (

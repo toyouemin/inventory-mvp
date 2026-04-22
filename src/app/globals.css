@@ -94,13 +94,6 @@ nav a:hover {
   color: var(--accent);
 }
 
-/** 메인 메뉴: 거래명세서 → 짧은 라벨용 (조금 작고 굵게) */
-nav a.app-nav-link--statement {
-  font-weight: 800;
-  font-size: clamp(14px, 1.05vw, 17px);
-  letter-spacing: -0.03em;
-}
-
 .nav-dropdown {
   position: relative;
 }
@@ -3468,6 +3461,8 @@ label {
 /* ========== ORDER QUANTITY MATCH ========== */
 .oqm-page .products-content-container {
   max-width: 720px;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 .oqm-page-title {
@@ -3557,6 +3552,40 @@ label {
   gap: 12px;
 }
 
+.oqm-quick-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  margin: 10px 0 0;
+}
+
+.oqm-quick-total-row--tight {
+  margin-top: 6px;
+}
+
+.oqm-quick-total-row .oqm-quick-total {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.oqm-btn-clear-quantities {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.oqm-quick-total-row .oqm-btn-clear-quantities {
+  width: auto;
+  max-width: none;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
+
 .oqm-quick-type {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3611,11 +3640,6 @@ label {
   min-width: 0;
   max-width: 100%;
   field-sizing: content;
-}
-
-.oqm-field--category-custom {
-  min-width: min(280px, 100%);
-  flex: 1 1 260px;
 }
 
 .oqm-product-scope-empty {
@@ -3739,7 +3763,7 @@ label {
 
 /* ----- 의류 사이즈: compact 그리드 표 (남/여/공용) ----- */
 .oqm-matrix-wrap--compact {
-  padding: 8px 10px 10px;
+  padding: 6px 4px 8px;
 }
 
 .oqm-apparel-matrix {
@@ -3767,44 +3791,44 @@ label {
 .oqm-apparel-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  margin: 0 -2px;
-  padding: 0 2px 2px;
+  margin: 0;
+  padding: 0 0 1px;
   overscroll-behavior-x: contain;
 }
 
 .oqm-apparel-grid {
-  --oqm-apparel-lab: 2.6rem;
   display: grid;
   align-items: center;
-  gap: 3px 5px;
+  gap: 2px 2px;
   min-width: min-content;
   font-variant-numeric: tabular-nums;
 }
 
 .oqm-apparel-grid--nolab {
-  gap: 3px 5px;
+  gap: 2px 2px;
 }
 
 .oqm-apparel-grid__role,
 .oqm-apparel-grid__qty-lab {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   color: var(--muted);
-  line-height: 1.1;
+  line-height: 1.05;
   white-space: nowrap;
   text-align: left;
   min-width: 0;
-  padding-right: 2px;
+  padding-right: 0;
+  margin-right: 0;
 }
 
 .oqm-apparel-grid__size {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   color: var(--text);
   text-align: center;
   min-width: 0;
-  padding: 2px 0;
-  line-height: 1.15;
+  padding: 1px 0;
+  line-height: 1.1;
   word-break: keep-all;
 }
 
@@ -3816,20 +3840,6 @@ label {
   min-width: 0;
   display: block;
   box-sizing: border-box;
-}
-
-.oqm-input--qty-mtx {
-  display: block;
-  width: 100%;
-  min-width: 0;
-  min-height: 40px;
-  margin: 0;
-  padding: 6px 3px;
-  font-size: 0.86rem;
-  text-align: center;
-  line-height: 1.2;
-  box-sizing: border-box;
-  border-radius: 6px;
 }
 
 .oqm-quick-total--tight {
@@ -4363,6 +4373,22 @@ label {
   font-variant-numeric: tabular-nums;
 }
 
+/* 의류 사이즈 그리드: .oqm-input 기본 패딩보다 뒤에 두어 덮어씀 */
+.oqm-input.oqm-input--qty-mtx {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  margin: 0;
+  padding: 4px 2px;
+  font-size: 0.88rem;
+  text-align: center;
+  line-height: 1.15;
+  box-sizing: border-box;
+  border-radius: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
 .oqm-select {
   width: 100%;
   min-width: 0;
@@ -4377,6 +4403,12 @@ label {
 
 .oqm-muted {
   color: var(--muted);
+}
+
+.oqm-result-empty {
+  font-size: 1.05rem;
+  line-height: 1.35;
+  margin: 0;
 }
 
 /* ----- 매칭 결과: compact 리스트 (모바일 우선) ----- */

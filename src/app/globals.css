@@ -94,6 +94,13 @@ nav a:hover {
   color: var(--accent);
 }
 
+/** 메인 메뉴: 거래명세서 → 짧은 라벨용 (조금 작고 굵게) */
+nav a.app-nav-link--statement {
+  font-weight: 800;
+  font-size: clamp(14px, 1.05vw, 17px);
+  letter-spacing: -0.03em;
+}
+
 .nav-dropdown {
   position: relative;
 }

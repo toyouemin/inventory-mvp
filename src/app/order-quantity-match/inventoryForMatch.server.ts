@@ -22,7 +22,7 @@ function mapProduct(row: Record<string, unknown>): Product {
     sku,
     category: catNorm || null,
     name: String((row.name as string) ?? sku ?? ""),
-    imageUrl: null,
+    imageUrl: row.image_url != null && String(row.image_url).trim() ? String(row.image_url) : null,
     wholesalePrice: row.wholesale_price != null ? Number(row.wholesale_price) : null,
     msrpPrice: row.msrp_price != null ? Number(row.msrp_price) : null,
     salePrice: row.sale_price != null ? Number(row.sale_price) : null,
@@ -60,7 +60,7 @@ async function fetchAllProductRows(): Promise<{ rows: Record<string, unknown>[];
     const { data, error } = await supabaseServer
       .from("products")
       .select(
-        "id, sku, category, name, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
+        "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
       )
       .order("sku", { ascending: true })
       .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);

@@ -17,7 +17,7 @@ export type MatchStatus = "full" | "partial" | "impossible";
 
 /** 재고 측 garmentType 출처·신뢰도(키워드 추론은 임시값) */
 export type GarmentTypeInferenceMeta = {
-  source: "keyword_inference" | "override";
+  source: "keyword_inference" | "override" | "category_policy";
   confidence: "high" | "ambiguous" | "defaulted";
   matchedRuleIds: string[];
   competingGarmentTypes?: GarmentTypeId[];
@@ -29,7 +29,7 @@ export type NormalizedStockLine = {
   displayName: string;
   dimensions: DimensionValues;
   stock: number;
-  /** 키워드 추론 또는 수동·엑셀 보정(override) 메타. 없으면 구버전 데이터로 간주 */
+  /** 키워드·카테고리 정책(`category_policy`)·수동(override) 메타. 없으면 구버전 데이터로 간주 */
   garmentTypeInference?: GarmentTypeInferenceMeta;
 };
 

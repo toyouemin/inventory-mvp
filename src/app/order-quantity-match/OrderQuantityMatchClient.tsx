@@ -5,7 +5,8 @@
  * 기존 상품/재고 API를 호출하지 않고 props로 받은 스냅샷에 대해 메모리상 계산만 한다.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import type { GarmentTypeId, MatchStatus, NormalizedStockLine, RequestLineInput } from "@/features/orderQuantityMatch/types";
 import { type SizePolicy, getSavedCategoryPolicyStore, saveCategoryPolicyStore } from "@/features/orderQuantityMatch/categoryPolicy";
 import { matchOrderRowsToProducts, type ProductMatchResult } from "@/features/orderQuantityMatch/matchOrderToProducts";
@@ -21,15 +22,6 @@ import { normalizeRequestLine } from "@/features/orderQuantityMatch/normalizeReq
 
 const IS_DEV = process.env.NODE_ENV === "development";
 const GENERAL_ITEM_PRESETS = ["라켓", "가방"] as const;
-const CATEGORY_FALLBACK_PRESETS = [
-  "티셔츠",
-  "바람막이",
-  "후드",
-  "트레이닝복",
-  "라켓",
-  "가방",
-  "기타 사이즈 없음",
-] as const;
 const SIZE_CATEGORY_FALLBACK_PRESETS = ["티셔츠", "바람막이", "맨투맨", "오버핏", "트레이닝복", "7부바지"] as const;
 
 function safeScrollDomIdSegment(s: string): string {
@@ -38,16 +30,9 @@ function safeScrollDomIdSegment(s: string): string {
   return `h${Math.abs(h)}`;
 }
 
-/** 결과 카드·TOP3 이동에 공통으로 사용 (상품 기준) */
+/** 결과 행 스크롤 앵커·id (상품 기준) */
 function resultCardDomIdByProduct(result: ProductMatchResult): string {
   return `oqm-card-product-${safeScrollDomIdSegment(result.productId)}`;
-}
-
-function scrollToResultCardByProduct(result: ProductMatchResult): void {
-  const id = resultCardDomIdByProduct(result);
-  const el = typeof document !== "undefined" ? document.getElementById(id) : null;
-  el?.scrollIntoView({ behavior: "smooth", block: "start" });
-  el?.focus?.();
 }
 
 function newRowId(): string {
@@ -131,16 +116,14 @@ function statusClass(s: MatchStatus): string {
   return "oqm-badge oqm-badge--bad";
 }
 
-function productTitle(result: ProductMatchResult): string {
-  return `${result.displayName} / ${result.sku}`;
-}
-
 export function OrderQuantityMatchClient({
   categories,
   stockLines,
+  productImageById,
 }: {
   categories: string[];
   stockLines: NormalizedStockLine[];
+  productImageById: Record<string, string | null>;
 }) {
   const [quickCategory, setQuickCategory] = useState("티셔츠");
   const [savedPolicyStore, setSavedPolicyStore] = useState<Record<string, SizePolicy>>({});
@@ -169,13 +152,13 @@ export function OrderQuantityMatchClient({
     () => [...new Set(categories.map((c) => c.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
     [categories]
   );
-  /** 보조 추천: 실제 카테고리가 비거나 너무 적을 때만 합침 */
-  const categorySuggestions = useMemo(() => {
-    if (inventoryCategorySuggestions.length >= 3) return inventoryCategorySuggestions;
-    const merged = new Set<string>(inventoryCategorySuggestions);
-    for (const p of CATEGORY_FALLBACK_PRESETS) merged.add(p);
+  /** 일반(사이즈 없음) 물품 입력 자동완성 — 의류 `products.category` 전체를 넣지 않음(슬리브 등 혼동 방지) */
+  const generalItemDatalistOptions = useMemo(() => {
+    const fromProfile =
+      categoryProfile.generalItems.length > 0 ? categoryProfile.generalItems : [...GENERAL_ITEM_PRESETS];
+    const merged = new Set<string>([...GENERAL_ITEM_PRESETS, ...fromProfile].map((s) => s.trim()).filter(Boolean));
     return [...merged].sort((a, b) => a.localeCompare(b, "ko"));
-  }, [inventoryCategorySuggestions]);
+  }, [categoryProfile.generalItems]);
   /** 빠른 입력 첫 카테고리: 사이즈 입력이 가능한 카테고리만 노출 */
   const sizedCategorySuggestions = useMemo(() => {
     const sizedFromStock = new Set(
@@ -319,33 +302,6 @@ export function OrderQuantityMatchClient({
     [requestInputs, scopedStockLines]
   );
 
-  const matchSummary = useMemo(() => {
-    let full = 0;
-    let partial = 0;
-    let impossible = 0;
-    for (const it of productResults) {
-      const s = it.status;
-      if (s === "full") full += 1;
-      else if (s === "partial") partial += 1;
-      else impossible += 1;
-    }
-    const nonFull = productResults
-      .filter((it) => it.status !== "full")
-      .map((it) => ({
-        item: it,
-        scrollKey: resultCardDomIdByProduct(it),
-        label: productTitle(it),
-        totalShortage: it.totalShortage,
-        totalAllocated: it.totalAllocated,
-      }))
-      .sort((a, b) => {
-        if (a.totalShortage !== b.totalShortage) return a.totalShortage - b.totalShortage;
-        return b.totalAllocated - a.totalAllocated;
-      })
-      .slice(0, 3);
-    return { full, partial, impossible, closest: nonFull };
-  }, [productResults]);
-
   const debugSnapshots = useMemo(() => {
     const normalizedRequest = requestInputs.map((r) => normalizeRequestLine(r));
     const stockSummary = {
@@ -368,14 +324,15 @@ export function OrderQuantityMatchClient({
 
         <section className="oqm-section">
 
-          <datalist id="oqm-category-suggestions">
-            {categorySuggestions.map((c) => (
+          <datalist id="oqm-general-item-suggestions">
+            {generalItemDatalistOptions.map((c) => (
               <option key={c} value={c} />
             ))}
           </datalist>
 
           <QuickInputPanel
             categories={sizedCategorySuggestions}
+            generalItemDatalistOptions={generalItemDatalistOptions}
             quickCategory={quickCategory}
             setQuickCategory={setQuickCategory}
             productScopeOptions={quickScopeProductOptions}
@@ -408,44 +365,6 @@ export function OrderQuantityMatchClient({
           </p>
         </section>
 
-        <section className="oqm-summary-strip" aria-label="매칭 요약">
-          <div className="oqm-summary-strip__grid">
-            <div className="oqm-stat oqm-stat--ok">
-              <span className="oqm-stat__label">완전 가능</span>
-              <span className="oqm-stat__value">{matchSummary.full}건</span>
-            </div>
-            <div className="oqm-stat oqm-stat--partial">
-              <span className="oqm-stat__label">부분 가능</span>
-              <span className="oqm-stat__value">{matchSummary.partial}건</span>
-            </div>
-            <div className="oqm-stat oqm-stat--bad">
-              <span className="oqm-stat__label">불가</span>
-              <span className="oqm-stat__value">{matchSummary.impossible}건</span>
-            </div>
-          </div>
-          <div className="oqm-summary-closest">
-            <span className="oqm-summary-closest__title">가장 근접한 상품 TOP 3</span>
-            <span className="oqm-summary-closest__hint">(완전 가능 제외 · 부족 합 적은 순)</span>
-            {matchSummary.closest.length === 0 ? (
-              <p className="oqm-muted oqm-summary-closest__empty">완전 가능만 있거나, 표시할 주문이 없습니다.</p>
-            ) : (
-              <ul className="oqm-closest-list">
-                {matchSummary.closest.map((c, i) => (
-                  <li key={`${c.scrollKey}-${i}`}>
-                    <button type="button" className="oqm-closest-jump" onClick={() => scrollToResultCardByProduct(c.item)}>
-                      <span className="oqm-closest-list__name">{c.label}</span>
-                      <span className="oqm-closest-list__meta">
-                        부족 합 {c.totalShortage.toLocaleString()} · 충족 {c.totalAllocated.toLocaleString()}
-                        <span className="oqm-closest-jump__hint"> 결과로 이동</span>
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </section>
-
         <section className="oqm-section" aria-labelledby="oqm-result-heading">
           <h2 id="oqm-result-heading" className="oqm-section-title">
             매칭 결과
@@ -453,7 +372,7 @@ export function OrderQuantityMatchClient({
           <p className="oqm-intro oqm-intro--small">
             정렬: <strong>완전 가능</strong> 우선 → 부족 총합 오름차순 → 부족 항목 수 오름차순 → 충족(할당) 많은 순.
           </p>
-          <ResultCards items={productResults} />
+          <ResultCards items={productResults} productImageById={productImageById} />
         </section>
 
         {IS_DEV ? (
@@ -508,6 +427,7 @@ function numberInputProps(value: string) {
 
 function QuickInputPanel(props: {
   categories: string[];
+  generalItemDatalistOptions: string[];
   quickCategory: string;
   setQuickCategory: (v: string) => void;
   productScopeOptions: { productId: string; label: string }[];
@@ -529,6 +449,7 @@ function QuickInputPanel(props: {
 }) {
   const {
     categories,
+    generalItemDatalistOptions,
     quickCategory,
     setQuickCategory,
     productScopeOptions,
@@ -737,7 +658,7 @@ function QuickInputPanel(props: {
 
       {quickCategoryKind === "general" ? (
         <GeneralQuickPanel
-          categories={categories}
+          suggestionPreview={generalItemDatalistOptions}
           entries={generalEntries}
             onQuantityChange={(index, value) =>
               setGeneralEntries(updateQuickEntriesByIndex(generalEntries, index, { quantity: value }))
@@ -954,13 +875,14 @@ function TrainingSetMatrix({
 }
 
 function GeneralQuickPanel({
-  categories,
+  suggestionPreview,
   entries,
   onQuantityChange,
   onCategoryChange,
   onAdd,
 }: {
-  categories: string[];
+  /** 자동완성·힌트용 (의류 DB 카테고리 전체가 아님) */
+  suggestionPreview: string[];
   entries: QuickEntry[];
   onQuantityChange: (index: number, value: string) => void;
   onCategoryChange: (index: number, value: string) => void;
@@ -977,10 +899,10 @@ function GeneralQuickPanel({
           <li key={`general-${idx}`} className="oqm-general-item">
             <input
               className="oqm-input"
-              list="oqm-category-suggestions"
+              list="oqm-general-item-suggestions"
               value={e.id}
               onChange={(ev) => onCategoryChange(idx, ev.target.value)}
-              placeholder="카테고리"
+              placeholder="물품명"
               aria-label={`물품 ${idx + 1}`}
             />
             <input
@@ -996,97 +918,216 @@ function GeneralQuickPanel({
       <button type="button" className="btn btn-secondary oqm-btn-tool" onClick={onAdd}>
         품목 1줄 추가
       </button>
-      {categories.length > 0 ? <p className="oqm-muted oqm-general-hint">참고 카테고리: {categories.slice(0, 8).join(", ")}</p> : null}
+      {suggestionPreview.length > 0 ? (
+        <p className="oqm-muted oqm-general-hint">참고 물품명: {suggestionPreview.slice(0, 8).join(", ")}</p>
+      ) : null}
       <p className="oqm-quick-total">총 합계: {quickTotal(entries).toLocaleString()}</p>
     </div>
   );
 }
 
-function ResultCards({ items }: { items: ProductMatchResult[] }) {
-  if (items.length === 0) {
-    return <p className="oqm-muted">표시할 주문이 없습니다. 행을 추가하고 수량을 입력하세요.</p>;
-  }
+function oqmCompactShortageSummary(result: ProductMatchResult): string {
+  const lines = result.details.filter((d) => d.shortage > 0);
+  if (lines.length === 0) return "";
+  const parts = lines.map((d) => {
+    const segs = d.dimensionSummary.split("·").map((s) => s.trim()).filter(Boolean);
+    const shortLabel = segs.length >= 2 ? segs.slice(-2).join(" ") : (segs[0] ?? d.dimensionSummary);
+    return `${shortLabel} -${d.shortage}`;
+  });
+  const first = parts.slice(0, 3).join(", ");
+  const more = parts.length > 3 ? ` · 외 ${parts.length - 3}` : "";
+  return `부족: ${first}${more}`;
+}
+
+function OqmProductThumb({ url, name }: { url: string | null | undefined; name: string }) {
+  const [broke, setBroke] = useState(false);
+  const useImg = url && !broke;
   return (
-    <div className="oqm-result-cards">
-      {items.map((item) => (
-        <ProductResultCard key={item.productId} result={item} />
-      ))}
+    <div className="oqm-result-thumb" aria-hidden>
+      {useImg ? (
+        <img
+          src={url!}
+          alt=""
+          className="oqm-result-thumb__img"
+          width={66}
+          height={66}
+          onError={() => setBroke(true)}
+          loading="lazy"
+        />
+      ) : (
+        <div className="oqm-result-thumb__ph" title={name} />
+      )}
     </div>
   );
 }
 
-function cardStatusModifier(status: MatchStatus): string {
-  if (status === "full") return "oqm-result-card--status-full";
-  if (status === "partial") return "oqm-result-card--status-partial";
-  return "oqm-result-card--status-impossible";
+function ResultCards({
+  items,
+  productImageById,
+}: {
+  items: ProductMatchResult[];
+  productImageById: Record<string, string | null>;
+}) {
+  const [sheetResult, setSheetResult] = useState<ProductMatchResult | null>(null);
+  return (
+    <>
+      {items.length === 0 ? (
+        <p className="oqm-muted">표시할 주문이 없습니다. 행을 추가하고 수량을 입력하세요.</p>
+      ) : (
+        <ul className="oqm-result-list" role="list">
+          {items.map((item) => (
+            <li key={item.productId} className="oqm-result-list__li">
+              <OqmResultRow
+                result={item}
+                imageUrl={productImageById[item.productId] ?? null}
+                onOpenDetail={() => setSheetResult(item)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+      {sheetResult ? (
+        <OqmResultDetailSheet
+          result={sheetResult}
+          imageUrl={productImageById[sheetResult.productId] ?? null}
+          onClose={() => setSheetResult(null)}
+        />
+      ) : null}
+    </>
+  );
 }
 
-function ProductShortageCallout({
+function oqmResultRowClass(status: MatchStatus): string {
+  if (status === "full") return "oqm-result-row oqm-result-row--full";
+  if (status === "partial") return "oqm-result-row oqm-result-row--partial";
+  return "oqm-result-row oqm-result-row--impossible";
+}
+
+function OqmResultRow({
+  result,
+  imageUrl,
+  onOpenDetail,
+}: {
+  result: ProductMatchResult;
+  imageUrl: string | null;
+  onOpenDetail: () => void;
+}) {
+  const domId = resultCardDomIdByProduct(result);
+  const shortageText = oqmCompactShortageSummary(result);
+  const hasShort = result.status !== "full" && shortageText;
+  return (
+    <button
+      type="button"
+      id={domId}
+      className={oqmResultRowClass(result.status)}
+      onClick={onOpenDetail}
+    >
+      <OqmProductThumb url={imageUrl} name={result.displayName} />
+      <div className="oqm-result-row__body">
+        <span className="oqm-result-row__title">{result.displayName}</span>
+        <span className="oqm-result-row__sku">품번 {result.sku}</span>
+        {hasShort ? (
+          <span
+            className={
+              result.status === "impossible" ? "oqm-result-row__short oqm-result-row__short--bad" : "oqm-result-row__short"
+            }
+          >
+            {shortageText}
+          </span>
+        ) : null}
+      </div>
+      <span className={`oqm-result-row__badge ${statusClass(result.status)}`}>{statusLabel(result.status)}</span>
+    </button>
+  );
+}
+
+function OqmResultDetailSheet({
+  result,
+  imageUrl,
+  onClose,
+}: {
+  result: ProductMatchResult;
+  imageUrl: string | null;
+  onClose: () => void;
+}) {
+  const onKey = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    },
+    [onClose]
+  );
+  useEffect(() => {
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onKey]);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="oqm-detail-sheet" role="dialog" aria-modal="true" aria-labelledby="oqm-detail-sheet-title">
+      <button type="button" className="oqm-detail-sheet__backdrop" aria-label="닫기" onClick={onClose} />
+      <div className="oqm-detail-sheet__panel">
+        <div className="oqm-detail-sheet__head">
+          <h3 id="oqm-detail-sheet-title" className="oqm-detail-sheet__title">
+            {result.displayName}
+          </h3>
+          <button type="button" className="oqm-detail-sheet__close" onClick={onClose} aria-label="상세 닫기">
+            ×
+          </button>
+        </div>
+        <div className="oqm-detail-sheet__image-wrap">
+          {imageUrl ? (
+            <img
+              className="oqm-detail-sheet__image"
+              src={imageUrl}
+              alt={result.displayName}
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="oqm-detail-sheet__image-ph" aria-hidden />
+          )}
+        </div>
+        <p className="oqm-detail-sheet__sku">품번 {result.sku}</p>
+        <p>
+          <span className={statusClass(result.status)}>{statusLabel(result.status)}</span>
+        </p>
+        {result.status !== "full" ? (
+          <div className="oqm-detail-sheet__detail-block">
+            <h4 className="oqm-detail-sheet__sub">부족·재고</h4>
+            <OqmShortageListInSheet details={result.details} status={result.status} />
+          </div>
+        ) : null}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function OqmShortageListInSheet({
   details,
-  title = "부족 사이즈 상세",
+  status,
 }: {
   details: ProductMatchResult["details"];
-  title?: string;
+  status: MatchStatus;
 }) {
-  const has = details.some((d) => d.shortage > 0);
-  if (!has) return null;
-  return (
-    <div className="oqm-shortage-callout" role="region" aria-label={title}>
-      <h4 className="oqm-shortage-callout__title">{title}</h4>
-      <ShortageList details={details} />
-    </div>
-  );
-}
-
-function ProductResultCard({ result }: { result: ProductMatchResult }) {
-  const domId = resultCardDomIdByProduct(result);
-  const hasShortage = result.totalShortage > 0;
-  return (
-    <article
-      id={domId}
-      tabIndex={-1}
-      className={`oqm-result-card ${cardStatusModifier(result.status)}`}
-    >
-      <header className="oqm-result-card__head">
-        <span className="oqm-result-card__kind">상품</span>
-        <span className={statusClass(result.status)}>{statusLabel(result.status)}</span>
-      </header>
-      <h3 className="oqm-result-card__title">{result.displayName}</h3>
-      <p className="oqm-result-card__bundle-hint">품번: {result.sku}</p>
-      {hasShortage ? <ProductShortageCallout details={result.details} /> : null}
-      <dl className="oqm-result-card__stats">
-        <div>
-          <dt>총 요청 수량</dt>
-          <dd>{result.totalRequested.toLocaleString()}</dd>
-        </div>
-        <div>
-          <dt>총 충족 수량</dt>
-          <dd>{result.totalAllocated.toLocaleString()}</dd>
-        </div>
-        <div>
-          <dt>총 부족 수량</dt>
-          <dd className={result.totalShortage > 0 ? "oqm-num-warn" : ""}>{result.totalShortage.toLocaleString()}</dd>
-        </div>
-      </dl>
-      {!hasShortage ? (
-        <p className="oqm-muted oqm-result-card__no-short">부족 항목 없음</p>
-      ) : null}
-    </article>
-  );
-}
-
-function ShortageList({ details }: { details: ProductMatchResult["details"] }) {
   const lines = details.filter((d) => d.shortage > 0);
   if (lines.length === 0) {
-    return <p className="oqm-muted oqm-shortage-empty">없음</p>;
+    return <p className="oqm-muted oqm-shortage-empty">부족 없음(상태: {statusLabel(status)})</p>;
   }
   return (
-    <ul className="oqm-shortage-list">
+    <ul className="oqm-shortage-list oqm-shortage-list--sheet">
       {lines.map((d) => (
         <li key={d.matchKey}>
           <span className="oqm-shortage-list__dim">{d.dimensionSummary}</span>
           <span className="oqm-shortage-list__nums">
-            재고 {d.availableStock.toLocaleString()} → 부족 <strong>{d.shortage.toLocaleString()}</strong>
+            재고 {d.availableStock.toLocaleString()} — 부족 <strong className="oqm-num-warn">{d.shortage.toLocaleString()}</strong>
           </span>
         </li>
       ))}

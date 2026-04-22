@@ -9,6 +9,7 @@ import {
   inferGarmentTypeFromProductTextDetailed,
   type GarmentTypeInferenceRule,
 } from "./inventoryGarmentTypeInference";
+import { CATEGORY_PROFILES, inferStockScopeType, type StockScopeType } from "./categoryPolicy";
 import { buildMatchKey } from "./matchKey";
 import { tryMergeBundaeShortPantsVariant } from "./shortPantsBundaeStockNormalize";
 import { normalizeText } from "./textNormalize";
@@ -20,6 +21,20 @@ export type CatalogStockNormalizationOptions = {
   inferenceRules?: readonly GarmentTypeInferenceRule[];
 };
 
+/**
+ * OQM 입력판은 `CATEGORY_PROFILES`·`inferStockScopeType`으로 상/하/아웃을 정한다.
+ * 매칭 키 `dimensions.garmentType`이 재고·요청이 같아지도록, 상품 `category`가 있을 때
+ * 이 경로를 키워드 추론보다 먼저 쓴다(예: "긴팔티"는 이름에 티/셔츠 키워드가 없어도 `top`으로 둘 다 맞음).
+ */
+function garmentTypeIdFromOqmProductCategory(product: Product): GarmentTypeId | null {
+  const cat = normalizeText(product.category ?? "");
+  if (!cat) return null;
+  const scope: StockScopeType = CATEGORY_PROFILES[cat]?.stockScopeType ?? inferStockScopeType(cat);
+  if (scope === "top" || scope === "outer") return "top";
+  if (scope === "bottom") return "bottom";
+  return null;
+}
+
 function resolveGarmentTypeForProduct(
   product: Product,
   rules: readonly GarmentTypeInferenceRule[] | undefined,
@@ -30,6 +45,17 @@ function resolveGarmentTypeForProduct(
       garmentType: override,
       inference: {
         source: "override",
+        confidence: "high",
+        matchedRuleIds: [],
+      },
+    };
+  }
+  const fromOqmCategory = garmentTypeIdFromOqmProductCategory(product);
+  if (fromOqmCategory != null) {
+    return {
+      garmentType: fromOqmCategory,
+      inference: {
+        source: "category_policy",
         confidence: "high",
         matchedRuleIds: [],
       },

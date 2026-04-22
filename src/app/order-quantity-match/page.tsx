@@ -22,6 +22,9 @@ export default async function OrderQuantityMatchPage() {
   }
 
   const stockLines = normalizeProductCatalogToStockLines(products, variantsByProductId);
+  const productImageById: Record<string, string | null> = Object.fromEntries(
+    products.map((p) => [p.id, p.imageUrl != null && String(p.imageUrl).trim() ? String(p.imageUrl) : null])
+  );
 
-  return <OrderQuantityMatchClient categories={categories} stockLines={stockLines} />;
+  return <OrderQuantityMatchClient categories={categories} stockLines={stockLines} productImageById={productImageById} />;
 }

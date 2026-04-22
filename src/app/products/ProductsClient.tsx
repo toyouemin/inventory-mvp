@@ -31,6 +31,7 @@ import {
 import { VARIANT_AUDIT_TARGET_SKUS } from "./variantAuditTargets";
 import { ENABLE_BATCH_IMAGE_UPLOAD } from "./featureFlags";
 import { fitCategorySelectWidth } from "./fitCategorySelectWidth";
+import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
 
 type ViewMode = "card" | "list";
 type ListStockUpdatedSort = "default" | "stock_updated_desc";
@@ -715,6 +716,7 @@ export function ProductsClient({
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const downloadYymmdd = formatDownloadFileNameDateYymmdd(new Date());
   const jumpProductId = (searchParams.get("jumpProductId") ?? "").trim();
   const hasJumpedToProductRef = useRef(false);
   const [uploading, setUploading] = useState(false);
@@ -2228,6 +2230,7 @@ export function ProductsClient({
         <a
           role="menuitem"
           href="/products/xlsx/price-list"
+          download={`price-list_${downloadYymmdd}.xlsx`}
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
@@ -2236,7 +2239,7 @@ export function ProductsClient({
         <a
           role="menuitem"
           href="/products/csv/products"
-          download="products.csv"
+          download={`products_${downloadYymmdd}.csv`}
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
@@ -2245,7 +2248,7 @@ export function ProductsClient({
         <a
           role="menuitem"
           href="/products/xlsx/products"
-          download="products.xlsx"
+          download={`products_${downloadYymmdd}.xlsx`}
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >

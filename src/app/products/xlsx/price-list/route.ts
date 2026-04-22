@@ -1,3 +1,4 @@
+import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
 import { ExcelColumnWidthAccumulator } from "@/lib/excelDownloadColumnWidths";
 import { applyExcelDownloadFontToWorksheet, writeStyledXlsxBuffer } from "@/lib/excelDownloadFont";
 import { supabaseServer } from "@/lib/supabaseClient";
@@ -62,16 +63,6 @@ type PriceListDebugReason = {
   }>;
   notes: string[];
 };
-
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-/** 서버 로컬 날짜 YYYY-MM-DD */
-function priceListFilenameDate(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-}
 
 function toExcelNumber(v: unknown): number | null {
   if (v === null || v === undefined) return null;
@@ -442,7 +433,7 @@ export async function GET(req: Request) {
 
   const buffer = writeStyledXlsxBuffer(wb);
 
-  const fname = `price-list-${priceListFilenameDate()}.xlsx`;
+  const fname = `price-list_${formatDownloadFileNameDateYymmdd(new Date())}.xlsx`;
 
   return new Response(new Uint8Array(buffer), {
     headers: {

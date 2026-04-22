@@ -1,4 +1,5 @@
 import { buildTransactionStatementData } from "@/features/transactionStatement/buildData";
+import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
 import {
   exportTransactionStatementExcel,
   exportTransactionStatementExcelFromTemplateBuffer,
@@ -11,13 +12,6 @@ import path from "node:path";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const TEMPLATE_RELATIVE_PATH = "public/templates/transaction.xlsx";
-
-function formatFileDate(date: Date): string {
-  const yyyy = String(date.getFullYear());
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}${mm}${dd}`;
-}
 
 export async function POST(req: Request): Promise<Response> {
   let body: TransactionStatementRequestBody;
@@ -60,7 +54,7 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
 
-    const fileName = `transaction-statement-${formatFileDate(new Date())}.xlsx`;
+    const fileName = `transaction-statement-${formatDownloadFileNameDateYymmdd(new Date())}.xlsx`;
 
     return new Response(new Uint8Array(buffer), {
       status: 200,

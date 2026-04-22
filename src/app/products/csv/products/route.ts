@@ -1,3 +1,4 @@
+import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
 import { fetchAllProductsPaged, fetchVariantsByProductIdsPaged } from "../../xlsx/pagedFetch";
@@ -156,10 +157,11 @@ export async function GET(req: Request) {
   const lines = [CSV_HEADER, ...rows.map((r) => r.join(","))];
   const csv = "\uFEFF" + lines.join("\r\n");
 
+  const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="products.csv"`,
+      "Content-Disposition": `attachment; filename="products_${yymmdd}.csv"`,
       "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       Pragma: "no-cache",
       Expires: "0",

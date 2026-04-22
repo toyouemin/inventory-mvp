@@ -3,7 +3,7 @@
  */
 
 import type { DimensionValues, GarmentTypeId } from "./types";
-import { normalizeCommonUnisexSizeToken } from "./mantomanSizeNormalize";
+import { normalizeSizeByPolicy, resolveCategorySizePolicy } from "./categoryPolicy";
 import { normalizeText } from "./textNormalize";
 
 export const CLOTHING_DIMENSION_ORDER = ["category", "garmentType", "gender", "size"] as const;
@@ -60,7 +60,8 @@ export function buildClothingDimensionValues(input: {
   const category = normalizeText(input.category);
   const gender = normalizeGenderValue(input.gender);
   const sizeRaw = normalizeText(input.size);
-  const size = gender === "공용" ? normalizeCommonUnisexSizeToken(sizeRaw) : sizeRaw;
+  const policy = resolveCategorySizePolicy(category);
+  const size = policy ? normalizeSizeByPolicy(policy, gender, sizeRaw) : sizeRaw;
   return {
     category,
     garmentType: input.garmentType,

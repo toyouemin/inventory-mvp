@@ -1,3 +1,4 @@
+import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
 import { supabaseServer } from "@/lib/supabaseClient";
 import { fetchCategoryOrderMap } from "../../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../../categorySortOrder.utils";
@@ -159,10 +160,11 @@ export async function GET(req: Request) {
   const lines = [CSV_HEADER, ...rows.map((r) => r.join(","))];
   const csv = "\uFEFF" + lines.join("\r\n");
 
+  const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="stock.csv"',
+      "Content-Disposition": `attachment; filename="stock_${yymmdd}.csv"`,
       "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       Pragma: "no-cache",
     },

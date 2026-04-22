@@ -1,3 +1,4 @@
+import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
 import { buildProductStockExcelColumnWidths } from "@/lib/excelDownloadColumnWidths";
 import {
   applyExcelDownloadFontToWorksheet,
@@ -171,10 +172,11 @@ export async function GET() {
 
   const buffer = writeStyledXlsxBuffer(wb);
 
+  const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": 'attachment; filename="stock.xlsx"',
+      "Content-Disposition": `attachment; filename="stock_${yymmdd}.xlsx"`,
       "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       Pragma: "no-cache",
     },

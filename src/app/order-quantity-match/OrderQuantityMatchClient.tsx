@@ -7,13 +7,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { GarmentTypeId, MatchStatus, NormalizedStockLine, RequestLineInput } from "@/features/orderQuantityMatch/types";
-import { GARMENT_TYPE_LABELS } from "@/features/orderQuantityMatch/clothingDimensionProfile";
 import {
-  UNISEX_NUMERIC_APPAREL_SIZES,
-  formatUnisexNumericApparelInputLabel,
-  normalizeCommonUnisexSizeToken,
-  isUnisexNumericApparelCategory,
-} from "@/features/orderQuantityMatch/mantomanSizeNormalize";
+  CATEGORY_PROFILES,
+  type SizePolicy,
+  type StockScopeType,
+  UNISEX_ALPHA_SIZES,
+  UNISEX_NUMERIC_SIZES,
+  getSavedCategoryPolicyStore,
+  inferSizePolicy,
+  inferStockScopeType,
+  linesForCategoryPolicyInference,
+  normalizeSizeByPolicy,
+  parseGenderAndSize,
+  resolveCategorySizePolicy,
+  saveCategoryPolicyStore,
+} from "@/features/orderQuantityMatch/categoryPolicy";
 import { matchOrderRowsToProducts, type ProductMatchResult } from "@/features/orderQuantityMatch/matchOrderToProducts";
 import { normalizeRequestLine } from "@/features/orderQuantityMatch/normalizeRequest";
 
@@ -28,7 +36,7 @@ const CATEGORY_FALLBACK_PRESETS = [
   "가방",
   "기타 사이즈 없음",
 ] as const;
-const SIZE_CATEGORY_FALLBACK_PRESETS = ["티셔츠", "바람막이", "후드", "맨투맨", "트레이닝복"] as const;
+const SIZE_CATEGORY_FALLBACK_PRESETS = ["티셔츠", "바람막이", "맨투맨", "오버핏", "트레이닝복", "7부바지"] as const;
 
 function safeScrollDomIdSegment(s: string): string {
   let h = 0;
@@ -63,9 +71,12 @@ type QuickEntry = {
 type QuickCategoryKind = "apparel" | "training" | "general";
 
 type CategoryProfile = {
-  kind: QuickCategoryKind;
-  apparelSizeType: ApparelSizeType;
+  stockScopeType: StockScopeType;
+  sizePolicy: SizePolicy;
+  needsPolicyChoice: boolean;
+  recommendedPolicy: SizePolicy | null;
   unisexSizes: string[];
+  unisexAlphaSizes: string[];
   femaleSizes: string[];
   maleSizes: string[];
   generalItems: string[];
@@ -103,14 +114,6 @@ function buildRequestRow(input: Omit<RequestLineInput, "rowId">): RequestLineInp
     rowId: newRowId(),
     ...input,
   };
-}
-
-function resolveQuickCategoryKind(categoryRaw: string): QuickCategoryKind {
-  const category = categoryRaw.trim();
-  if (category === "트레이닝복") return "training";
-  if (["티셔츠", "바람막이", "후드", "맨투맨"].includes(category)) return "apparel";
-  if (["라켓", "가방", "기타 사이즈 없음"].includes(category)) return "general";
-  return "apparel";
 }
 
 function normalizeSizeToken(raw: string): string {
@@ -180,79 +183,67 @@ function clampTrainingMaleSizes(sizes: string[]): string[] {
   });
 }
 
-function buildCategoryProfile(category: string, stockLines: NormalizedStockLine[]): CategoryProfile {
+function buildCategoryProfile(
+  category: string,
+  stockLines: NormalizedStockLine[],
+  savedPolicyStore: Record<string, SizePolicy>
+): CategoryProfile {
   const cat = category.trim();
   const lines = stockLines.filter((l) => (l.dimensions.category ?? "").trim() === cat);
-  const garmentTypes = new Set(lines.map((l) => (l.dimensions.garmentType ?? "").trim()));
-  const genders = uniqueSorted(lines.map((l) => (l.dimensions.gender ?? "").trim()));
-  const sizes = uniqueSorted(lines.map((l) => normalizeSizeToken(l.dimensions.size ?? "")));
-  const isTrainingCategory = cat === "트레이닝복";
-  if (isTrainingCategory) {
-    const femaleSizesRaw = uniqueSorted(
-      lines.filter((l) => (l.dimensions.gender ?? "").trim() === "여").map((l) => normalizeSizeToken(l.dimensions.size ?? ""))
-    );
-    const maleSizesRaw = uniqueSorted(
-      lines.filter((l) => (l.dimensions.gender ?? "").trim() === "남").map((l) => normalizeSizeToken(l.dimensions.size ?? ""))
-    );
-    const femaleSizes = uniqueSorted(clampTrainingFemaleSizes([...TRAINING_FEMALE_BASE, ...femaleSizesRaw]));
-    const maleSizes = uniqueSorted(clampTrainingMaleSizes([...TRAINING_MALE_BASE, ...maleSizesRaw]));
+  const inferRows = linesForCategoryPolicyInference(cat, stockLines);
+  const recommendedPolicy = inferSizePolicy(inferRows);
+  const resolvedPolicy = resolveCategorySizePolicy(cat, inferRows, savedPolicyStore);
+  const sizePolicy: SizePolicy = resolvedPolicy ?? "custom";
+  const preset = CATEGORY_PROFILES[cat];
+  const needsPolicyChoice = !preset?.sizePolicy && !savedPolicyStore[cat] && resolvedPolicy == null;
+  const stockScopeType = preset?.stockScopeType ?? inferStockScopeType(cat);
+
+  const items = uniqueSorted(lines.map((l) => l.displayName || l.sku)).slice(0, 30);
+  const parsedRows = lines.map((l) => {
+    const parsed = parseGenderAndSize(`${l.dimensions.gender ?? ""}${l.dimensions.size ?? ""}`);
+    const gender = (l.dimensions.gender ?? "").trim() || parsed.gender;
+    const sizeRaw = (l.dimensions.size ?? "").trim() || parsed.size;
     return {
-      kind: "training",
-      apparelSizeType: "genderSplit",
-      unisexSizes: [],
-      femaleSizes: femaleSizes.length > 0 ? femaleSizes : [...TRAINING_FEMALE_BASE],
-      maleSizes: maleSizes.length > 0 ? maleSizes : [...TRAINING_MALE_BASE],
-      generalItems: [],
+      gender,
+      size: normalizeSizeByPolicy(sizePolicy, gender, sizeRaw),
     };
-  }
-
-  const hasAnySizeSignal = sizes.length > 0 || genders.some((g) => g === "남" || g === "여" || g === "공용");
-  if (!hasAnySizeSignal) {
-    const items = uniqueSorted(lines.map((l) => l.displayName || l.sku)).slice(0, 30);
-    return {
-      kind: "general",
-      apparelSizeType: "unisex",
-      unisexSizes: [],
-      femaleSizes: [],
-      maleSizes: [],
-      generalItems: items.length > 0 ? items : [...GENERAL_ITEM_PRESETS],
-    };
-  }
-
-  const femaleSizes = uniqueSorted(
-    lines.filter((l) => (l.dimensions.gender ?? "").trim() === "여").map((l) => normalizeSizeToken(l.dimensions.size ?? ""))
+  });
+  const femaleSizesRaw = uniqueSorted(parsedRows.filter((r) => r.gender === "여").map((r) => normalizeSizeToken(r.size)));
+  const maleSizesRaw = uniqueSorted(parsedRows.filter((r) => r.gender === "남").map((r) => normalizeSizeToken(r.size)));
+  const unisexSizesRaw = uniqueSorted(
+    parsedRows
+      .filter((r) => r.gender === "공용" || r.gender === "")
+      .map((r) => normalizeSizeToken(r.size))
   );
-  const maleSizes = uniqueSorted(
-    lines.filter((l) => (l.dimensions.gender ?? "").trim() === "남").map((l) => normalizeSizeToken(l.dimensions.size ?? ""))
-  );
-  const unisexSizes = uniqueSorted(
-    lines
-      .filter((l) => {
-        const g = (l.dimensions.gender ?? "").trim();
-        return g === "" || g === "공용";
-      })
-      .map((l) => normalizeCommonUnisexSizeToken(normalizeSizeToken(l.dimensions.size ?? "")))
-  );
-  const sizeType: ApparelSizeType = femaleSizes.length > 0 && maleSizes.length > 0 ? "genderSplit" : "unisex";
 
-  const apparelProfile: CategoryProfile = {
-    kind: "apparel",
-    apparelSizeType: sizeType,
-    unisexSizes: unisexSizes.length > 0 ? unisexSizes : [...FALLBACK_NUMERIC],
-    femaleSizes: femaleSizes.length > 0 ? femaleSizes : [...FALLBACK_FEMALE],
-    maleSizes: maleSizes.length > 0 ? maleSizes : [...FALLBACK_MALE],
-    generalItems: [],
+  return {
+    stockScopeType,
+    sizePolicy,
+    needsPolicyChoice,
+    recommendedPolicy,
+    unisexSizes:
+      sizePolicy === "unisexNumeric"
+        ? [...UNISEX_NUMERIC_SIZES]
+        : sizePolicy === "free"
+          ? ["FREE"]
+          : unisexSizesRaw.length > 0
+            ? unisexSizesRaw
+            : [...FALLBACK_NUMERIC],
+    unisexAlphaSizes: sizePolicy === "unisexAlpha" ? [...UNISEX_ALPHA_SIZES] : unisexSizesRaw,
+    femaleSizes:
+      femaleSizesRaw.length > 0
+        ? femaleSizesRaw
+        : sizePolicy === "custom"
+          ? [...TRAINING_FEMALE_BASE]
+          : [...FALLBACK_FEMALE],
+    maleSizes:
+      maleSizesRaw.length > 0
+        ? maleSizesRaw
+        : sizePolicy === "custom"
+          ? [...TRAINING_MALE_BASE]
+          : [...FALLBACK_MALE],
+    generalItems: items.length > 0 ? items : [...GENERAL_ITEM_PRESETS],
   };
-
-  if (isUnisexNumericApparelCategory(cat) && apparelProfile.apparelSizeType !== "genderSplit") {
-    return {
-      ...apparelProfile,
-      apparelSizeType: "unisex",
-      unisexSizes: [...UNISEX_NUMERIC_APPAREL_SIZES],
-    };
-  }
-
-  return apparelProfile;
 }
 
 function statusLabel(s: MatchStatus): string {
@@ -279,6 +270,7 @@ export function OrderQuantityMatchClient({
   stockLines: NormalizedStockLine[];
 }) {
   const [quickCategory, setQuickCategory] = useState("티셔츠");
+  const [savedPolicyStore, setSavedPolicyStore] = useState<Record<string, SizePolicy>>({});
   /** 빠른 입력: 카테고리 내 재고를 선택한 상품 집합으로 한정(빈 배열 = 전체 상품) */
   const [quickProductScopeIds, setQuickProductScopeIds] = useState<string[]>([]);
   const linesInQuickCategory = useMemo(() => {
@@ -291,8 +283,11 @@ export function OrderQuantityMatchClient({
     const idSet = new Set(quickProductScopeIds);
     return linesInQuickCategory.filter((l) => idSet.has(l.productId));
   }, [linesInQuickCategory, quickProductScopeIds]);
-  const categoryProfile = useMemo(() => buildCategoryProfile(quickCategory, quickStockScopeLines), [quickCategory, quickStockScopeLines]);
-  const [apparelSizeType, setApparelSizeType] = useState<ApparelSizeType>(categoryProfile.apparelSizeType);
+  const categoryProfile = useMemo(
+    () => buildCategoryProfile(quickCategory, quickStockScopeLines, savedPolicyStore),
+    [quickCategory, quickStockScopeLines, savedPolicyStore]
+  );
+  const [apparelSizeType, setApparelSizeType] = useState<ApparelSizeType>("genderSplit");
   const [apparelQtyByKey, setApparelQtyByKey] = useState<Record<string, string>>({});
   const [trainingSetQtyByKey, setTrainingSetQtyByKey] = useState<Record<string, string>>({});
   const [generalEntries, setGeneralEntries] = useState<QuickEntry[]>(GENERAL_ITEM_PRESETS.map((name) => quickEntry(name)));
@@ -352,31 +347,39 @@ export function OrderQuantityMatchClient({
     if (selectedProductScopeLabels.length === 1) return selectedProductScopeLabels[0]!;
     return `${selectedProductScopeLabels.length}개 선택`;
   }, [quickProductScopeIds, selectedProductScopeLabels]);
-  const quickCategoryKind = useMemo(() => categoryProfile.kind ?? resolveQuickCategoryKind(quickCategory), [categoryProfile.kind, quickCategory]);
+  const quickCategoryKind = useMemo<QuickCategoryKind>(() => {
+    if (categoryProfile.stockScopeType === "set") return "training";
+    if (categoryProfile.stockScopeType === "other") return "general";
+    return "apparel";
+  }, [categoryProfile.stockScopeType]);
   const apparelGarmentType = useMemo<GarmentTypeId>(() => {
     if (quickCategoryKind !== "apparel") return "single";
-    const types = new Set<GarmentTypeId>();
-    for (const line of quickStockScopeLines) {
-      const t = (line.dimensions.garmentType ?? "").trim();
-      if (t === "single" || t === "top" || t === "bottom") types.add(t);
-    }
-    if (types.size === 1) return [...types][0]!;
-    if (types.has("top") && !types.has("bottom")) return "top";
-    if (types.has("bottom") && !types.has("top")) return "bottom";
-
-    const c = quickCategory.trim();
-    if (["티셔츠", "바람막이", "후드", "맨투맨"].includes(c)) return "top";
-    if (["바지", "팬츠", "하의", "레깅스", "스커트"].some((k) => c.includes(k))) return "bottom";
+    if (categoryProfile.stockScopeType === "top" || categoryProfile.stockScopeType === "outer") return "top";
+    if (categoryProfile.stockScopeType === "bottom") return "bottom";
     return "single";
-  }, [quickCategoryKind, quickCategory, quickStockScopeLines]);
+  }, [quickCategoryKind, categoryProfile.stockScopeType]);
   const activeApparelSizes =
     apparelSizeType === "genderSplit"
       ? [...new Set([...categoryProfile.femaleSizes, ...categoryProfile.maleSizes])]
-      : categoryProfile.unisexSizes;
+      : categoryProfile.sizePolicy === "unisexAlpha"
+        ? categoryProfile.unisexAlphaSizes
+        : categoryProfile.unisexSizes;
 
   useEffect(() => {
-    setApparelSizeType(categoryProfile.apparelSizeType);
-  }, [quickCategory, categoryProfile.apparelSizeType]);
+    setSavedPolicyStore(getSavedCategoryPolicyStore());
+  }, []);
+
+  function confirmCategoryPolicy(policy: SizePolicy) {
+    const category = quickCategory.trim();
+    if (!category) return;
+    const next = { ...savedPolicyStore, [category]: policy };
+    setSavedPolicyStore(next);
+    saveCategoryPolicyStore(next);
+  }
+
+  useEffect(() => {
+    setApparelSizeType(categoryProfile.sizePolicy === "genderSplit" ? "genderSplit" : "unisex");
+  }, [quickCategory, categoryProfile.sizePolicy]);
 
   useEffect(() => {
     setQuickProductScopeIds([]);
@@ -594,13 +597,13 @@ export function OrderQuantityMatchClient({
             categoryProfile={categoryProfile}
             quickCategoryKind={quickCategoryKind}
             apparelSizeType={apparelSizeType}
-            setApparelSizeType={setApparelSizeType}
             apparelQtyByKey={apparelQtyByKey}
             setApparelQtyByKey={setApparelQtyByKey}
             trainingSetQtyByKey={trainingSetQtyByKey}
             setTrainingSetQtyByKey={setTrainingSetQtyByKey}
             generalEntries={generalEntries}
             setGeneralEntries={setGeneralEntries}
+            onConfirmCategoryPolicy={confirmCategoryPolicy}
           />
 
           <p className="oqm-input-summary">
@@ -723,13 +726,13 @@ function QuickInputPanel(props: {
   categoryProfile: CategoryProfile;
   quickCategoryKind: QuickCategoryKind;
   apparelSizeType: ApparelSizeType;
-  setApparelSizeType: (v: ApparelSizeType) => void;
   apparelQtyByKey: Record<string, string>;
   setApparelQtyByKey: (v: Record<string, string>) => void;
   trainingSetQtyByKey: Record<string, string>;
   setTrainingSetQtyByKey: (v: Record<string, string>) => void;
   generalEntries: QuickEntry[];
   setGeneralEntries: (v: QuickEntry[]) => void;
+  onConfirmCategoryPolicy: (policy: SizePolicy) => void;
 }) {
   const {
     categories,
@@ -741,13 +744,13 @@ function QuickInputPanel(props: {
     categoryProfile,
     quickCategoryKind,
     apparelSizeType,
-    setApparelSizeType,
     apparelQtyByKey,
     setApparelQtyByKey,
     trainingSetQtyByKey,
     setTrainingSetQtyByKey,
     generalEntries,
     setGeneralEntries,
+    onConfirmCategoryPolicy,
   } = props;
   const selectedCategoryValue =
     quickCategory.trim() !== "" && categories.includes(quickCategory.trim()) ? quickCategory.trim() : "__custom__";
@@ -863,33 +866,35 @@ function QuickInputPanel(props: {
 
       {quickCategoryKind === "apparel" ? (
         <>
-          {isUnisexNumericApparelCategory(quickCategory.trim()) ? (
+          {categoryProfile.sizePolicy === "unisexNumeric" ? (
             <p className="oqm-muted oqm-mantoman-hint">
               이 카테고리는 공용 숫자형 정규화(S/M/L/XL/2XL/3XL/4XL ↔ 85/90/95/100/105/110/115)를 적용합니다.
             </p>
-          ) : (
+          ) : null}
+          {categoryProfile.needsPolicyChoice ? (
             <div className="oqm-quick-head">
               <div className="oqm-size-mode">
+                <span className="oqm-muted">이 카테고리의 사이즈 방식을 선택해 주세요 (1회 저장)</span>
                 {([
-                  ["unisex", "공용 입력"],
                   ["genderSplit", "남/여 분리"],
+                  ["unisexNumeric", "공용 숫자형"],
+                  ["unisexAlpha", "공용 S/M/L"],
+                  ["free", "프리사이즈"],
+                  ["custom", "사용자 정의"],
                 ] as const).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`oqm-size-mode-btn${apparelSizeType === id ? " oqm-size-mode-btn--active" : ""}`}
-                    onClick={() => setApparelSizeType(id)}
-                  >
+                  <button key={id} type="button" className="oqm-size-mode-btn" onClick={() => onConfirmCategoryPolicy(id)}>
                     {label}
                   </button>
                 ))}
+                {categoryProfile.recommendedPolicy ? (
+                  <span className="oqm-muted">추천: {categoryProfile.recommendedPolicy}</span>
+                ) : null}
               </div>
             </div>
-          )}
+          ) : null}
           <ApparelMatrix
             apparelSizeType={apparelSizeType}
             profile={categoryProfile}
-            quickCategory={quickCategory}
             qtyByKey={apparelQtyByKey}
             onChange={(id, value) => setApparelQtyByKey({ ...apparelQtyByKey, [id]: value })}
           />
@@ -933,19 +938,17 @@ function QuickInputPanel(props: {
 function ApparelMatrix({
   apparelSizeType,
   profile,
-  quickCategory,
   qtyByKey,
   onChange,
 }: {
   apparelSizeType: ApparelSizeType;
   profile: CategoryProfile;
-  quickCategory: string;
   qtyByKey: Record<string, string>;
   onChange: (id: string, value: string) => void;
 }) {
   const femaleSizes = profile.femaleSizes;
   const maleSizes = profile.maleSizes;
-  const unisexSizes = profile.unisexSizes;
+  const unisexSizes = profile.sizePolicy === "unisexAlpha" ? profile.unisexAlphaSizes : profile.unisexSizes;
   const total =
     apparelSizeType === "genderSplit"
       ? [...femaleSizes, ...maleSizes].reduce((sum, size) => sum + parseQty(qtyByKey[`여|${size}`] ?? "") + parseQty(qtyByKey[`남|${size}`] ?? ""), 0)
@@ -995,7 +998,7 @@ function ApparelMatrix({
         <div className="oqm-matrix-unisex-col">
           {leftSizes.map((size) => (
             <label key={size} className="oqm-matrix-cell oqm-matrix-cell--unisex-pair">
-              <span>{formatUnisexNumericApparelInputLabel(size)}</span>
+              <span>{profile.sizePolicy === "unisexNumeric" ? `공용${size}` : size}</span>
               <input
                 className="oqm-input oqm-input--qty"
                 {...numberInputProps(qtyByKey[`공용|${size}`] ?? "")}
@@ -1007,7 +1010,7 @@ function ApparelMatrix({
         <div className="oqm-matrix-unisex-col">
           {rightSizes.map((size) => (
             <label key={size} className="oqm-matrix-cell oqm-matrix-cell--unisex-pair">
-              <span>{formatUnisexNumericApparelInputLabel(size)}</span>
+              <span>{profile.sizePolicy === "unisexNumeric" ? `공용${size}` : size}</span>
               <input
                 className="oqm-input oqm-input--qty"
                 {...numberInputProps(qtyByKey[`공용|${size}`] ?? "")}

@@ -80,6 +80,8 @@ type CategoryProfile = {
   femaleSizes: string[];
   maleSizes: string[];
   generalItems: string[];
+  hasUnisexData: boolean;
+  hasGenderSplitData: boolean;
 };
 
 const FALLBACK_NUMERIC = ["85", "90", "95", "100", "105", "110", "115"] as const;
@@ -215,6 +217,8 @@ function buildCategoryProfile(
       .filter((r) => r.gender === "공용" || r.gender === "")
       .map((r) => normalizeSizeToken(r.size))
   );
+  const hasGenderSplitData = femaleSizesRaw.length > 0 || maleSizesRaw.length > 0;
+  const hasUnisexData = unisexSizesRaw.length > 0;
 
   return {
     stockScopeType,
@@ -243,6 +247,8 @@ function buildCategoryProfile(
           ? [...TRAINING_MALE_BASE]
           : [...FALLBACK_MALE],
     generalItems: items.length > 0 ? items : [...GENERAL_ITEM_PRESETS],
+    hasUnisexData,
+    hasGenderSplitData,
   };
 }
 
@@ -364,6 +370,9 @@ export function OrderQuantityMatchClient({
       : categoryProfile.sizePolicy === "unisexAlpha"
         ? categoryProfile.unisexAlphaSizes
         : categoryProfile.unisexSizes;
+  // 입력판은 카테고리명/정책 fallback이 아니라 현재 선택 범위의 실제 size 데이터 구조만 따른다.
+  const canShowUnisexInput = categoryProfile.hasUnisexData;
+  const canShowGenderSplitInput = categoryProfile.hasGenderSplitData;
 
   useEffect(() => {
     setSavedPolicyStore(getSavedCategoryPolicyStore());
@@ -378,8 +387,15 @@ export function OrderQuantityMatchClient({
   }
 
   useEffect(() => {
-    setApparelSizeType(categoryProfile.sizePolicy === "genderSplit" ? "genderSplit" : "unisex");
-  }, [quickCategory, categoryProfile.sizePolicy]);
+    if (canShowUnisexInput && canShowGenderSplitInput) return;
+    if (canShowGenderSplitInput) {
+      setApparelSizeType("genderSplit");
+      return;
+    }
+    if (canShowUnisexInput) {
+      setApparelSizeType("unisex");
+    }
+  }, [quickCategory, canShowUnisexInput, canShowGenderSplitInput]);
 
   useEffect(() => {
     setQuickProductScopeIds([]);
@@ -597,6 +613,9 @@ export function OrderQuantityMatchClient({
             categoryProfile={categoryProfile}
             quickCategoryKind={quickCategoryKind}
             apparelSizeType={apparelSizeType}
+            setApparelSizeType={setApparelSizeType}
+            canShowUnisexInput={canShowUnisexInput}
+            canShowGenderSplitInput={canShowGenderSplitInput}
             apparelQtyByKey={apparelQtyByKey}
             setApparelQtyByKey={setApparelQtyByKey}
             trainingSetQtyByKey={trainingSetQtyByKey}
@@ -726,6 +745,9 @@ function QuickInputPanel(props: {
   categoryProfile: CategoryProfile;
   quickCategoryKind: QuickCategoryKind;
   apparelSizeType: ApparelSizeType;
+  setApparelSizeType: (v: ApparelSizeType) => void;
+  canShowUnisexInput: boolean;
+  canShowGenderSplitInput: boolean;
   apparelQtyByKey: Record<string, string>;
   setApparelQtyByKey: (v: Record<string, string>) => void;
   trainingSetQtyByKey: Record<string, string>;
@@ -744,6 +766,9 @@ function QuickInputPanel(props: {
     categoryProfile,
     quickCategoryKind,
     apparelSizeType,
+    setApparelSizeType,
+    canShowUnisexInput,
+    canShowGenderSplitInput,
     apparelQtyByKey,
     setApparelQtyByKey,
     trainingSetQtyByKey,
@@ -892,8 +917,29 @@ function QuickInputPanel(props: {
               </div>
             </div>
           ) : null}
+          {canShowUnisexInput && canShowGenderSplitInput ? (
+            <div className="oqm-quick-head">
+              <div className="oqm-size-mode">
+                {([
+                  ["unisex", "공용 입력"],
+                  ["genderSplit", "남/여 분리"],
+                ] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`oqm-size-mode-btn${apparelSizeType === id ? " oqm-size-mode-btn--active" : ""}`}
+                    onClick={() => setApparelSizeType(id)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <ApparelMatrix
             apparelSizeType={apparelSizeType}
+            canShowUnisexInput={canShowUnisexInput}
+            canShowGenderSplitInput={canShowGenderSplitInput}
             profile={categoryProfile}
             qtyByKey={apparelQtyByKey}
             onChange={(id, value) => setApparelQtyByKey({ ...apparelQtyByKey, [id]: value })}
@@ -937,15 +983,27 @@ function QuickInputPanel(props: {
 
 function ApparelMatrix({
   apparelSizeType,
+  canShowUnisexInput,
+  canShowGenderSplitInput,
   profile,
   qtyByKey,
   onChange,
 }: {
   apparelSizeType: ApparelSizeType;
+  canShowUnisexInput: boolean;
+  canShowGenderSplitInput: boolean;
   profile: CategoryProfile;
   qtyByKey: Record<string, string>;
   onChange: (id: string, value: string) => void;
 }) {
+  if (!canShowUnisexInput && !canShowGenderSplitInput) {
+    return (
+      <div className="oqm-matrix-wrap">
+        <p className="oqm-muted">선택한 범위에 유효한 사이즈 데이터가 없어 입력판을 표시할 수 없습니다.</p>
+      </div>
+    );
+  }
+
   const femaleSizes = profile.femaleSizes;
   const maleSizes = profile.maleSizes;
   const unisexSizes = profile.sizePolicy === "unisexAlpha" ? profile.unisexAlphaSizes : profile.unisexSizes;
@@ -954,7 +1012,8 @@ function ApparelMatrix({
       ? [...femaleSizes, ...maleSizes].reduce((sum, size) => sum + parseQty(qtyByKey[`여|${size}`] ?? "") + parseQty(qtyByKey[`남|${size}`] ?? ""), 0)
       : unisexSizes.reduce((sum, size) => sum + parseQty(qtyByKey[`공용|${size}`] ?? ""), 0);
 
-  if (apparelSizeType === "genderSplit") {
+  const renderGenderSplit = canShowGenderSplitInput && (apparelSizeType === "genderSplit" || !canShowUnisexInput);
+  if (renderGenderSplit) {
     return (
       <div className="oqm-matrix-wrap">
         <div className="oqm-matrix-gender">

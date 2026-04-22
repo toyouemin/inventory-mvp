@@ -18,7 +18,6 @@ import {
   type OqmCategoryProfile,
   type OqmApparelSizeType,
 } from "@/features/orderQuantityMatch/oqmPipelineModel";
-import { normalizeRequestLine } from "@/features/orderQuantityMatch/normalizeRequest";
 
 const IS_DEV = process.env.NODE_ENV === "development";
 const GENERAL_ITEM_PRESETS = ["라켓", "가방"] as const;
@@ -352,19 +351,6 @@ export function OrderQuantityMatchClient({
     [requestInputs, scopedStockLines]
   );
 
-  const debugSnapshots = useMemo(() => {
-    const normalizedRequest = requestInputs.map((r) => normalizeRequestLine(r));
-    const stockSummary = {
-      lineCount: scopedStockLines.length,
-      sampleLines: scopedStockLines.slice(0, 20),
-    };
-    return {
-      rawRequestJson: JSON.stringify(requestInputs, null, 2),
-      normalizedRequestJson: JSON.stringify(normalizedRequest, null, 2),
-      stockSummaryJson: JSON.stringify(stockSummary, null, 2),
-    };
-  }, [requestInputs, scopedStockLines]);
-
   return (
     <div className="products-page oqm-page">
       <div className="products-content-container">
@@ -425,26 +411,6 @@ export function OrderQuantityMatchClient({
           </p>
           <ResultCards items={productResults} productImageById={productImageById} />
         </section>
-
-        {IS_DEV ? (
-          <details className="oqm-debug-details">
-            <summary className="oqm-debug-details__summary">개발용 · 요청/정규화/재고 스냅샷</summary>
-            <div className="oqm-debug-details__body">
-              <details className="oqm-debug-sub">
-                <summary>raw request (RequestLineInput[])</summary>
-                <pre className="oqm-debug-pre">{debugSnapshots.rawRequestJson}</pre>
-              </details>
-              <details className="oqm-debug-sub">
-                <summary>normalized request (normalizeRequestLine)</summary>
-                <pre className="oqm-debug-pre">{debugSnapshots.normalizedRequestJson}</pre>
-              </details>
-              <details className="oqm-debug-sub">
-                <summary>normalized stock 요약 (앞 20줄)</summary>
-                <pre className="oqm-debug-pre">{debugSnapshots.stockSummaryJson}</pre>
-              </details>
-            </div>
-          </details>
-        ) : null}
       </div>
     </div>
   );
@@ -585,13 +551,11 @@ function QuickInputPanel(props: {
           ) : null}
         </div>
       </div>
-      <p className="oqm-muted oqm-category-hint">
-        재고 카테고리 추천 {categories.length}개
-        {categories.length < 3 ? " (부족 시 보조 추천 포함)" : ""}
-        {quickCategory.trim() !== "" && productScopeOptions.length > 0
-          ? " · 품목명을 여러 개 선택하면 선택 범위 재고로만 매칭합니다. (미선택 시 전체)"
-          : ""}
-      </p>
+      {quickCategory.trim() !== "" && productScopeOptions.length > 0 ? (
+        <p className="oqm-muted oqm-category-hint">
+          품목명을 여러 개 선택하면 선택 범위 재고로만 매칭. (미선택 시 전체)
+        </p>
+      ) : null}
       {quickCategory.trim() !== "" ? (
         <div className="oqm-product-scope-selected">
           <span className="oqm-muted">선택 품목명:</span>

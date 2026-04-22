@@ -3468,11 +3468,11 @@ label {
 .oqm-page-title {
   font-size: clamp(1.15rem, 2.5vw + 0.75rem, 1.45rem);
   font-weight: 700;
-  margin: 0 0 6px;
+  margin: 0 0 3px;
 }
 
 .oqm-page-head {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .oqm-intro {
@@ -3637,7 +3637,7 @@ label {
 .oqm-quick-head-primary > .oqm-field--category-select .oqm-select,
 .oqm-quick-head-primary > .oqm-field--product-scope .oqm-select {
   width: auto;
-  min-width: 0;
+  min-width: 14rem;
   max-width: 100%;
   field-sizing: content;
 }
@@ -3822,7 +3822,7 @@ label {
 }
 
 .oqm-apparel-grid__size {
-  font-size: 0.68rem;
+  font-size: calc(0.68rem + 1pt);
   font-weight: 700;
   color: var(--text);
   text-align: center;
@@ -3833,7 +3833,7 @@ label {
 }
 
 .oqm-apparel-grid__size--unisex {
-  font-size: 0.75rem;
+  font-size: calc(0.75rem + 1pt);
 }
 
 .oqm-apparel-grid__cell {
@@ -4330,6 +4330,11 @@ label {
   letter-spacing: 0.02em;
 }
 
+.oqm-field--category-select .oqm-field__label,
+.oqm-field--product-scope .oqm-field__label {
+  font-size: 14px;
+}
+
 .oqm-field--qty {
   max-width: 6.5rem;
 }
@@ -4406,7 +4411,7 @@ label {
 }
 
 .oqm-result-empty {
-  font-size: 1.05rem;
+  font-size: 14px;
   line-height: 1.35;
   margin: 0;
 }
@@ -4896,57 +4901,6 @@ label {
   color: var(--accent);
 }
 
-.oqm-debug-details {
-  margin: 24px 0 8px;
-  padding: 0;
-  border: 1px dashed #c9bfb2;
-  border-radius: 8px;
-  background: #faf8f6;
-  font-size: 0.8rem;
-}
-
-.oqm-debug-details__summary {
-  padding: 10px 12px;
-  cursor: pointer;
-  font-weight: 700;
-  color: var(--muted);
-  list-style: none;
-}
-
-.oqm-debug-details__summary::-webkit-details-marker {
-  display: none;
-}
-
-.oqm-debug-details__body {
-  padding: 0 12px 12px;
-  border-top: 1px dashed #ddd8d2;
-}
-
-.oqm-debug-sub {
-  margin-top: 8px;
-}
-
-.oqm-debug-sub summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--text);
-  padding: 4px 0;
-}
-
-.oqm-debug-pre {
-  margin: 6px 0 0;
-  padding: 10px;
-  max-height: 220px;
-  overflow: auto;
-  font-size: 0.72rem;
-  line-height: 1.4;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
 @media (max-width: 900px) and (min-width: 641px) {
   .oqm-field-grid {
     grid-template-columns: 1fr 1fr;
@@ -4994,6 +4948,34 @@ label {
 
   .oqm-quick-type {
     grid-template-columns: 1fr;
+  }
+
+  .oqm-quick-head-primary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+    gap: 10px 8px;
+    width: 100%;
+  }
+
+  .oqm-quick-head-primary > .oqm-field--category-select,
+  .oqm-quick-head-primary > .oqm-field--product-scope {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .oqm-quick-head-primary > .oqm-product-scope-empty {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .oqm-quick-head-primary > .oqm-field--category-select .oqm-select,
+  .oqm-quick-head-primary > .oqm-field--product-scope .oqm-select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .oqm-training-head {

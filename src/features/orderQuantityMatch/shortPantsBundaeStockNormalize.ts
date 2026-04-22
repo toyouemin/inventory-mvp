@@ -27,12 +27,15 @@ export function tryMergeBundaeShortPantsVariant(product: Product, variant: Produ
   const sizeRaw = normalizeText(variant.size ?? "");
   const genderDb = normalizeText(variant.gender ?? "");
 
-  const mColor = colorRaw.match(BUNDAE_COLOR_GENDER);
+  /** CSV/재고에 `3부-여`가 color가 아니라 gender 컬럼만 채워진 경우 */
+  const mFromColor = colorRaw.match(BUNDAE_COLOR_GENDER);
+  const mFromGenderField = genderDb.match(BUNDAE_COLOR_GENDER);
+  const mColor = mFromColor ?? mFromGenderField;
   if (!mColor) return null;
 
   const lengthPart = mColor[1]!; // 3부
   const gFromColor = mColor[2]! as "여" | "남" | "공용";
-  const genderResolved = pickBundaeGender(genderDb, gFromColor);
+  const genderResolved = mFromColor != null ? pickBundaeGender(genderDb, gFromColor) : pickBundaeGender("", gFromColor);
 
   if (/^\d{2,3}$/.test(sizeRaw)) {
     return { gender: genderResolved, size: `${lengthPart}-${sizeRaw}` };

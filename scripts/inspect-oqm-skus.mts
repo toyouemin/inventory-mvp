@@ -11,7 +11,15 @@ import { normalizeProductCatalogToStockLines, normalizeVariantToStockLines } fro
 import { buildOqmCategoryProfile } from "../src/features/orderQuantityMatch/oqmPipelineModel";
 import type { NormalizedStockLine } from "../src/features/orderQuantityMatch/types";
 
-const SKUS = ["T24HP-4011DG", "T24HP-4010NY"] as const;
+/** 조회할 품번 (DB `products.sku` 그대로; 하이픈 없는 행이면 그 문자열 사용) */
+const SKUS = ["T24HP-4011DG", "T24HP4010NY"] as const;
+
+/** DB에 없을 때 비슷한 sku 검색용 */
+async function findSimilarSkus(supabase: ReturnType<typeof createClient>, needle: string): Promise<string[]> {
+  const { data, error } = await supabase.from("products").select("sku").ilike("sku", `%${needle}%`);
+  if (error || !data) return [];
+  return [...new Set(data.map((r) => String((r as { sku: string }).sku)))].sort();
+}
 
 function loadEnvLocal(): void {
   const envPath = resolve(process.cwd(), ".env.local");
@@ -98,7 +106,11 @@ const bySku = new Map(products.map((p) => [p.sku, p]));
 for (const sku of SKUS) {
   const p = bySku.get(sku);
   if (!p) {
-    console.log(`\n=== SKU ${sku}: DB에 없음 ===\n`);
+    console.log(`\n=== SKU ${sku}: DB에 없음 ===`);
+    const tail = sku.replace(/[^A-Z0-9]/gi, "");
+    const similar = await findSimilarSkus(supabase, tail.length >= 4 ? tail.slice(-6) : tail);
+    if (similar.length) console.log("  ilike sku (일부):", similar.slice(0, 20));
+    console.log("");
     continue;
   }
 

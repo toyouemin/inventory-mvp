@@ -95,7 +95,7 @@ export function inferSizePolicy(rows: Array<{ gender?: string; size?: string }>)
     if (gender === "여" || gender === "남") hasMaleOrFemale = true;
     if (gender === "공용") unisexCount += 1;
     if (size === "F" || size === "FREE") freeCount += 1;
-    if (/^\d{2,3}$/.test(size)) numericCount += 1;
+    if (/^\d{2,3}$/.test(size) || /^\d+부-?\d{2,3}$/u.test(size)) numericCount += 1;
     if (/^(XXS|XS|S|M|L|XL|XXL|XXXL|XXXXL|[2-9]XL)$/.test(size)) alphaCount += 1;
   }
 

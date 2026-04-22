@@ -7,22 +7,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { GarmentTypeId, MatchStatus, NormalizedStockLine, RequestLineInput } from "@/features/orderQuantityMatch/types";
-import {
-  CATEGORY_PROFILES,
-  type SizePolicy,
-  type StockScopeType,
-  UNISEX_ALPHA_SIZES,
-  UNISEX_NUMERIC_SIZES,
-  getSavedCategoryPolicyStore,
-  inferSizePolicy,
-  inferStockScopeType,
-  linesForCategoryPolicyInference,
-  normalizeSizeByPolicy,
-  parseGenderAndSize,
-  resolveCategorySizePolicy,
-  saveCategoryPolicyStore,
-} from "@/features/orderQuantityMatch/categoryPolicy";
+import { type SizePolicy, getSavedCategoryPolicyStore, saveCategoryPolicyStore } from "@/features/orderQuantityMatch/categoryPolicy";
 import { matchOrderRowsToProducts, type ProductMatchResult } from "@/features/orderQuantityMatch/matchOrderToProducts";
+import {
+  buildOqmCategoryProfile,
+  buildOqmQuickRequestLines,
+  isOqmRecognizedSizeToken,
+  normalizeOqmSizeToken,
+  type OqmCategoryProfile,
+  type OqmApparelSizeType,
+} from "@/features/orderQuantityMatch/oqmPipelineModel";
 import { normalizeRequestLine } from "@/features/orderQuantityMatch/normalizeRequest";
 
 const IS_DEV = process.env.NODE_ENV === "development";
@@ -61,8 +55,6 @@ function newRowId(): string {
   return `row-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-type ApparelSizeType = "unisex" | "genderSplit";
-
 type QuickEntry = {
   id: string;
   quantity: string;
@@ -70,24 +62,8 @@ type QuickEntry = {
 
 type QuickCategoryKind = "apparel" | "training" | "general";
 
-type CategoryProfile = {
-  stockScopeType: StockScopeType;
-  sizePolicy: SizePolicy;
-  needsPolicyChoice: boolean;
-  recommendedPolicy: SizePolicy | null;
-  unisexSizes: string[];
-  unisexAlphaSizes: string[];
-  femaleSizes: string[];
-  maleSizes: string[];
-  generalItems: string[];
-  hasUnisexData: boolean;
-  hasGenderSplitData: boolean;
-};
-
-const FALLBACK_NUMERIC = ["85", "90", "95", "100", "105", "110", "115"] as const;
-const FALLBACK_ALPHA = ["S", "M", "L", "XL", "2XL", "3XL", "4XL"] as const;
-const FALLBACK_FEMALE = ["85", "90", "95", "100", "105"] as const;
-const FALLBACK_MALE = ["95", "100", "105", "110", "115"] as const;
+type CategoryProfile = OqmCategoryProfile;
+type ApparelSizeType = OqmApparelSizeType;
 const TRAINING_FEMALE_BASE = ["85", "90", "95", "100", "105"] as const;
 const TRAINING_MALE_BASE = ["95", "100", "105", "110", "115"] as const;
 const ALPHA_SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
@@ -118,55 +94,13 @@ function buildRequestRow(input: Omit<RequestLineInput, "rowId">): RequestLineInp
   };
 }
 
-function normalizeSizeToken(raw: string): string {
-  const t = raw.trim().toUpperCase().replace(/\s+/g, "");
-  if (!t) return "";
-  if (t.startsWith("공용")) return t.replace(/^공용/, "");
-  return t;
-}
-
-function isRecognizedSizeToken(raw: string): boolean {
-  const original = raw.trim().toUpperCase().replace(/\s+/g, "");
-  if (!original) return false;
-
-  // 허용 접두: 공용/여/남 (예: 공용95, 여85, 남S)
-  let body = original;
-  if (body.startsWith("공용")) body = body.slice(2);
-  else if (body.startsWith("여") || body.startsWith("남")) body = body.slice(1);
-  if (!body) return false;
-
-  // 숫자 사이즈: 85, 90, 95, 100, 105, 110, 115, ...
-  if (/^\d{2,3}$/.test(body)) return true;
-
-  // 영문 사이즈: S, M, L, XL, XXL, 2XL, 3XL, 4XL...
-  if (/^(XXS|XS|S|M|L|XL|XXL|XXXL|XXXXL|[2-9]XL)$/.test(body)) return true;
-
-  return false;
-}
-
 function isAlphaSize(raw: string): boolean {
-  const t = normalizeSizeToken(raw);
+  const t = normalizeOqmSizeToken(raw);
   return ALPHA_SIZE_RANK.has(t);
 }
 
-function compareSize(a: string, b: string): number {
-  const na = normalizeSizeToken(a);
-  const nb = normalizeSizeToken(b);
-  const an = Number(na);
-  const bn = Number(nb);
-  if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
-  const ar = ALPHA_SIZE_RANK.get(na);
-  const br = ALPHA_SIZE_RANK.get(nb);
-  if (ar != null && br != null) return ar - br;
-  return na.localeCompare(nb, "ko", { numeric: true });
-}
-
-function uniqueSorted(values: string[]): string[] {
-  return [...new Set(values.map((v) => v.trim()).filter(Boolean))].sort(compareSize);
-}
-
 function numericSizeOrNull(raw: string): number | null {
-  const t = normalizeSizeToken(raw);
+  const t = normalizeOqmSizeToken(raw);
   const n = Number(t);
   return Number.isFinite(n) ? n : null;
 }
@@ -183,73 +117,6 @@ function clampTrainingMaleSizes(sizes: string[]): string[] {
     const n = numericSizeOrNull(s);
     return n == null ? true : n >= 95;
   });
-}
-
-function buildCategoryProfile(
-  category: string,
-  stockLines: NormalizedStockLine[],
-  savedPolicyStore: Record<string, SizePolicy>
-): CategoryProfile {
-  const cat = category.trim();
-  const lines = stockLines.filter((l) => (l.dimensions.category ?? "").trim() === cat);
-  const inferRows = linesForCategoryPolicyInference(cat, stockLines);
-  const recommendedPolicy = inferSizePolicy(inferRows);
-  const resolvedPolicy = resolveCategorySizePolicy(cat, inferRows, savedPolicyStore);
-  const sizePolicy: SizePolicy = resolvedPolicy ?? "custom";
-  const preset = CATEGORY_PROFILES[cat];
-  const needsPolicyChoice = !preset?.sizePolicy && !savedPolicyStore[cat] && resolvedPolicy == null;
-  const stockScopeType = preset?.stockScopeType ?? inferStockScopeType(cat);
-
-  const items = uniqueSorted(lines.map((l) => l.displayName || l.sku)).slice(0, 30);
-  const parsedRows = lines.map((l) => {
-    const parsed = parseGenderAndSize(`${l.dimensions.gender ?? ""}${l.dimensions.size ?? ""}`);
-    const gender = (l.dimensions.gender ?? "").trim() || parsed.gender;
-    const sizeRaw = (l.dimensions.size ?? "").trim() || parsed.size;
-    return {
-      gender,
-      size: normalizeSizeByPolicy(sizePolicy, gender, sizeRaw),
-    };
-  });
-  const femaleSizesRaw = uniqueSorted(parsedRows.filter((r) => r.gender === "여").map((r) => normalizeSizeToken(r.size)));
-  const maleSizesRaw = uniqueSorted(parsedRows.filter((r) => r.gender === "남").map((r) => normalizeSizeToken(r.size)));
-  const unisexSizesRaw = uniqueSorted(
-    parsedRows
-      .filter((r) => r.gender === "공용" || r.gender === "")
-      .map((r) => normalizeSizeToken(r.size))
-  );
-  const hasGenderSplitData = femaleSizesRaw.length > 0 || maleSizesRaw.length > 0;
-  const hasUnisexData = unisexSizesRaw.length > 0;
-
-  return {
-    stockScopeType,
-    sizePolicy,
-    needsPolicyChoice,
-    recommendedPolicy,
-    unisexSizes:
-      sizePolicy === "unisexNumeric"
-        ? [...UNISEX_NUMERIC_SIZES]
-        : sizePolicy === "free"
-          ? ["FREE"]
-          : unisexSizesRaw.length > 0
-            ? unisexSizesRaw
-            : [...FALLBACK_NUMERIC],
-    unisexAlphaSizes: sizePolicy === "unisexAlpha" ? [...UNISEX_ALPHA_SIZES] : unisexSizesRaw,
-    femaleSizes:
-      femaleSizesRaw.length > 0
-        ? femaleSizesRaw
-        : sizePolicy === "custom"
-          ? [...TRAINING_FEMALE_BASE]
-          : [...FALLBACK_FEMALE],
-    maleSizes:
-      maleSizesRaw.length > 0
-        ? maleSizesRaw
-        : sizePolicy === "custom"
-          ? [...TRAINING_MALE_BASE]
-          : [...FALLBACK_MALE],
-    generalItems: items.length > 0 ? items : [...GENERAL_ITEM_PRESETS],
-    hasUnisexData,
-    hasGenderSplitData,
-  };
 }
 
 function statusLabel(s: MatchStatus): string {
@@ -290,7 +157,7 @@ export function OrderQuantityMatchClient({
     return linesInQuickCategory.filter((l) => idSet.has(l.productId));
   }, [linesInQuickCategory, quickProductScopeIds]);
   const categoryProfile = useMemo(
-    () => buildCategoryProfile(quickCategory, quickStockScopeLines, savedPolicyStore),
+    () => buildOqmCategoryProfile(quickCategory, quickStockScopeLines, savedPolicyStore),
     [quickCategory, quickStockScopeLines, savedPolicyStore]
   );
   const [apparelSizeType, setApparelSizeType] = useState<ApparelSizeType>("genderSplit");
@@ -313,7 +180,7 @@ export function OrderQuantityMatchClient({
   const sizedCategorySuggestions = useMemo(() => {
     const sizedFromStock = new Set(
       stockLines
-        .filter((l) => isRecognizedSizeToken(l.dimensions.size ?? ""))
+        .filter((l) => isOqmRecognizedSizeToken(l.dimensions.size ?? ""))
         .map((l) => (l.dimensions.category ?? "").trim())
         .filter(Boolean)
     );
@@ -415,128 +282,32 @@ export function OrderQuantityMatchClient({
     setGeneralEntries(items.map((name) => quickEntry(name)));
   }, [quickCategory, quickCategoryKind, generalItemsKey]);
 
-  const quickRequestInputs = useMemo(() => {
-    const out: RequestLineInput[] = [];
-    if (quickCategoryKind === "apparel") {
-      if (apparelSizeType === "genderSplit") {
-        for (const size of categoryProfile.femaleSizes) {
-          const qty = parseQty(apparelQtyByKey[`여|${size}`] ?? "");
-          if (qty <= 0) continue;
-          out.push(
-            buildRequestRow({
-              category: quickCategory.trim() || "의류",
-              garmentType: apparelGarmentType,
-              gender: "여",
-              size,
-              quantity: qty,
-              bundleKey: "",
-            })
-          );
-        }
-        for (const size of categoryProfile.maleSizes) {
-          const qty = parseQty(apparelQtyByKey[`남|${size}`] ?? "");
-          if (qty <= 0) continue;
-          out.push(
-            buildRequestRow({
-              category: quickCategory.trim() || "의류",
-              garmentType: apparelGarmentType,
-              gender: "남",
-              size,
-              quantity: qty,
-              bundleKey: "",
-            })
-          );
-        }
-      } else {
-        for (const size of activeApparelSizes) {
-          const qty = parseQty(apparelQtyByKey[`공용|${size}`] ?? "");
-          if (qty <= 0) continue;
-          out.push(
-            buildRequestRow({
-              category: quickCategory.trim() || "의류",
-              garmentType: apparelGarmentType,
-              gender: "공용",
-              size,
-              quantity: qty,
-              bundleKey: "",
-            })
-          );
-        }
-      }
-      return out;
-    }
-
-    if (quickCategoryKind === "training") {
-      for (const size of categoryProfile.femaleSizes) {
-        const qty = parseQty(trainingSetQtyByKey[`여|${size}`] ?? "");
-        if (qty <= 0) continue;
-        const bundleKey = `SET-여-${size}`;
-        out.push(
-          buildRequestRow({
-            category: quickCategory.trim() || "트레이닝복",
-            garmentType: "single",
-            gender: "여",
-            size,
-            quantity: qty,
-            bundleKey,
-          })
-        );
-      }
-      for (const size of categoryProfile.maleSizes) {
-        const qty = parseQty(trainingSetQtyByKey[`남|${size}`] ?? "");
-        if (qty <= 0) continue;
-        const bundleKey = `SET-남-${size}`;
-        out.push(
-          buildRequestRow({
-            category: quickCategory.trim() || "트레이닝복",
-            garmentType: "single",
-            gender: "남",
-            size,
-            quantity: qty,
-            bundleKey,
-          })
-        );
-      }
-      return out;
-    }
-
-    for (const entry of generalEntries) {
-      const qty = parseQty(entry.quantity);
-        if (qty <= 0) continue;
-      /**
-       * [임시 매핑 - 일반 물품]
-       * 엔진 계약이 (category,type,gender,size) 고정이라, 사이즈 없는 물품명은 `size` 슬롯에 담아 구분한다.
-       * - category: 상단 선택 카테고리
-       * - size: 개별 물품명(예: 라켓/가방 세부명)
-       *
-       * 확장 시점:
-       * - 엑셀/문서 추출에 일반 물품 전용 필드(itemName 등)를 도입하면
-       *   어댑터 단계에서 이 매핑을 교체한다. 엔진 계약은 그대로 유지 가능.
-       */
-      out.push(
-        buildRequestRow({
-          category: quickCategory.trim() || "기타 사이즈 없음",
-          garmentType: "single",
-          gender: "",
-          size: entry.id,
-          quantity: qty,
-          bundleKey: "",
-        })
-      );
-    }
-    return out;
-  }, [
-    activeApparelSizes,
-    apparelQtyByKey,
-    apparelSizeType,
-    categoryProfile.femaleSizes,
-    categoryProfile.maleSizes,
-    generalEntries,
-    apparelGarmentType,
-    quickCategory,
-    quickCategoryKind,
-    trainingSetQtyByKey,
-  ]);
+  const quickRequestInputs = useMemo(
+    () =>
+      buildOqmQuickRequestLines({
+        createRow: buildRequestRow,
+        quickCategory,
+        quickCategoryKind,
+        apparelSizeType,
+        categoryProfile,
+        activeApparelSizes,
+        apparelGarmentType,
+        apparelQtyByKey,
+        trainingSetQtyByKey,
+        generalEntries,
+      }),
+    [
+      activeApparelSizes,
+      apparelQtyByKey,
+      apparelSizeType,
+      categoryProfile,
+      generalEntries,
+      apparelGarmentType,
+      quickCategory,
+      quickCategoryKind,
+      trainingSetQtyByKey,
+    ]
+  );
 
   const requestInputs = quickRequestInputs;
   const scopedStockLines = useMemo(() => {
@@ -1014,6 +785,48 @@ function ApparelMatrix({
 
   const renderGenderSplit = canShowGenderSplitInput && (apparelSizeType === "genderSplit" || !canShowUnisexInput);
   if (renderGenderSplit) {
+    if (maleSizes.length === 0) {
+      return (
+        <div className="oqm-matrix-wrap">
+          <div className="oqm-matrix-gender">
+            {femaleSizes.map((size) => (
+              <div key={`여-${size}`} className="oqm-gender-row">
+                <label className="oqm-matrix-cell">
+                  <span>여 {size}</span>
+                  <input
+                    className="oqm-input oqm-input--qty"
+                    {...numberInputProps(qtyByKey[`여|${size}`] ?? "")}
+                    onChange={(e) => onChange(`여|${size}`, e.target.value)}
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+          <p className="oqm-quick-total">총 합계: {total.toLocaleString()}</p>
+        </div>
+      );
+    }
+    if (femaleSizes.length === 0) {
+      return (
+        <div className="oqm-matrix-wrap">
+          <div className="oqm-matrix-gender">
+            {maleSizes.map((size) => (
+              <div key={`남-${size}`} className="oqm-gender-row">
+                <label className="oqm-matrix-cell">
+                  <span>남 {size}</span>
+                  <input
+                    className="oqm-input oqm-input--qty"
+                    {...numberInputProps(qtyByKey[`남|${size}`] ?? "")}
+                    onChange={(e) => onChange(`남|${size}`, e.target.value)}
+                  />
+                </label>
+              </div>
+            ))}
+          </div>
+          <p className="oqm-quick-total">총 합계: {total.toLocaleString()}</p>
+        </div>
+      );
+    }
     return (
       <div className="oqm-matrix-wrap">
         <div className="oqm-matrix-gender">

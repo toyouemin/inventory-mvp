@@ -10,6 +10,7 @@ import {
   type GarmentTypeInferenceRule,
 } from "./inventoryGarmentTypeInference";
 import { buildMatchKey } from "./matchKey";
+import { tryMergeBundaeShortPantsVariant } from "./shortPantsBundaeStockNormalize";
 import { normalizeText } from "./textNormalize";
 
 export type CatalogStockNormalizationOptions = {
@@ -66,8 +67,9 @@ export function normalizeVariantToStockLines(
     options?.rules,
     options?.garmentTypeOverride
   );
-  const gender = variant.gender ?? "";
-  const size = variant.size ?? "";
+  const bundae = tryMergeBundaeShortPantsVariant(product, variant);
+  const gender = bundae?.gender ?? variant.gender ?? "";
+  const size = bundae?.size ?? variant.size ?? "";
   const dimensions = buildClothingDimensionValues({
     category,
     garmentType,

@@ -706,117 +706,117 @@ function ApparelMatrix({
 
   const renderGenderSplit = canShowGenderSplitInput && (apparelSizeType === "genderSplit" || !canShowUnisexInput);
   if (renderGenderSplit) {
-    if (maleSizes.length === 0) {
+    if (femaleSizes.length === 0 && maleSizes.length === 0) {
       return (
         <div className="oqm-matrix-wrap">
-          <div className="oqm-matrix-gender">
-            {femaleSizes.map((size) => (
-              <div key={`여-${size}`} className="oqm-gender-row">
-                <label className="oqm-matrix-cell">
-                  <span>여 {size}</span>
-                  <input
-                    className="oqm-input oqm-input--qty"
-                    {...numberInputProps(qtyByKey[`여|${size}`] ?? "")}
-                    onChange={(e) => onChange(`여|${size}`, e.target.value)}
-                  />
-                </label>
-              </div>
-            ))}
-          </div>
-          <p className="oqm-quick-total">총 합계: {total.toLocaleString()}</p>
+          <p className="oqm-muted">선택한 범위에 남/여 사이즈가 없어 입력란을 표시할 수 없습니다.</p>
         </div>
       );
     }
-    if (femaleSizes.length === 0) {
-      return (
-        <div className="oqm-matrix-wrap">
-          <div className="oqm-matrix-gender">
-            {maleSizes.map((size) => (
-              <div key={`남-${size}`} className="oqm-gender-row">
-                <label className="oqm-matrix-cell">
-                  <span>남 {size}</span>
-                  <input
-                    className="oqm-input oqm-input--qty"
-                    {...numberInputProps(qtyByKey[`남|${size}`] ?? "")}
-                    onChange={(e) => onChange(`남|${size}`, e.target.value)}
-                  />
-                </label>
-              </div>
-            ))}
-          </div>
-          <p className="oqm-quick-total">총 합계: {total.toLocaleString()}</p>
-        </div>
-      );
-    }
+    const colFemale =
+      femaleSizes.length > 0
+        ? `var(--oqm-apparel-lab, 2.6rem) repeat(${femaleSizes.length}, minmax(2.1rem, 1fr))`
+        : "";
+    const colMale = maleSizes.length > 0 ? `var(--oqm-apparel-lab, 2.6rem) repeat(${maleSizes.length}, minmax(2.1rem, 1fr))` : "";
     return (
-      <div className="oqm-matrix-wrap">
-        <div className="oqm-matrix-gender">
-          {femaleSizes.map((size, idx) => {
-            const male = maleSizes[idx] ?? maleSizes[maleSizes.length - 1] ?? "";
-            return (
-              <div key={size} className="oqm-gender-row">
-                <label className="oqm-matrix-cell">
-                  <span>여 {size}</span>
-                  <input
-                    className="oqm-input oqm-input--qty"
-                    {...numberInputProps(qtyByKey[`여|${size}`] ?? "")}
-                    onChange={(e) => onChange(`여|${size}`, e.target.value)}
-                  />
-                </label>
-                <label className="oqm-matrix-cell">
-                  <span>남 {male}</span>
-                  <input
-                    className="oqm-input oqm-input--qty"
-                    {...numberInputProps(qtyByKey[`남|${male}`] ?? "")}
-                    onChange={(e) => onChange(`남|${male}`, e.target.value)}
-                  />
-                </label>
+      <div className="oqm-matrix-wrap oqm-matrix-wrap--compact">
+        <div className="oqm-apparel-matrix">
+          {femaleSizes.length > 0 ? (
+            <div className="oqm-apparel-block">
+              <div className="oqm-apparel-scroll" role="group" aria-label="여성 수량">
+                <div
+                  className="oqm-apparel-grid"
+                  style={{ gridTemplateColumns: colFemale }}
+                >
+                  <div className="oqm-apparel-grid__role">여성</div>
+                  {femaleSizes.map((size) => (
+                    <div key={`h-여-${size}`} className="oqm-apparel-grid__size">
+                      {size}
+                    </div>
+                  ))}
+                  <div className="oqm-apparel-grid__qty-lab">수량</div>
+                  {femaleSizes.map((size) => (
+                    <div key={`in-여-${size}`} className="oqm-apparel-grid__cell">
+                      <input
+                        className="oqm-input oqm-input--qty oqm-input--qty-mtx"
+                        {...numberInputProps(qtyByKey[`여|${size}`] ?? "")}
+                        onChange={(e) => onChange(`여|${size}`, e.target.value)}
+                        aria-label={`여성 ${size} 수량`}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            );
-          })}
+            </div>
+          ) : null}
+          {maleSizes.length > 0 ? (
+            <div className="oqm-apparel-block">
+              <div className="oqm-apparel-scroll" role="group" aria-label="남성 수량">
+                <div
+                  className="oqm-apparel-grid"
+                  style={{ gridTemplateColumns: colMale }}
+                >
+                  <div className="oqm-apparel-grid__role">남성</div>
+                  {maleSizes.map((size) => (
+                    <div key={`h-남-${size}`} className="oqm-apparel-grid__size">
+                      {size}
+                    </div>
+                  ))}
+                  <div className="oqm-apparel-grid__qty-lab">수량</div>
+                  {maleSizes.map((size) => (
+                    <div key={`in-남-${size}`} className="oqm-apparel-grid__cell">
+                      <input
+                        className="oqm-input oqm-input--qty oqm-input--qty-mtx"
+                        {...numberInputProps(qtyByKey[`남|${size}`] ?? "")}
+                        onChange={(e) => onChange(`남|${size}`, e.target.value)}
+                        aria-label={`남성 ${size} 수량`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
-        <p className="oqm-quick-total">총 합계: {total.toLocaleString()}</p>
+        <p className="oqm-quick-total oqm-quick-total--tight" role="status">
+          총 합계: {total.toLocaleString()}
+        </p>
       </div>
     );
   }
 
-  const sizeList = unisexSizes;
-  const mid = Math.ceil(sizeList.length / 2);
-  const leftSizes = sizeList.slice(0, mid);
-  const rightSizes = sizeList.slice(mid);
-
   return (
-    <div className="oqm-matrix-wrap">
-      <div className="oqm-matrix-unisex oqm-matrix-unisex--cols-down">
-        <div className="oqm-matrix-unisex-col">
-          {leftSizes.map((size) => (
-            <label key={size} className="oqm-matrix-cell oqm-matrix-cell--unisex-pair">
-              <span>{profile.sizePolicy === "unisexNumeric" ? `공용${size}` : size}</span>
-              <input
-                className="oqm-input oqm-input--qty"
-                {...numberInputProps(qtyByKey[`공용|${size}`] ?? "")}
-                onChange={(e) => onChange(`공용|${size}`, e.target.value)}
-              />
-            </label>
-          ))}
+    <div className="oqm-matrix-wrap oqm-matrix-wrap--compact">
+      <div className="oqm-apparel-matrix oqm-apparel-matrix--unisex">
+        <div className="oqm-apparel-block-title" id="oqm-unisex-hd">
+          공용
         </div>
-        <div className="oqm-matrix-unisex-col">
-          {rightSizes.map((size) => (
-            <label key={size} className="oqm-matrix-cell oqm-matrix-cell--unisex-pair">
-              <span>{profile.sizePolicy === "unisexNumeric" ? `공용${size}` : size}</span>
-              <input
-                className="oqm-input oqm-input--qty"
-                {...numberInputProps(qtyByKey[`공용|${size}`] ?? "")}
-                onChange={(e) => onChange(`공용|${size}`, e.target.value)}
-              />
-            </label>
-          ))}
-          <div className="oqm-matrix-total-inline" role="status" aria-label={`총 합계 ${total.toLocaleString()}`}>
-            <span className="oqm-matrix-total-inline__label">총 합계</span>
-            <span className="oqm-matrix-total-inline__value">{total.toLocaleString()}</span>
+        <div className="oqm-apparel-scroll" role="group" aria-labelledby="oqm-unisex-hd" aria-label="공용 수량">
+          <div
+            className="oqm-apparel-grid oqm-apparel-grid--nolab"
+            style={{ gridTemplateColumns: `repeat(${unisexSizes.length}, minmax(2.1rem, 1fr))` }}
+          >
+            {unisexSizes.map((size) => (
+              <div key={`h-공-${size}`} className="oqm-apparel-grid__size oqm-apparel-grid__size--unisex">
+                {size}
+              </div>
+            ))}
+            {unisexSizes.map((size) => (
+              <div key={`in-공-${size}`} className="oqm-apparel-grid__cell">
+                <input
+                  className="oqm-input oqm-input--qty oqm-input--qty-mtx"
+                  {...numberInputProps(qtyByKey[`공용|${size}`] ?? "")}
+                  onChange={(e) => onChange(`공용|${size}`, e.target.value)}
+                  aria-label={`공용 ${size} 수량`}
+                />
+              </div>
+            ))}
           </div>
         </div>
       </div>
+      <p className="oqm-quick-total oqm-quick-total--tight" role="status" aria-label={`총 합계 ${total.toLocaleString()}`}>
+        총 합계: {total.toLocaleString()}
+      </p>
     </div>
   );
 }

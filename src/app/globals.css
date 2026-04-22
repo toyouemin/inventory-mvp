@@ -3730,6 +3730,106 @@ label {
   padding: 12px;
 }
 
+/* ----- 의류 사이즈: compact 그리드 표 (남/여/공용) ----- */
+.oqm-matrix-wrap--compact {
+  padding: 8px 10px 10px;
+}
+
+.oqm-apparel-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.oqm-apparel-matrix--unisex {
+  gap: 4px;
+}
+
+.oqm-apparel-block-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--muted);
+  margin: 0 0 2px;
+  letter-spacing: 0.02em;
+}
+
+.oqm-apparel-block {
+  min-width: 0;
+}
+
+.oqm-apparel-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -2px;
+  padding: 0 2px 2px;
+  overscroll-behavior-x: contain;
+}
+
+.oqm-apparel-grid {
+  --oqm-apparel-lab: 2.6rem;
+  display: grid;
+  align-items: center;
+  gap: 3px 5px;
+  min-width: min-content;
+  font-variant-numeric: tabular-nums;
+}
+
+.oqm-apparel-grid--nolab {
+  gap: 3px 5px;
+}
+
+.oqm-apparel-grid__role,
+.oqm-apparel-grid__qty-lab {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--muted);
+  line-height: 1.1;
+  white-space: nowrap;
+  text-align: left;
+  min-width: 0;
+  padding-right: 2px;
+}
+
+.oqm-apparel-grid__size {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+  min-width: 0;
+  padding: 2px 0;
+  line-height: 1.15;
+  word-break: keep-all;
+}
+
+.oqm-apparel-grid__size--unisex {
+  font-size: 0.75rem;
+}
+
+.oqm-apparel-grid__cell {
+  min-width: 0;
+  display: block;
+  box-sizing: border-box;
+}
+
+.oqm-input--qty-mtx {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  margin: 0;
+  padding: 6px 3px;
+  font-size: 0.86rem;
+  text-align: center;
+  line-height: 1.2;
+  box-sizing: border-box;
+  border-radius: 6px;
+}
+
+.oqm-quick-total--tight {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+}
+
 .oqm-matrix-gender {
   display: flex;
   flex-direction: column;

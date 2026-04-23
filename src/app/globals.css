@@ -4833,6 +4833,27 @@ label {
   color: #4a453c;
 }
 
+.oqm-result-chip--ok {
+  background: #f4fbf7;
+  border-color: #e3f0ea;
+  color: #3d5e4d;
+}
+
+.oqm-result-chip--ok .oqm-result-chip__size {
+  color: #3a6b55;
+  font-weight: 700;
+}
+
+.oqm-result-chip--ok .oqm-result-chip__sep {
+  color: #6fa588;
+  opacity: 0.4;
+}
+
+.oqm-result-chip--ok .oqm-result-chip__qty {
+  color: #4f7964;
+  font-weight: 500;
+}
+
 .oqm-result-chip--shortage {
   background: #fdecef;
   border-color: #f0c4cd;

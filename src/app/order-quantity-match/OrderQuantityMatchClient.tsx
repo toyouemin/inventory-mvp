@@ -674,7 +674,7 @@ function QuickInputPanel(props: {
         <>
           {categoryProfile.sizePolicy === "unisexNumeric" ? (
             <p className="oqm-muted oqm-mantoman-hint">
-              이 카테고리는 공용 숫자형 정규화(S/M/L/XL/2XL/3XL/4XL ↔ 85/90/95/100/105/110/115)를 적용합니다.
+              사이즈 정규화(S/M/L/XL/2XL/3XL/4XL ↔ 85/90/95/100/105/110/115)적용
             </p>
           ) : null}
           {categoryProfile.needsPolicyChoice ? (

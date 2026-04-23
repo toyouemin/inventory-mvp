@@ -93,6 +93,7 @@ export function normalizeVariantToStockLines(
     options?.rules,
     options?.garmentTypeOverride
   );
+  /** 반바지 병합은 gender·size만 사용. color는 라벨 전용이라 재고 차원에 반영하지 않음. */
   const bundae = tryMergeBundaeShortPantsVariant(product, variant);
   const gender = bundae?.gender ?? variant.gender ?? "";
   const size = bundae?.size ?? variant.size ?? "";

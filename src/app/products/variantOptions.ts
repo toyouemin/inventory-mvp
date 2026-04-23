@@ -1,7 +1,9 @@
 import { compareWearSize } from "@/lib/sizeSort";
 
 /**
- * variant: color / gender / size 분리 저장, UI는 gender+size 붙여 표시.
+ * variant: color / gender / size 분리 저장.
+ * - color: 의미 없는 라벨(숫자·"3부" 등 포함 가능). 파싱·정규화·사이즈 추론에 쓰지 않음.
+ * - UI 칩: [color] [gender+size] — `formatGenderSizeDisplay(gender, size)`.
  * DB 유니크: (sku, color, gender, size) — 한 상품 내에서는 sku가 고정이므로
  * variantCompositeKey(color, gender, size)만으로도 동일 조합 식별에 쓸 수 있음.
  */
@@ -104,10 +106,11 @@ function sockGenderRank(gender: string): number {
 
 export type SockParsedKey = { length: string; gender: string; size: number };
 
-export type SockParseSource = "gsLabel" | "colorCombined" | "splitColor" | null;
+export type SockParseSource = "gsLabel" | "sizeField" | null;
 
 /**
- * `3부-여85` 한 덩어리 문자열(표시용 gender+size 또는 예전 color 단일 컬럼).
+ * `3부-여85` 형: gender+size를 붙인 문자열 또는 size 단일 컬럼에만 들어 있는 경우.
+ * color 컬럼 값은 절대 넣지 않는다.
  * `rest`에 숫자가 없으면 `sizeFallback` 컬럼에서 숫자 사용.
  */
 function parseSockCombinedString(optionSegment: string, sizeFallback: string): SockParsedKey | null {
@@ -140,7 +143,6 @@ function tryParseSockStyleVariantWithSource(v: {
   gender?: string | null;
   size?: string | null;
 }): { parsed: SockParsedKey | null; source: SockParseSource } {
-  const c = (v.color ?? "").trim();
   const gField = (v.gender ?? "").trim();
   const sField = (v.size ?? "").trim();
   const gsLabel = formatGenderSizeDisplay(v.gender, v.size);
@@ -154,29 +156,19 @@ function tryParseSockStyleVariantWithSource(v: {
     return { parsed: r, source: "gsLabel" };
   }
 
-  r = parseSockCombinedString(c, sField);
+  r = parseSockCombinedString(sField, sField);
   if (r) {
     if (!r.gender) {
       const g = gField.startsWith("여") ? "여" : gField.startsWith("남") ? "남" : "";
       if (g) r = { ...r, gender: g };
     }
-    return { parsed: r, source: "colorCombined" };
-  }
-
-  if (/^\d+부$/.test(c)) {
-    const gender = gField.startsWith("여") ? "여" : gField.startsWith("남") ? "남" : "";
-    const parsed = parseInt(sField.replace(/[^\d]/g, ""), 10);
-    const sn = sizeNumericPart(sField) ?? (Number.isFinite(parsed) ? parsed : null);
-    return {
-      parsed: { length: c, gender, size: sn ?? 0 },
-      source: "splitColor",
-    };
+    return { parsed: r, source: "sizeField" };
   }
 
   return { parsed: null, source: null };
 }
 
-/** 카드 칩 `BK` + `3부-여85` 구조에서 두 번째 칩(gsLabel) 기준으로 양말형 인식 */
+/** 카드 칩 두 번째 조각(gender+size) 또는 size 단일 컬럼 기준으로 양말형 인식 — color 미사용 */
 export function tryParseSockStyleVariant(v: {
   color?: string | null;
   gender?: string | null;
@@ -269,8 +261,9 @@ export function compareVariantDisplay(
 
 /**
  * 카드·리스트 옵션 정렬:
- * - **양말형**(gsLabel·color·split 중 한 경로로 파싱 성공): 길이(3부→4부) → 여→남 → 사이즈 숫자 →(동률) composite
+ * - **양말형**(gender+size 또는 size 컬럼만 파싱 성공): 길이(3부→4부) → 여→남 → 사이즈 숫자 →(동률) composite
  * - **비양말형**: `compareVariantDisplay`(의류 사이즈 순 포함) → composite
+ * color 문자열은 정렬 시 비교용(원문 localeCompare)만 하고 내용 해석은 하지 않음.
  */
 export function sortVariantRows(
   a: { color?: string | null; gender?: string | null; size?: string | null },

@@ -2,7 +2,7 @@ import { normalizeCategoryLabel } from "./categoryNormalize";
 import { normalizeSkuForMatch } from "./skuNormalize";
 
 /**
- * 상품 CSV: 컬럼값만 사용(상품명·색·성별·사이즈 추론 없음).
+ * 상품 CSV: 컬럼값만 사용(상품명·성별·사이즈 추론 없음). color는 trim만 하고 파싱·정규화하지 않음(라벨 전용).
  * 헤더: SKU,카테고리,상품명,이미지url,color,gender,size,stock,wholesalePrice,msrpPrice,salePrice,extraPrice,memo,memo2
  *
  * --- 재고가 0으로만 저장되는 흔한 원인 (color/gender 공백 행) ---

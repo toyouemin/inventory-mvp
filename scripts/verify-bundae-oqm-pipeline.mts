@@ -1,6 +1,6 @@
 /**
- * 반바지 `3부-여`+숫자 size 번들 정규화 → buildOqmCategoryProfile → buildOqmQuickRequestLines
- * 세 단계 size 키(예: 3부-85) 일치 검증.
+ * 반바지 gender=`3부-여` + 숫자 size 번들 정규화 → buildOqmCategoryProfile → buildOqmQuickRequestLines
+ * 세 단계 size 키(예: 3부-85) 일치 검증. (color 컬럼은 사용하지 않음)
  * 사용: npx tsx scripts/verify-bundae-oqm-pipeline.mts
  */
 import type { Product, ProductVariant } from "../src/app/products/types";
@@ -18,8 +18,8 @@ const variant: ProductVariant = {
   id: "v1",
   productId: product.id,
   sku: product.sku,
-  color: "3부-여",
-  gender: "",
+  color: "",
+  gender: "3부-여",
   size: "85",
   stock: 3,
 };

@@ -829,56 +829,69 @@ export async function updateProductMemo(
  * CSV Upload: FormData `mode`
  * - "merge": (sku,color,gender,size) 기준 upsert, CSV에 없는 기존 variant 유지
  * - "reset": 전체 삭제 후 CSV로 재삽입(실패 시 스냅샷 복구)
+ * - 예외를 던지지 않고 `{ ok: false, error }`로 반환 → 클라이언트 한글 모달만 사용(Next 기본 에러 화면 방지)
  * ----------------------------- */
 
-export async function uploadProductsCsv(formData: FormData) {
-  const file = formData.get("file") as File | null;
-  if (!file) return;
+export type UploadProductsCsvResult =
+  | { ok: true; skippedCount: number; skippedRows: number[] }
+  | { ok: false; error: string };
 
-  const modeRaw = String(formData.get("mode") ?? "merge")
-    .trim()
-    .toLowerCase();
-  const mode: "merge" | "reset" = modeRaw === "reset" ? "reset" : "merge";
-
-  const raw = await file.arrayBuffer();
-
-  function decodeWithFallback(buf: ArrayBuffer) {
-    // 1) utf-8 시도
-    let t = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-  
-    // utf-8이 실패하면 보통 '�' (replacement char) 가 많이 생김
-    const bad = (t.match(/\uFFFD/g) ?? []).length;
-  
-    // 2) 깨진 느낌이면 euc-kr 재시도 (엑셀/윈도우에서 흔함)
-    if (bad > 0) {
-      try {
-        t = new TextDecoder("euc-kr", { fatal: false }).decode(buf);
-      } catch {
-        // 일부 환경에서 euc-kr 미지원이면 그대로 둠
-      }
+export async function uploadProductsCsv(formData: FormData): Promise<UploadProductsCsvResult> {
+  try {
+    const file = formData.get("file") as File | null;
+    if (!file) {
+      return { ok: false, error: "업로드할 파일이 없습니다.\n파일을 선택해 주세요." };
     }
-  
-    // BOM 제거
-    return t.replace(/^\uFEFF/, "");
-  }
-  
-  const text = decodeWithFallback(raw);
 
-  const { rows, skippedRows } = runProductCsvPipeline(text);
-  if (mode === "reset") {
-    await replaceAllProductsAndVariantsFromCsv(rows);
-  } else {
-    await mergeProductsAndVariantsFromCsv(rows);
-  }
-  await syncCategorySortOrderAfterCsv(buildCategoryOrderMapFromCsvRows(rows), mode);
-  revalidatePath("/products");
-  revalidatePath("/status");
-  if (LOG_MOVES) revalidatePath("/moves");
+    const modeRaw = String(formData.get("mode") ?? "merge")
+      .trim()
+      .toLowerCase();
+    const mode: "merge" | "reset" = modeRaw === "reset" ? "reset" : "merge";
 
-  return {
-    skippedCount: skippedRows.length,
-    skippedRows,
-  };
+    const raw = await file.arrayBuffer();
+
+    function decodeWithFallback(buf: ArrayBuffer) {
+      // 1) utf-8 시도
+      let t = new TextDecoder("utf-8", { fatal: false }).decode(buf);
+
+      // utf-8이 실패하면 보통 '�' (replacement char) 가 많이 생김
+      const bad = (t.match(/\uFFFD/g) ?? []).length;
+
+      // 2) 깨진 느낌이면 euc-kr 재시도 (엑셀/윈도우에서 흔함)
+      if (bad > 0) {
+        try {
+          t = new TextDecoder("euc-kr", { fatal: false }).decode(buf);
+        } catch {
+          // 일부 환경에서 euc-kr 미지원이면 그대로 둠
+        }
+      }
+
+      // BOM 제거
+      return t.replace(/^\uFEFF/, "");
+    }
+
+    const text = decodeWithFallback(raw);
+
+    const { rows, skippedRows } = runProductCsvPipeline(text);
+    if (mode === "reset") {
+      await replaceAllProductsAndVariantsFromCsv(rows);
+    } else {
+      await mergeProductsAndVariantsFromCsv(rows);
+    }
+    await syncCategorySortOrderAfterCsv(buildCategoryOrderMapFromCsvRows(rows), mode);
+    revalidatePath("/products");
+    revalidatePath("/status");
+    if (LOG_MOVES) revalidatePath("/moves");
+
+    return {
+      ok: true,
+      skippedCount: skippedRows.length,
+      skippedRows,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg || "CSV 업로드 처리 중 오류가 발생했습니다." };
+  }
 }
 
 function chunkArray<T>(arr: T[], chunkSize: number) {

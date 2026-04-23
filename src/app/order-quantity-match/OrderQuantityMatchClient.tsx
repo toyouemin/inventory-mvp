@@ -1159,7 +1159,7 @@ function OqmResultDetailSheet({
             ×
           </button>
         </div>
-        <div className="oqm-detail-sheet__image-wrap">
+        <div className="oqm-detail-sheet__image-wrap oqm-image-modal">
           {imageUrl ? (
             <img
               className="oqm-detail-sheet__image"

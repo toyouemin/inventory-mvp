@@ -1975,10 +1975,8 @@ export function ProductsClient({
       fd.append("file", file);
       fd.append("mode", csvPendingModeRef.current);
       const result = await uploadProductsCsv(fd);
-      if (result == null) {
-        openCsvUploadErrorModal(
-          "서버에서 CSV를 처리하지 못했습니다.\n파일이 비어 있거나 요청 형식이 올바른지 확인해 주세요."
-        );
+      if (!result.ok) {
+        openCsvUploadErrorModal(result.error);
         return;
       }
       if (result.skippedCount > 0) {

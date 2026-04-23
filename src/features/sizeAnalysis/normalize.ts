@@ -1,0 +1,124 @@
+import type { ParsePiece } from "./types";
+
+const GENDER_RULES: Array<{ re: RegExp; value: "남" | "여" | "공용" }> = [
+  { re: /\b(남|남자|남성|MALE|MAN)\b/i, value: "남" },
+  { re: /\b(여|여자|여성|FEMALE|WOMAN)\b/i, value: "여" },
+  { re: /\b(공용|UNISEX)\b/i, value: "공용" },
+];
+
+const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115", "120"]);
+const ALPHA_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "FREE"] as const;
+const ALPHA_RE = /\b(4XL|3XL|2XL|XL|XS|FREE|S|M|L)\b/i;
+const QTY_RE = /(\d{1,4})\s*(장|개|EA|PCS)?\b/i;
+const NUM_RE = /\b(80|85|90|95|100|105|110|115|120)\b/;
+
+export function preprocessCell(value: string | null | undefined): string {
+  if (!value) return "";
+  return String(value)
+    .replace(/\r?\n/g, " ")
+    .replace(/[()]/g, " ")
+    .replace(/[,_]/g, " ")
+    .replace(/[/-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+export function normalizeGender(raw: string | null | undefined): "남" | "여" | "공용" | undefined {
+  const s = preprocessCell(raw);
+  if (!s) return undefined;
+  for (const rule of GENDER_RULES) {
+    if (rule.re.test(s)) return rule.value;
+  }
+  return undefined;
+}
+
+export function extractSizeGenderQty(raw: string | null | undefined): ParsePiece {
+  const s = preprocessCell(raw);
+  if (!s) {
+    return { confidence: 0, reason: "빈 값", status: "unresolved" };
+  }
+
+  const gender = normalizeGender(s);
+  const numSize = s.match(NUM_RE)?.[1];
+  const alphaSize = s.match(ALPHA_RE)?.[1]?.toUpperCase();
+  const qtyHit = s.match(QTY_RE)?.[1];
+  const qty = qtyHit ? Number(qtyHit) : undefined;
+
+  const sizeCandidates = [numSize, alphaSize].filter(Boolean) as string[];
+  const uniqueSizes = new Set(sizeCandidates);
+  const size = sizeCandidates[0];
+
+  const hasAmbiguousMixed = Boolean(numSize && alphaSize);
+  const normalizedSize = size ? normalizeSize(size) : undefined;
+  const validSize = normalizedSize && (NUMERIC_SIZES.has(normalizedSize) || ALPHA_SIZES.includes(normalizedSize as never));
+
+  if (hasAmbiguousMixed || uniqueSizes.size > 1) {
+    return {
+      gender,
+      size: normalizedSize,
+      qty,
+      confidence: 0.35,
+      reason: "혼합 사이즈 표기",
+      status: "needs_review",
+    };
+  }
+
+  if (!validSize && !gender && qty === undefined) {
+    return { confidence: 0.15, reason: "유효 토큰 미검출", status: "unresolved" };
+  }
+
+  if (validSize && (gender || qty !== undefined)) {
+    return {
+      gender,
+      size: normalizedSize,
+      qty,
+      confidence: 0.92,
+      reason: "사이즈/성별/수량 분리 성공",
+      status: "auto_confirmed",
+    };
+  }
+
+  if (validSize) {
+    return {
+      size: normalizedSize,
+      gender,
+      qty,
+      confidence: 0.84,
+      reason: "사이즈 추출 성공",
+      status: "auto_confirmed",
+    };
+  }
+
+  return {
+    gender,
+    size: normalizedSize,
+    qty,
+    confidence: 0.52,
+    reason: "부분 추출, 검토 필요",
+    status: "needs_review",
+  };
+}
+
+export function normalizeSize(raw: string | null | undefined): string | undefined {
+  const s = preprocessCell(raw);
+  if (!s) return undefined;
+  if (NUMERIC_SIZES.has(s)) return s;
+
+  if (s === "XXL") return "2XL";
+  if (s === "XXXL") return "3XL";
+  if (s === "XXXXL") return "4XL";
+  if (ALPHA_SIZES.includes(s as never)) return s;
+
+  return undefined;
+}
+
+export function parseQty(raw: string | null | undefined): number | undefined {
+  const s = preprocessCell(raw);
+  if (!s) return undefined;
+  const m = s.match(QTY_RE);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : undefined;
+}
+

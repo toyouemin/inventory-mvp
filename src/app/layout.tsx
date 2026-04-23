@@ -40,6 +40,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <AdaptiveHomepageLink />
             <a href="/transaction-statement">명세서</a>
             <a href="/order-quantity-match">수량매칭</a>
+            <a href="/size-analysis">사이즈 분석</a>
             {/*href="/moves">재고 변동</a>*/}
           </nav>
         </div>

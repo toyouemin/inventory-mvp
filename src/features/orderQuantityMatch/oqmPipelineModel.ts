@@ -18,7 +18,6 @@ import {
 } from "./categoryPolicy";
 import { isBundaeMergedSizeToken } from "./shortPantsBundaeStockNormalize";
 
-const FALLBACK_NUMERIC = ["85", "90", "95", "100", "105", "110", "115"] as const;
 const TRAINING_FEMALE_BASE = ["85", "90", "95", "100", "105"] as const;
 const TRAINING_MALE_BASE = ["95", "100", "105", "110", "115"] as const;
 const GENERAL_ITEM_PRESETS = ["라켓", "가방"] as const;
@@ -120,20 +119,25 @@ export function buildOqmCategoryProfile(
   const hasGenderSplitData = femaleSizesRaw.length > 0 || maleSizesRaw.length > 0;
   const hasUnisexData = unisexSizesRaw.length > 0;
 
+  /** 공용·숫자형: 선택 범위 재고에 나온 사이즈만 입력판에 표시. 없을 때만 기본 눈금(85~). */
+  const unisexNumericSizesForUi =
+    unisexSizesRaw.length > 0 ? unisexSizesRaw : [...UNISEX_NUMERIC_SIZES];
+  /** 공용·알파: 재고 알파 사이즈 집합 우선, 없으면 표준 눈금 */
+  const unisexAlphaSizesForUi =
+    unisexSizesRaw.length > 0 ? unisexSizesRaw : [...UNISEX_ALPHA_SIZES];
+
   return {
     stockScopeType,
     sizePolicy,
     needsPolicyChoice,
     recommendedPolicy,
     unisexSizes:
-      sizePolicy === "unisexNumeric"
-        ? [...UNISEX_NUMERIC_SIZES]
-        : sizePolicy === "free"
-          ? ["FREE"]
-          : unisexSizesRaw.length > 0
-            ? unisexSizesRaw
-            : [...FALLBACK_NUMERIC],
-    unisexAlphaSizes: sizePolicy === "unisexAlpha" ? [...UNISEX_ALPHA_SIZES] : unisexSizesRaw,
+      sizePolicy === "free"
+        ? ["FREE"]
+        : sizePolicy === "unisexNumeric"
+          ? unisexNumericSizesForUi
+          : unisexSizesRaw,
+    unisexAlphaSizes: sizePolicy === "unisexAlpha" ? unisexAlphaSizesForUi : unisexSizesRaw,
     femaleSizes: femaleSizesRaw.length > 0 ? femaleSizesRaw : sizePolicy === "custom" ? [...TRAINING_FEMALE_BASE] : [],
     maleSizes: maleSizesRaw.length > 0 ? maleSizesRaw : sizePolicy === "custom" ? [...TRAINING_MALE_BASE] : [],
     generalItems: items.length > 0 ? items : [...GENERAL_ITEM_PRESETS],

@@ -23,8 +23,16 @@ const IS_DEV = process.env.NODE_ENV === "development";
 const GENERAL_ITEM_PRESETS = ["라켓", "가방"] as const;
 const SIZE_CATEGORY_FALLBACK_PRESETS = ["티셔츠", "바람막이", "맨투맨", "오버핏", "트레이닝복", "7부바지"] as const;
 
-/** 개발 시 어느 배열에 섞였는지 추적 (운영 빌드에서는 미사용) */
-const OQM_DEBUG_CATEGORY_NEEDLE = "슬리브";
+/**
+ * 수량 매칭 UI에서만 카테고리 선택·자동완성 후보에서 제외 (DB `products.category` 값은 변경하지 않음).
+ * 필요 시 문자열을 추가하면 됨.
+ */
+const OQM_UI_EXCLUDED_CATEGORIES = ["슬리브"] as const;
+const OQM_UI_EXCLUDED_CATEGORY_SET = new Set<string>(OQM_UI_EXCLUDED_CATEGORIES);
+
+function filterOqmUiCategories(cats: readonly string[]): string[] {
+  return cats.map((c) => c.trim()).filter(Boolean).filter((c) => !OQM_UI_EXCLUDED_CATEGORY_SET.has(c));
+}
 
 /**
  * 일반 물품 datalist·행 시드: 프리셋 + `buildOqmCategoryProfile`의 generalItems(현재 카테고리 재고의 표시명)만 사용.
@@ -163,31 +171,34 @@ export function OrderQuantityMatchClient({
   const [apparelQtyByKey, setApparelQtyByKey] = useState<Record<string, string>>({});
   const [trainingSetQtyByKey, setTrainingSetQtyByKey] = useState<Record<string, string>>({});
   const [generalEntries, setGeneralEntries] = useState<QuickEntry[]>(GENERAL_ITEM_PRESETS.map((name) => quickEntry(name)));
-  /** 상단 카테고리 추천의 기본 소스: 기존 재고 상품(products.category) 고유값 */
+  /** 상단 카테고리 추천의 기본 소스: 기존 재고 상품(products.category) 고유값 — UI 제외 목록 반영 */
   const inventoryCategorySuggestions = useMemo(
-    () => [...new Set(categories.map((c) => c.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ko")),
+    () => [...new Set(filterOqmUiCategories(categories))].sort((a, b) => a.localeCompare(b, "ko")),
     [categories]
   );
-  /** 일반(사이즈 없음) 물품: 프리셋 + 현재 범주 generalItems — DB 카테고리명과 동일한 토큰은 제외 */
+  /** 일반(사이즈 없음) 물품: 프리셋 + 현재 범주 generalItems — 노출 카테고리명과 동일한 토큰은 제외 */
   const generalItemDatalistOptions = useMemo(
-    () => buildOqmGeneralItemUiOptions(categories, categoryProfile.generalItems),
-    [categories, categoryProfile.generalItems]
+    () => buildOqmGeneralItemUiOptions(inventoryCategorySuggestions, categoryProfile.generalItems),
+    [inventoryCategorySuggestions, categoryProfile.generalItems]
   );
-  /** 빠른 입력 첫 카테고리: 사이즈 입력이 가능한 카테고리만 노출 */
+  /** 빠른 입력 첫 카테고리: 사이즈 입력이 가능한 카테고리만 노출 — UI 제외 목록 반영 */
   const sizedCategorySuggestions = useMemo(() => {
     const sizedFromStock = new Set(
       stockLines
         .filter((l) => isOqmRecognizedSizeToken(l.dimensions.size ?? ""))
         .map((l) => (l.dimensions.category ?? "").trim())
         .filter(Boolean)
+        .filter((c) => !OQM_UI_EXCLUDED_CATEGORY_SET.has(c))
     );
     // 트레이닝복은 운영상 필요 시 size 누락 데이터에서도 선택 가능하도록 예외 유지
     if (inventoryCategorySuggestions.includes("트레이닝복")) sizedFromStock.add("트레이닝복");
 
-    if (sizedFromStock.size >= 3) return [...sizedFromStock].sort((a, b) => a.localeCompare(b, "ko"));
+    const withoutExcluded = (arr: string[]) => arr.filter((c) => !OQM_UI_EXCLUDED_CATEGORY_SET.has(c));
+
+    if (sizedFromStock.size >= 3) return withoutExcluded([...sizedFromStock].sort((a, b) => a.localeCompare(b, "ko")));
     const merged = new Set<string>(sizedFromStock);
     for (const p of SIZE_CATEGORY_FALLBACK_PRESETS) merged.add(p);
-    return [...merged].sort((a, b) => a.localeCompare(b, "ko"));
+    return withoutExcluded([...merged].sort((a, b) => a.localeCompare(b, "ko")));
   }, [inventoryCategorySuggestions, stockLines]);
 
   useEffect(() => {
@@ -296,16 +307,18 @@ export function OrderQuantityMatchClient({
 
   useEffect(() => {
     if (!IS_DEV) return;
-    const n = OQM_DEBUG_CATEGORY_NEEDLE;
-    const pick = (arr: readonly string[]) => arr.filter((x) => x.includes(n));
-    const hits = {
-      inventoryCategorySuggestions: pick(inventoryCategorySuggestions),
-      sizedCategorySuggestions: pick(sizedCategorySuggestions),
-      generalItemDatalistOptions: pick(generalItemDatalistOptions),
-      categoryProfile_generalItems: pick(categoryProfile.generalItems),
-    };
-    if (Object.values(hits).some((a) => a.length > 0)) {
-      console.info(`[OQM] '${n}' 포함 배열(어느 경로에서 노출되는지 확인)`, hits);
+    const needles = [...OQM_UI_EXCLUDED_CATEGORIES];
+    const pick = (arr: readonly string[], n: string) => arr.filter((x) => x.includes(n));
+    for (const n of needles) {
+      const hits = {
+        inventoryCategorySuggestions: pick(inventoryCategorySuggestions, n),
+        sizedCategorySuggestions: pick(sizedCategorySuggestions, n),
+        generalItemDatalistOptions: pick(generalItemDatalistOptions, n),
+        categoryProfile_generalItems: pick(categoryProfile.generalItems, n),
+      };
+      if (Object.values(hits).some((a) => a.length > 0)) {
+        console.info(`[OQM] UI 제외 목록 위반 의심: '${n}' 포함`, hits);
+      }
     }
   }, [
     inventoryCategorySuggestions,

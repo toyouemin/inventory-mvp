@@ -3652,7 +3652,7 @@ label {
   display: flex;
   flex-wrap: wrap;
   gap: 10px 12px;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .oqm-quick-head-primary {

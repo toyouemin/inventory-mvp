@@ -229,23 +229,70 @@ function parseNumberCell(v: string | undefined, fallback = 0): number {
   return Number.isFinite(n) ? Math.round(n) : fallback;
 }
 
-function assertHeaders(rawHeaders: string[]): ColMap {
-  const cells = rawHeaders.map((h) => stripCellValue(h));
-  if (cells.length !== REQUIRED_HEADERS.length) {
-    throw new Error(
-      `CSV 오류: 헤더는 ${REQUIRED_HEADERS.length}개 컬럼이어야 합니다.\n필요: ${REQUIRED_HEADERS.join(",")}\n현재 ${cells.length}개: ${cells.join(",")}`
+/**
+ * 헤더가 템플릿과 다르면 한글 안내(누락·추가·이름 불일치만). 일치하면 null.
+ */
+function describeHeaderValidationError(cells: string[]): string | null {
+  const nReq = REQUIRED_HEADERS.length;
+  const nGot = cells.length;
+
+  const missingTrailing: string[] =
+    nGot < nReq ? REQUIRED_HEADERS.slice(nGot).map((h) => String(h)) : [];
+
+  const extraHeaders: string[] = [];
+  if (nGot > nReq) {
+    for (let i = nReq; i < nGot; i++) {
+      const h = cells[i] ?? "";
+      extraHeaders.push(h.trim() === "" ? `(빈 헤더, ${i + 1}번째)` : h);
+    }
+  }
+
+  const wrongPosition: { pos: number; expected: string; got: string }[] = [];
+  const overlap = Math.min(nGot, nReq);
+  for (let i = 0; i < overlap; i++) {
+    const expected = REQUIRED_HEADERS[i];
+    const got = cells[i] ?? "";
+    if (got !== expected) {
+      wrongPosition.push({
+        pos: i + 1,
+        expected,
+        got: got.trim() === "" ? "(비어 있음)" : got,
+      });
+    }
+  }
+
+  if (missingTrailing.length === 0 && extraHeaders.length === 0 && wrongPosition.length === 0) {
+    return null;
+  }
+
+  const lines: string[] = [];
+  if (nGot !== nReq) {
+    lines.push(`필수 컬럼은 ${nReq}개인데 현재 ${nGot}개입니다.`);
+  }
+  if (missingTrailing.length > 0) {
+    lines.push(`누락된 필수 컬럼: ${missingTrailing.join(", ")}`);
+  }
+  if (extraHeaders.length > 0) {
+    lines.push(`추가된 불필요 컬럼: ${extraHeaders.join(", ")}`);
+  }
+  if (wrongPosition.length > 0) {
+    lines.push(
+      "헤더 이름이 템플릿과 다른 칸:",
+      ...wrongPosition.map((w) => `- ${w.pos}번째: "${w.expected}" 이어야 하는데 "${w.got}" 입니다`)
     );
   }
+
+  return `CSV 오류: 헤더가 템플릿과 다릅니다.\n${lines.join("\n")}`;
+}
+
+function assertHeaders(rawHeaders: string[]): ColMap {
+  const cells = rawHeaders.map((h) => stripCellValue(h));
+  const headerError = describeHeaderValidationError(cells);
+  if (headerError) throw new Error(headerError);
+
   const map = {} as ColMap;
   for (let i = 0; i < REQUIRED_HEADERS.length; i++) {
-    const expected = REQUIRED_HEADERS[i];
-    const got = cells[i];
-    if (got !== expected) {
-      throw new Error(
-        `CSV 오류: ${i + 1}번째 헤더가 "${expected}" 이어야 합니다. (현재: "${got}")\n전체 헤더: ${cells.join(",")}`
-      );
-    }
-    map[expected] = i;
+    map[REQUIRED_HEADERS[i]] = i;
   }
   return map;
 }

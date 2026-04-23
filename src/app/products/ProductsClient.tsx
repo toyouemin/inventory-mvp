@@ -723,6 +723,8 @@ export function ProductsClient({
   /** CSV 업로드 버튼 색상 피드백(성공 녹색 / 실패 빨간색, 6초) */
   const [csvUploadHighlight, setCsvUploadHighlight] = useState<"success" | "error" | null>(null);
   const csvUploadHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [csvUploadErrorOpen, setCsvUploadErrorOpen] = useState(false);
+  const [csvUploadErrorMessage, setCsvUploadErrorMessage] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -893,6 +895,18 @@ export function ProductsClient({
       setCsvUploadHighlight(null);
       csvUploadHighlightTimerRef.current = null;
     }, CSV_UPLOAD_HIGHLIGHT_MS);
+  }
+
+  function openCsvUploadErrorModal(message: string) {
+    const text = (message ?? "").trim() || "알 수 없는 오류가 발생했습니다.";
+    setCsvUploadErrorMessage(text);
+    setCsvUploadErrorOpen(true);
+    showUploadHighlight("error");
+  }
+
+  function closeCsvUploadErrorModal() {
+    setCsvUploadErrorOpen(false);
+    setCsvUploadErrorMessage("");
   }
 
   const updateDownloadMenuPosition = useCallback(() => {
@@ -1962,7 +1976,9 @@ export function ProductsClient({
       fd.append("mode", csvPendingModeRef.current);
       const result = await uploadProductsCsv(fd);
       if (result == null) {
-        showUploadHighlight("error");
+        openCsvUploadErrorModal(
+          "서버에서 CSV를 처리하지 못했습니다.\n파일이 비어 있거나 요청 형식이 올바른지 확인해 주세요."
+        );
         return;
       }
       if (result.skippedCount > 0) {
@@ -1982,7 +1998,7 @@ export function ProductsClient({
       });
     } catch (err) {
       console.error("[uploadProductsCsv]", err);
-      showUploadHighlight("error");
+      openCsvUploadErrorModal(err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -2727,6 +2743,31 @@ export function ProductsClient({
           setDeleteConfirmTargetId(null);
         }}
       />
+
+      {csvUploadErrorOpen ? (
+        <div
+          className="modal-overlay csv-upload-error-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="csv-upload-error-title"
+          aria-describedby="csv-upload-error-desc"
+          onClick={closeCsvUploadErrorModal}
+        >
+          <div className="modal csv-upload-error-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 id="csv-upload-error-title" className="csv-upload-error-modal__title">
+              CSV 업로드 실패
+            </h2>
+            <div id="csv-upload-error-desc" className="csv-upload-error-modal__body">
+              {csvUploadErrorMessage}
+            </div>
+            <div className="csv-upload-error-modal__actions">
+              <button type="button" className="btn btn-secondary csv-upload-error-modal__btn" onClick={closeCsvUploadErrorModal}>
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {deleteConfirmOpen ? (
         <div

@@ -2267,6 +2267,57 @@ label {
   box-sizing: border-box;
 }
 
+/* 상품 CSV 업로드 실패 안내 */
+.modal-overlay.csv-upload-error-overlay {
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: rgba(0, 0, 0, 0.58);
+  z-index: 225;
+}
+
+.modal.csv-upload-error-modal {
+  max-width: min(520px, calc(100vw - 32px));
+  width: 100%;
+  padding: 20px 18px 16px;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.csv-upload-error-modal__title {
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--text);
+}
+
+.csv-upload-error-modal__body {
+  margin: 0 0 18px;
+  padding: 12px 12px;
+  max-height: min(52vh, 22rem);
+  overflow-y: auto;
+  border-radius: 8px;
+  background: #f6f3ef;
+  border: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+}
+
+.csv-upload-error-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.csv-upload-error-modal__btn {
+  width: auto;
+  min-width: 6.5rem;
+}
+
 .modal-header-add-product {
   display: flex;
   justify-content: space-between;

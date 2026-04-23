@@ -11,7 +11,9 @@ import { normalizeSkuForMatch } from "./skuNormalize";
  * 2) 본 파서는 헤더 이름으로 인덱스를 고정하므로 "빈 칸이 사라져 인덱스가 밀린다"는 현상은
  *    실제로는 **파싱 결과 cells[] 길이가 14가 아닐 때** 발생합니다.
  * 3) 엑셀 등에서 **끝쪽 빈 컬럼만** 잘려 나온 경우는 아래에서 뒤를 ""로 패딩해 완화합니다.
- *    가운데 빈 color/gender는 반드시 `,,` 처럼 **구분자 개수**를 맞춰야 합니다.
+ *    가운데 빈 color/gender는 반드시 `,,` 또는 탭 구분에서 빈 칸을 맞춰야 합니다.
+ * 4) **TSV(탭 구분)** 지원: 구분자는 **헤더 줄**에서 `\t` → `,` → `;` 순으로 시도해 14개 컬럼·헤더명이 일치하면 채택.
+ *    (데이터 행에 쉼표가 많아도 탭 헤더면 탭으로 파싱)
  *
  * 디버그: .env.local 에 `DEBUG_CSV_SKU=T21AC01NP` (normalizeSkuForMatch 기준으로 비교)
  *        또는 `DEBUG_CSV_PRODUCT_PIPELINE=1` 이면 칸 수 불일치 행마다 원본 라인·cells 요약 로그.
@@ -140,7 +142,7 @@ function normalizeCellCount(
   }
 
   console.warn(
-    `[csvProductPipeline] ${fileLine1}행: 컬럼 ${n}개(필요 ${EXPECTED_COL_COUNT}). 앞 ${EXPECTED_COL_COUNT}칸만 사용합니다(값에 콤마·따옴표 확인).`
+    `[csvProductPipeline] ${fileLine1}행: 컬럼 ${n}개(필요 ${EXPECTED_COL_COUNT}). 앞 ${EXPECTED_COL_COUNT}칸만 사용합니다(값에 콤마·탭·따옴표 확인).`
   );
   if (envFlag("DEBUG_CSV_PRODUCT_PIPELINE")) {
     logPipelineMismatch("cells_long_will_truncate", { fileLine1, rawLine, cellCount: n, cells, col });
@@ -157,12 +159,39 @@ function detectDelimiter(line: string) {
   return ",";
 }
 
+/** 셀 앞뒤 공백 제거 + UTF-8 BOM(U+FEFF) 등 제거(특히 첫 컬럼 SKU) */
+function stripCellValue(s: string): string {
+  return String(s ?? "")
+    .replace(/^\uFEFF+/, "")
+    .replace(/\uFEFF/g, "")
+    .trim();
+}
+
+/**
+ * 헤더 줄로 구분자 확정. 데이터 행에 쉼표가 많아도(숫자 포맷 등) TSV를 올바르게 쓰려면 탭 우선.
+ */
+function inferDelimiterFromHeaderLine(line: string): string {
+  for (const delimiter of ["\t", ",", ";"] as const) {
+    const cells = parseCsvLine(line, delimiter);
+    if (cells.length !== EXPECTED_COL_COUNT) continue;
+    let ok = true;
+    for (let i = 0; i < EXPECTED_COL_COUNT; i++) {
+      if (cells[i] !== REQUIRED_HEADERS[i]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return delimiter;
+  }
+  return detectDelimiter(line);
+}
+
 function parseCsvLine(line: string, delimiter: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;
   const pushCell = () => {
-    result.push(current.trim());
+    result.push(stripCellValue(current));
     current = "";
   };
   for (let i = 0; i < line.length; i++) {
@@ -201,7 +230,7 @@ function parseNumberCell(v: string | undefined, fallback = 0): number {
 }
 
 function assertHeaders(rawHeaders: string[]): ColMap {
-  const cells = rawHeaders.map((h) => h.trim());
+  const cells = rawHeaders.map((h) => stripCellValue(h));
   if (cells.length !== REQUIRED_HEADERS.length) {
     throw new Error(
       `CSV 오류: 헤더는 ${REQUIRED_HEADERS.length}개 컬럼이어야 합니다.\n필요: ${REQUIRED_HEADERS.join(",")}\n현재 ${cells.length}개: ${cells.join(",")}`
@@ -226,8 +255,9 @@ export function runProductCsvPipeline(text: string): { rows: ParsedCsvRow[]; ski
   const headerLineIndex = rawLines.findIndex((l) => (l ?? "").trim().length > 0);
   if (headerLineIndex < 0) throw new Error("CSV 오류: 헤더 라인이 없습니다.");
 
-  const delimiter = detectDelimiter(rawLines[headerLineIndex] ?? "");
-  const headerCells = parseCsvLine(rawLines[headerLineIndex] ?? "", delimiter);
+  const headerLineRaw = rawLines[headerLineIndex] ?? "";
+  const delimiter = inferDelimiterFromHeaderLine(headerLineRaw);
+  const headerCells = parseCsvLine(headerLineRaw, delimiter);
   const col = assertHeaders(headerCells);
 
   const rows: ParsedCsvRow[] = [];

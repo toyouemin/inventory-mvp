@@ -210,7 +210,6 @@ export function OrderQuantityMatchClient({
     });
   }, [sizedCategorySuggestions]);
 
-  const displayedCategory = quickCategory;
   const quickScopeProductOptions = useMemo(() => {
     const byId = new Map<string, { productId: string; label: string }>();
     for (const line of linesInQuickCategory) {
@@ -225,18 +224,6 @@ export function OrderQuantityMatchClient({
     }
     return [...byId.values()].sort((a, b) => b.label.localeCompare(a.label, "ko", { numeric: true }));
   }, [linesInQuickCategory]);
-  const selectedProductScopeLabels = useMemo(
-    () =>
-      quickProductScopeIds
-        .map((id) => quickScopeProductOptions.find((o) => o.productId === id)?.label)
-        .filter((v): v is string => Boolean(v)),
-    [quickProductScopeIds, quickScopeProductOptions]
-  );
-  const displayedProductScopeLabel = useMemo(() => {
-    if (quickProductScopeIds.length === 0) return "전체";
-    if (selectedProductScopeLabels.length === 1) return selectedProductScopeLabels[0]!;
-    return `${selectedProductScopeLabels.length}개 선택`;
-  }, [quickProductScopeIds, selectedProductScopeLabels]);
   const quickCategoryKind = useMemo<QuickCategoryKind>(() => {
     if (categoryProfile.stockScopeType === "set") return "training";
     if (categoryProfile.stockScopeType === "other") return "general";
@@ -371,7 +358,7 @@ export function OrderQuantityMatchClient({
           <h1 className="oqm-page-title">주문 수량 매칭</h1>
         </header>
 
-        <section className="oqm-section">
+        <section className="oqm-section oqm-section--input">
 
           <datalist id="oqm-general-item-suggestions">
             {generalItemDatalistOptions.map((c) => (
@@ -402,26 +389,12 @@ export function OrderQuantityMatchClient({
             onConfirmCategoryPolicy={confirmCategoryPolicy}
             onClearAllQuantities={clearAllQuickQuantities}
           />
-
-          <p className="oqm-input-summary">
-            현재 입력 생성 행 수: <strong>{requestInputs.length.toLocaleString()}</strong> · 대상 카테고리:{" "}
-            <strong>{displayedCategory || "-"}</strong>
-            {quickCategory.trim() !== "" ? (
-              <>
-                {" "}
-                · 매칭 재고 범위(품목명): <strong>{displayedProductScopeLabel}</strong>
-              </>
-            ) : null}
-          </p>
         </section>
 
-        <section className="oqm-section" aria-labelledby="oqm-result-heading">
+        <section className="oqm-section oqm-section--results" aria-labelledby="oqm-result-heading">
           <h2 id="oqm-result-heading" className="oqm-section-title">
             매칭 결과
           </h2>
-          <p className="oqm-intro oqm-intro--small">
-            정렬: <strong>완전 가능</strong> 우선 → 부족 총합 오름차순 → 부족 항목 수 오름차순 → 충족(할당) 많은 순.
-          </p>
           <ResultCards items={productResults} productImageById={productImageById} />
         </section>
       </div>

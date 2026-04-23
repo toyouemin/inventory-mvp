@@ -3526,22 +3526,16 @@ label {
   margin-bottom: 8px;
 }
 
-.oqm-intro {
-  font-size: 0.9rem;
-  color: var(--muted);
-  max-width: 52rem;
-  line-height: 1.55;
-  margin: 0;
+.oqm-section {
+  margin-bottom: 28px;
 }
 
-.oqm-intro--small {
-  font-size: 0.85rem;
-  margin-top: 4px;
+.oqm-page .oqm-section--input {
   margin-bottom: 12px;
 }
 
-.oqm-section {
-  margin-bottom: 28px;
+.oqm-page .oqm-section--results .oqm-section-title {
+  margin-bottom: 10px;
 }
 
 .oqm-section-head {
@@ -3589,12 +3583,6 @@ label {
   background: #fff;
   color: var(--text);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.07);
-}
-
-.oqm-input-summary {
-  margin: 10px 2px 0;
-  font-size: 0.82rem;
-  color: var(--muted);
 }
 
 .oqm-quick {

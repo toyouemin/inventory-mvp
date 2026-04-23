@@ -9,7 +9,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GarmentTypeId, MatchStatus, NormalizedStockLine, RequestLineInput } from "@/features/orderQuantityMatch/types";
 import { type SizePolicy, getSavedCategoryPolicyStore, saveCategoryPolicyStore } from "@/features/orderQuantityMatch/categoryPolicy";
-import { matchOrderRowsToProducts, type ProductMatchResult } from "@/features/orderQuantityMatch/matchOrderToProducts";
+import { CLOTHING_DIMENSION_ORDER } from "@/features/orderQuantityMatch/clothingDimensionProfile";
+import { parseMatchKey } from "@/features/orderQuantityMatch/matchKey";
+import {
+  matchOrderRowsToProducts,
+  type ProductMatchResult,
+  type ProductShortageDetail,
+} from "@/features/orderQuantityMatch/matchOrderToProducts";
 import {
   buildOqmCategoryProfile,
   buildOqmQuickRequestLines,
@@ -77,6 +83,29 @@ const TRAINING_FEMALE_BASE = ["85", "90", "95", "100", "105"] as const;
 const TRAINING_MALE_BASE = ["95", "100", "105", "110", "115"] as const;
 const ALPHA_SIZE_ORDER = ["XXS", "XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"] as const;
 const ALPHA_SIZE_RANK: Map<string, number> = new Map(ALPHA_SIZE_ORDER.map((s, i) => [s, i]));
+
+function oqmSizeOrderingForSort(size: string): [number, number, string] {
+  const raw = size.trim();
+  if (!raw) return [3, 0, ""];
+  const t = normalizeOqmSizeToken(raw);
+  const n = Number(t);
+  if (Number.isFinite(n) && n >= 0) return [0, n, t];
+  const ar = ALPHA_SIZE_RANK.get(t);
+  if (ar !== undefined) return [1, ar, t];
+  return [2, 0, t];
+}
+
+function oqmSortStockDetails(details: ProductShortageDetail[]): ProductShortageDetail[] {
+  return [...details].sort((a, b) => {
+    const da = parseMatchKey(CLOTHING_DIMENSION_ORDER, a.matchKey);
+    const db = parseMatchKey(CLOTHING_DIMENSION_ORDER, b.matchKey);
+    const sa = oqmSizeOrderingForSort(String(da.size ?? ""));
+    const sb = oqmSizeOrderingForSort(String(db.size ?? ""));
+    if (sa[0] !== sb[0]) return sa[0] - sb[0];
+    if (sa[1] !== sb[1]) return sa[1] - sb[1];
+    return String(da.size ?? "").localeCompare(String(db.size ?? ""), "ko", { numeric: true });
+  });
+}
 
 function quickEntry(id: string): QuickEntry {
   return { id, quantity: "" };
@@ -351,6 +380,33 @@ export function OrderQuantityMatchClient({
     [requestInputs, scopedStockLines]
   );
 
+  const resultStatusCounts = useMemo(() => {
+    const c = { full: 0, partial: 0, impossible: 0 };
+    for (const r of productResults) {
+      if (r.status === "full") c.full += 1;
+      else if (r.status === "partial") c.partial += 1;
+      else c.impossible += 1;
+    }
+    return c;
+  }, [productResults]);
+
+  const oqmSummaryScopeLabel = useMemo(() => {
+    const cat = quickCategory.trim();
+    if (!cat) return "카테고리를 선택하세요";
+    if (quickProductScopeIds.length === 0) return `${cat} · 전체 품목`;
+    if (quickProductScopeIds.length === 1) {
+      const id = quickProductScopeIds[0]!;
+      const label = quickScopeProductOptions.find((o) => o.productId === id)?.label ?? id;
+      return `${cat} · ${label}`;
+    }
+    return `${cat} · 선택 ${quickProductScopeIds.length}건`;
+  }, [quickCategory, quickProductScopeIds, quickScopeProductOptions]);
+
+  const oqmSummaryTotalQty = useMemo(
+    () => requestInputs.reduce((s, r) => s + (Number.isFinite(r.quantity) && r.quantity > 0 ? r.quantity : 0), 0),
+    [requestInputs]
+  );
+
   return (
     <div className="products-page oqm-page">
       <div className="products-content-container">
@@ -358,45 +414,84 @@ export function OrderQuantityMatchClient({
           <h1 className="oqm-page-title">주문 수량 매칭</h1>
         </header>
 
-        <section className="oqm-section oqm-section--input">
+        <div className="oqm-page-content">
+          <div className="oqm-page-content__sidebar">
+            <datalist id="oqm-general-item-suggestions">
+              {generalItemDatalistOptions.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
 
-          <datalist id="oqm-general-item-suggestions">
-            {generalItemDatalistOptions.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
+            <div className="oqm-sidebar-stack">
+              <QuickInputPanel
+                categories={sizedCategorySuggestions}
+                generalItemDatalistOptions={generalItemDatalistOptions}
+                quickCategory={quickCategory}
+                setQuickCategory={setQuickCategory}
+                productScopeOptions={quickScopeProductOptions}
+                quickProductScopeIds={quickProductScopeIds}
+                setQuickProductScopeIds={setQuickProductScopeIds}
+                categoryProfile={categoryProfile}
+                quickCategoryKind={quickCategoryKind}
+                apparelSizeType={apparelSizeType}
+                setApparelSizeType={setApparelSizeType}
+                canShowUnisexInput={canShowUnisexInput}
+                canShowGenderSplitInput={canShowGenderSplitInput}
+                apparelQtyByKey={apparelQtyByKey}
+                setApparelQtyByKey={setApparelQtyByKey}
+                trainingSetQtyByKey={trainingSetQtyByKey}
+                setTrainingSetQtyByKey={setTrainingSetQtyByKey}
+                generalEntries={generalEntries}
+                setGeneralEntries={setGeneralEntries}
+                onConfirmCategoryPolicy={confirmCategoryPolicy}
+                onClearAllQuantities={clearAllQuickQuantities}
+              />
 
-          <QuickInputPanel
-            categories={sizedCategorySuggestions}
-            generalItemDatalistOptions={generalItemDatalistOptions}
-            quickCategory={quickCategory}
-            setQuickCategory={setQuickCategory}
-            productScopeOptions={quickScopeProductOptions}
-            quickProductScopeIds={quickProductScopeIds}
-            setQuickProductScopeIds={setQuickProductScopeIds}
-            categoryProfile={categoryProfile}
-            quickCategoryKind={quickCategoryKind}
-            apparelSizeType={apparelSizeType}
-            setApparelSizeType={setApparelSizeType}
-            canShowUnisexInput={canShowUnisexInput}
-            canShowGenderSplitInput={canShowGenderSplitInput}
-            apparelQtyByKey={apparelQtyByKey}
-            setApparelQtyByKey={setApparelQtyByKey}
-            trainingSetQtyByKey={trainingSetQtyByKey}
-            setTrainingSetQtyByKey={setTrainingSetQtyByKey}
-            generalEntries={generalEntries}
-            setGeneralEntries={setGeneralEntries}
-            onConfirmCategoryPolicy={confirmCategoryPolicy}
-            onClearAllQuantities={clearAllQuickQuantities}
-          />
-        </section>
+              <div className="oqm-card oqm-input-card oqm-input-card--summary">
+                <h3 className="oqm-input-card__title">입력 요약</h3>
+                <dl className="oqm-summary-dl">
+                  <div className="oqm-summary-dl__row">
+                    <dt className="oqm-summary-dl__dt">선택 품목</dt>
+                    <dd className="oqm-summary-dl__dd">{oqmSummaryScopeLabel}</dd>
+                  </div>
+                  <div className="oqm-summary-dl__row">
+                    <dt className="oqm-summary-dl__dt">총 수량</dt>
+                    <dd className="oqm-summary-dl__dd">{oqmSummaryTotalQty.toLocaleString()}</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </div>
 
-        <section className="oqm-section oqm-section--results" aria-labelledby="oqm-result-heading">
-          <h2 id="oqm-result-heading" className="oqm-section-title">
-            매칭 결과
-          </h2>
-          <ResultCards items={productResults} productImageById={productImageById} />
-        </section>
+          <section
+            className="oqm-page-content__results oqm-results-panel oqm-section oqm-section--results"
+            aria-labelledby="oqm-result-heading"
+          >
+            <div className="oqm-results-panel__head">
+              <h2 id="oqm-result-heading" className="oqm-section-title oqm-results-panel__title">
+                매칭 결과
+              </h2>
+              {productResults.length > 0 ? (
+                <div className="oqm-results-summary-badges" aria-label="매칭 상태 요약">
+                  {resultStatusCounts.full > 0 ? (
+                    <span className="oqm-badge oqm-badge--ok">
+                      완전 가능 {resultStatusCounts.full}
+                    </span>
+                  ) : null}
+                  {resultStatusCounts.partial > 0 ? (
+                    <span className="oqm-badge oqm-badge--partial">
+                      부분 가능 {resultStatusCounts.partial}
+                    </span>
+                  ) : null}
+                  {resultStatusCounts.impossible > 0 ? (
+                    <span className="oqm-badge oqm-badge--bad">불가 {resultStatusCounts.impossible}</span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <ResultCards items={productResults} productImageById={productImageById} />
+          </section>
+        </div>
       </div>
     </div>
   );
@@ -482,95 +577,100 @@ function QuickInputPanel(props: {
   }, [quickCategory]);
 
   return (
-    <div className="oqm-quick">
-      <div className="oqm-quick-head">
-        <div className="oqm-quick-head-primary">
-          <label className="oqm-field oqm-field--category-select">
-            <span className="oqm-field__label">카테고리 선택</span>
-            <select
-              className="oqm-select"
-              value={selectedCategoryValue}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "__empty__") {
-                  setQuickCategory("");
-                  return;
-                }
-                setQuickCategory(v);
-              }}
-            >
-              <option value="__empty__">카테고리 선택</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
-          {quickCategory.trim() !== "" ? (
-            productScopeOptions.length > 0 ? (
-              <label className="oqm-field oqm-field--product-scope">
-                <span className="oqm-field__label">품목명 (매칭 재고 범위)</span>
-                <select
-                  className="oqm-select"
-                  value={productPickerValue}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setProductPickerValue("");
-                    if (!id) return;
-                    if (quickProductScopeIds.includes(id)) return;
-                    setQuickProductScopeIds([...quickProductScopeIds, id]);
-                  }}
-                  aria-label="매칭에 사용할 재고 품목명 범위"
-                >
-                  <option value="">품목명</option>
-                  {productScopeOptions.map((o) => (
-                    <option key={o.productId} value={o.productId}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+    <>
+      <div className="oqm-card oqm-input-card oqm-input-card--basic">
+        <h3 className="oqm-input-card__title">기본 정보</h3>
+        <div className="oqm-quick-head">
+          <div className="oqm-quick-head-primary">
+            <label className="oqm-field oqm-field--category-select">
+              <span className="oqm-field__label">카테고리 선택</span>
+              <select
+                className="oqm-select"
+                value={selectedCategoryValue}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "__empty__") {
+                    setQuickCategory("");
+                    return;
+                  }
+                  setQuickCategory(v);
+                }}
+              >
+                <option value="__empty__">카테고리 선택</option>
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {quickCategory.trim() !== "" ? (
+              productScopeOptions.length > 0 ? (
+                <label className="oqm-field oqm-field--product-scope">
+                  <span className="oqm-field__label">품목명 (매칭 재고 범위)</span>
+                  <select
+                    className="oqm-select"
+                    value={productPickerValue}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setProductPickerValue("");
+                      if (!id) return;
+                      if (quickProductScopeIds.includes(id)) return;
+                      setQuickProductScopeIds([...quickProductScopeIds, id]);
+                    }}
+                    aria-label="매칭에 사용할 재고 품목명 범위"
+                  >
+                    <option value="">품목명</option>
+                    {productScopeOptions.map((o) => (
+                      <option key={o.productId} value={o.productId}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <p className="oqm-muted oqm-product-scope-empty">이 카테고리에 재고가 없어 품목명을 지정할 수 없습니다.</p>
+              )
+            ) : null}
+          </div>
+        </div>
+        {quickCategory.trim() !== "" && productScopeOptions.length > 0 ? (
+          <p className="oqm-muted oqm-category-hint">
+            품목명을 여러 개 선택하면 선택 범위로만 매칭. (미선택 시 전체)
+          </p>
+        ) : null}
+        {quickCategory.trim() !== "" ? (
+          <div className="oqm-product-scope-selected">
+            <span className="oqm-muted">선택 품목명:</span>
+            {quickProductScopeIds.length === 0 ? (
+              <span className="oqm-muted oqm-product-scope-selected__all">전체</span>
             ) : (
-              <p className="oqm-muted oqm-product-scope-empty">이 카테고리에 재고가 없어 품목명을 지정할 수 없습니다.</p>
-            )
-          ) : null}
-        </div>
+              <div className="oqm-product-scope-chips">
+                {quickProductScopeIds.map((id) => {
+                  const label = productScopeOptions.find((o) => o.productId === id)?.label ?? id;
+                  return (
+                    <span key={id} className="oqm-chip-select">
+                      <span>{label}</span>
+                      <button
+                        type="button"
+                        className="oqm-chip-select__remove"
+                        onClick={() => setQuickProductScopeIds(quickProductScopeIds.filter((v) => v !== id))}
+                        aria-label={`${label} 선택 해제`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
-      {quickCategory.trim() !== "" && productScopeOptions.length > 0 ? (
-        <p className="oqm-muted oqm-category-hint">
-          품목명을 여러 개 선택하면 선택 범위로만 매칭. (미선택 시 전체)
-        </p>
-      ) : null}
-      {quickCategory.trim() !== "" ? (
-        <div className="oqm-product-scope-selected">
-          <span className="oqm-muted">선택 품목명:</span>
-          {quickProductScopeIds.length === 0 ? (
-            <span className="oqm-muted oqm-product-scope-selected__all">전체</span>
-          ) : (
-            <div className="oqm-product-scope-chips">
-              {quickProductScopeIds.map((id) => {
-                const label = productScopeOptions.find((o) => o.productId === id)?.label ?? id;
-                return (
-                  <span key={id} className="oqm-chip-select">
-                    <span>{label}</span>
-                    <button
-                      type="button"
-                      className="oqm-chip-select__remove"
-                      onClick={() => setQuickProductScopeIds(quickProductScopeIds.filter((v) => v !== id))}
-                      aria-label={`${label} 선택 해제`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : null}
 
-      {quickCategoryKind === "apparel" ? (
+      <div className="oqm-card oqm-input-card oqm-input-card--quantity">
+        <h3 className="oqm-input-card__title">수량 입력</h3>
+        {quickCategoryKind === "apparel" ? (
         <>
           {categoryProfile.sizePolicy === "unisexNumeric" ? (
             <p className="oqm-muted oqm-mantoman-hint">
@@ -627,9 +727,9 @@ function QuickInputPanel(props: {
             onClearAllQuantities={onClearAllQuantities}
           />
         </>
-      ) : null}
+        ) : null}
 
-      {quickCategoryKind === "training" ? (
+        {quickCategoryKind === "training" ? (
         <>
           <div className="oqm-quick-head oqm-training-head">
             <div className="oqm-size-mode">
@@ -645,12 +745,12 @@ function QuickInputPanel(props: {
             onClearAllQuantities={onClearAllQuantities}
           />
         </>
-      ) : null}
+        ) : null}
 
-      {quickCategoryKind === "general" ? (
-        <GeneralQuickPanel
-          suggestionPreview={generalItemDatalistOptions}
-          entries={generalEntries}
+        {quickCategoryKind === "general" ? (
+          <GeneralQuickPanel
+            suggestionPreview={generalItemDatalistOptions}
+            entries={generalEntries}
             onQuantityChange={(index, value) =>
               setGeneralEntries(updateQuickEntriesByIndex(generalEntries, index, { quantity: value }))
             }
@@ -659,9 +759,10 @@ function QuickInputPanel(props: {
             }
             onAdd={() => setGeneralEntries([...generalEntries, quickEntry(`물품-${generalEntries.length + 1}`)])}
             onClearAllQuantities={onClearAllQuantities}
-        />
-      ) : null}
-    </div>
+          />
+        ) : null}
+      </div>
+    </>
   );
 }
 
@@ -1028,8 +1129,8 @@ function OqmProductThumb({ url, name }: { url: string | null | undefined; name: 
           src={url!}
           alt=""
           className="oqm-result-thumb__img"
-          width={66}
-          height={66}
+          width={88}
+          height={88}
           onError={() => setBroke(true)}
           loading="lazy"
         />
@@ -1077,9 +1178,55 @@ function ResultCards({
 }
 
 function oqmResultRowClass(status: MatchStatus): string {
-  if (status === "full") return "oqm-result-row oqm-result-row--full";
-  if (status === "partial") return "oqm-result-row oqm-result-row--partial";
-  return "oqm-result-row oqm-result-row--impossible";
+  const base = "oqm-result-row oqm-result-card";
+  if (status === "full") return `${base} oqm-result-row--full`;
+  if (status === "partial") return `${base} oqm-result-row--partial`;
+  return `${base} oqm-result-row--impossible`;
+}
+
+function OqmResultStockChips({ details }: { details: ProductMatchResult["details"] }) {
+  const active = details.filter((d) => d.requested > 0);
+  if (active.length === 0) return null;
+  const sorted = oqmSortStockDetails(active);
+  const max = 16;
+  const shown = sorted.slice(0, max);
+  const rest = sorted.length - shown.length;
+  return (
+    <div className="oqm-result-card__chips">
+      {shown.map((d) => {
+        const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, d.matchKey);
+        const sizeLabel = String(dims.size ?? "").trim() || "—";
+        const shortage = d.shortage > 0;
+        const isZero = !shortage && d.availableStock === 0;
+        const chipKind = shortage
+          ? "oqm-result-chip--shortage"
+          : isZero
+            ? "oqm-result-chip--zero"
+            : "oqm-result-chip--ok";
+        const title = shortage
+          ? `요청 ${d.requested.toLocaleString()} · 재고 ${d.availableStock.toLocaleString()} · 부족 ${d.shortage.toLocaleString()}`
+          : `재고 ${d.availableStock.toLocaleString()}`;
+        return (
+          <span
+            key={d.matchKey}
+            className={`oqm-result-chip ${chipKind}`}
+            title={title}
+          >
+            <span className="oqm-result-chip__size">{sizeLabel}</span>
+            <span className="oqm-result-chip__sep" aria-hidden="true">
+              :
+            </span>
+            <span className="oqm-result-chip__qty">{d.availableStock.toLocaleString()}</span>
+          </span>
+        );
+      })}
+      {rest > 0 ? (
+        <span className="oqm-result-chip oqm-result-chip--more" title={`추가 ${rest}건`}>
+          +{rest}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function OqmResultRow({
@@ -1102,20 +1249,25 @@ function OqmResultRow({
       onClick={onOpenDetail}
     >
       <OqmProductThumb url={imageUrl} name={result.displayName} />
-      <div className="oqm-result-row__body">
-        <span className="oqm-result-row__title">{result.displayName}</span>
-        <span className="oqm-result-row__sku">품번 {result.sku}</span>
-        {hasShort ? (
-          <span
-            className={
-              result.status === "impossible" ? "oqm-result-row__short oqm-result-row__short--bad" : "oqm-result-row__short"
-            }
-          >
-            {shortageText}
-          </span>
-        ) : null}
+      <div className="oqm-result-card__main">
+        <div className="oqm-result-row__body">
+          <span className="oqm-result-row__title">{result.displayName}</span>
+          <span className="oqm-result-row__sku">품번 {result.sku}</span>
+          {hasShort ? (
+            <span
+              className={
+                result.status === "impossible" ? "oqm-result-row__short oqm-result-row__short--bad" : "oqm-result-row__short"
+              }
+            >
+              {shortageText}
+            </span>
+          ) : null}
+        </div>
+        <OqmResultStockChips details={result.details} />
       </div>
-      <span className={`oqm-result-row__badge ${statusClass(result.status)}`}>{statusLabel(result.status)}</span>
+      <span className={`oqm-result-row__badge oqm-result-card__status-badge ${statusClass(result.status)}`}>
+        {statusLabel(result.status)}
+      </span>
     </button>
   );
 }

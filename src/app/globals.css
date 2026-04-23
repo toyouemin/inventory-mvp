@@ -271,7 +271,7 @@ button:hover {
   box-sizing: border-box;
 }
 
-/* CSV 업로드 버튼: 성공(녹)·실패(적) 6초 하이라이트 */
+/* CSV ???????: ???(??????(?? 6??????????*/
 .products-csv-upload-btn--success {
   background: #2d6a4f !important;
   color: #fff !important;
@@ -415,7 +415,7 @@ button:hover {
   z-index: 9999;
 }
 
-/* direction 클래스는 fixed positioning에서 사용하지 않음(코드에서 top 계산) */
+/* direction ?????? fixed positioning??? ??????? ???(????? top ??) */
 .download-dropdown__menu--up {
   top: 0;
   bottom: auto;
@@ -479,7 +479,7 @@ button.download-dropdown__item:disabled {
   }
 }
 
-/* 숨김 파일 입력: label 대신 button으로 트리거할 때 다른 툴바 버튼과 높이·정렬 일치 */
+/* ???? ??? ???: label ????button??? ????? ????? ??? ??????????? ??? */
 .products-csv-file-input {
   position: absolute;
   left: 0;
@@ -565,7 +565,7 @@ button.download-dropdown__item:disabled {
   gap: 8px;
 }
 
-/* 수정·삭제 아래 margin과 맞물리도록 가격 행만 살짝 당김 */
+/* ???????? ??? margin?????????????? ??? ???? */
 .product-card__body > .product-card__prices {
   margin-top: -2px;
 }
@@ -602,7 +602,7 @@ button.download-dropdown__item:disabled {
   justify-content: space-between;
   align-items: flex-end;
   gap: 8px;
-  /* 버튼 높이를 줄인 만큼 위·아래 여백으로 복원 → 메뉴 주변이 더 넓어 보이게 */
+  /* ?? ??????? ?? ???????????? ?? ???? ?????????? ????*/
   margin-top: 6px;
   margin-bottom: 3px;
 }
@@ -630,7 +630,7 @@ button.download-dropdown__item:disabled {
   text-overflow: ellipsis;
 }
 
-/* 높이는 검색창보다 살짝 낮춤(44→38), 절약분은 margin으로 위임 */
+/* ??????????? ??? ????(44??8), ?????? margin??? ??? */
 .product-card__head-actions .btn-compact {
   height: 38px;
   box-sizing: border-box;
@@ -665,7 +665,7 @@ button.download-dropdown__item:disabled {
   color: var(--muted);
 }
 
-/* 헤더 블록: 제품명 ↔ 수정·삭제 사이 여유 */
+/* ??? ??: ??????????????? ??? ??? */
 .product-card__head-text .product-card__name {
   margin-top: 2px;
   margin-bottom: 4px;
@@ -811,7 +811,7 @@ button.download-dropdown__item:disabled {
   opacity: 1;
 }
 
-/* 옵션 전체를 한 덩어리로: 내부 스크롤/높이 제한 없음 → 8줄이 잘리지 않고 연속 표시 */
+/* ??? ????????????: ???? ???????? ??? ??? ??8?? ???? ??? ??? ??? */
 .product-card__option-list {
   display: flex;
   flex-direction: column;
@@ -890,7 +890,7 @@ button.download-dropdown__item:disabled {
 }
 
 .product-card__option-item--zero-muted {
-  /* 행 전체를 흐리되, 메모 텍스트는 제외하고 선명하게 유지 */
+  /* ???????????? ?? ?????? ?????? ?????? ???? */
 }
 
 .product-card__option-item--zero-muted .product-card__option-chips-scroll,
@@ -1158,7 +1158,7 @@ label {
   text-align: center;
 }
 
-/* 리스트 모드: 상단 헤더(이미지/품명/컬러/사이즈...) 고정 */
+/* ??????: ??? ???(?????/???/??/?????..) ?? */
 .products-table thead th {
   position: sticky;
   top: 0;
@@ -1173,7 +1173,7 @@ label {
 }
 
 @media (max-width: 768px) {
-  /* 상품 리스트만: 스크롤 영역 = 뷰포트 − 상단고정 − 툴바 − 하단바(JS 측정, safe-area는 바 박스에 포함) */
+  /* ??? ?????: ???????? = ??????????? ????? ???????JS ??, safe-area???????????) */
   .products-list-table-wrap {
     max-height: calc(
       100vh - var(--products-mobile-sticky-top, 0px) - var(--products-mobile-topbar-h, 0px) -
@@ -1189,7 +1189,7 @@ label {
   }
 }
 
-/* 리스트: 컬러·사이즈 폭 최소화 → 품명과 재고 열이 시각적으로 가깝게 */
+/* ???? ???????????????????????? ??? ??????????? */
 .products-table__th-name,
 .products-table__td-name {
   min-width: 0;
@@ -1224,7 +1224,7 @@ label {
 
 .products-table__sort-btn {
   width: 100%;
-  min-height: 30px;
+  min-height: 28px;
   padding: 2px 6px;
   border: 0;
   background: transparent;
@@ -1259,14 +1259,14 @@ label {
   font-size: calc(14px + 1pt);
 }
 
-/* /status 재고 현황 */
+/* /status ??? ??? */
 .status-stock-table-wrap {
   overflow-x: auto;
   width: 100%;
   -webkit-overflow-scrolling: touch;
 }
 
-/* 모바일: 뷰포트에 맞게 꽉 참 */
+/* ???? ????? ?? ????*/
 .table.status-stock-table {
   width: 100%;
   max-width: 100%;
@@ -1327,7 +1327,7 @@ label {
   color: var(--muted);
 }
 
-/* 재고 현황: 품목 수 · 총 재고 · 재고 0 — 모바일 한 줄(균등), 넓은 화면에서 여유 */
+/* ??? ???: ??? ??? ????? ? ??? 0 ????????????), ???? ?????? ??? */
 .status-stock-stats {
   display: flex;
   flex-direction: row;
@@ -1398,9 +1398,8 @@ label {
 }
 
 /*
- * 태블릿·데스크톱: 카테고리·품명·재고 열 폭 상한
- * - 테이블 폭 = 내용 기반(max-content), 상한 ≈ 22ch + 48ch + 재고열
- */
+ * ??????????? ???????????? ???????
+ * - ???????= ??? ??(max-content), ??? ??22ch + 48ch + ????? */
 @media (min-width: 769px) {
   .table.status-stock-table {
     width: max-content;
@@ -1437,7 +1436,7 @@ label {
   border: 1px solid #d4cdc3;
 }
 
-/* 리스트 썸네일: td 직하위 구조 고정(하이드레이션·레이아웃 일관) */
+/* ????????? td ?????? ??(???????????????? ????) */
 .products-table__thumb-root {
   display: flex;
   align-items: center;
@@ -1461,7 +1460,7 @@ label {
   outline-offset: 2px;
 }
 
-/* 리스트 모드: 이미지 열 썸네일을 세로·가로 모두 키워 행에 맞춤(기본 thumb-small은 아래) */
+/* ??????: ????? ???????? ????????? ??? ??? ??(?? thumb-small?? ???) */
 .products-table .products-table__thumb-root {
   min-height: 64px;
 }
@@ -1504,7 +1503,7 @@ label {
   gap: 6px;
 }
 
-/* 리스트 테이블: 넓은 화면에서는 셀 안 «재고» 라벨 숨김(열 헤더와 중복 방지) */
+/* ????????? ???? ?????????? ??????? ??? ????(??????? ?? ???) */
 .stock-cell__qty-label-mobile {
   display: none;
 }
@@ -1537,7 +1536,7 @@ label {
   flex-wrap: wrap;
 }
 
-/* 리스트 PC: 재고 -1 → 수량 → +1 한 줄(열이 너무 좁아 세로로 깨지지 않게) */
+/* ????PC: ??? -1 ????? ??+1 ??????? ??? ?? ????????? ???) */
 @media (min-width: 769px) {
   .products-table__th-stock,
   .products-table__td-stock {
@@ -1583,7 +1582,7 @@ label {
   }
 }
 
-/* 리스트 모드 좁은 화면: 재고 조절을 -1 → 재고·수량 → +1 세로 순으로 */
+/* ?????? ??? ???: ??? ????-1 ????????? ??+1 ??? ?????*/
 @media (max-width: 768px) {
   .products-table .stock-cell {
     flex-direction: column;
@@ -1640,7 +1639,7 @@ label {
   justify-content: center;
 }
 
-/* PC 풀사이즈: 앞쪽 컬럼(이미지/품명/카테고리) 간격·정렬 보정 */
+/* PC ??????? ??? ??(?????/???/????) ?????? ?? */
 @media (min-width: 1024px) {
   .products-table th:nth-child(1),
   .products-table td:nth-child(1) {
@@ -1681,7 +1680,7 @@ label {
   color: var(--muted);
 }
 
-/* 검색행 + 상품개수/토글행 통합 wrapper (모바일에서 fixed) */
+/* ???? + ?????/????????? wrapper (???????fixed) */
 .products-sticky-controls {
   position: static;
   top: auto;
@@ -1868,7 +1867,7 @@ label {
 }
 
 .product-card__option-list--novis {
-  /* 옵션 행(.product-card__option-row)과 동일한 좌우 10px */
+  /* ??? ??.product-card__option-row)????????? 10px */
   padding: 5px 10px 5px;
 }
 
@@ -1919,7 +1918,7 @@ label {
   font-size: 18px;
 }
 
-/* TODO(ENABLE_BATCH_IMAGE_UPLOAD): 기능 제거 시 `.bulk-image-modal` 관련 규칙 블록 전체 삭제 */
+/* TODO(ENABLE_BATCH_IMAGE_UPLOAD): ?? ??? ??`.bulk-image-modal` ????? ?? ??? ???? */
 .modal.add-product-modal.bulk-image-modal {
   max-width: 440px;
 }
@@ -2120,19 +2119,19 @@ label {
   margin-top: 16px;
 }
 
-/* 취소 등 보조 버튼이 둘째일 때만 — 단일 저장 버튼은 primary 유지 */
+/* ?? ???? ???????????? ????? ???????? primary ???? */
 .modal-actions button:last-child:not(:only-child) {
   background: #e8e4de;
   color: var(--text);
 }
 
-/* 상품 추가 모달: 헤더 취소 + 여백 축소 (가로만 좁게) */
+/* ??? ??? ??: ??? ?? + ??? ?? (??? ??) */
 .modal.add-product-modal {
   max-width: 380px;
   padding: 22px 16px 14px;
 }
 
-/* 상품 추가·수정: 본문만 스크롤, 하단 저장/취소 고정 (일괄 이미지 모달은 제외) */
+/* ??? ???????: ????????? ??? ?????? ?? (??? ????? ???? ???) */
 .modal.add-product-modal:not(.bulk-image-modal) {
   display: flex;
   flex-direction: column;
@@ -2209,7 +2208,7 @@ label {
   border-color: var(--accent);
 }
 
-/* 카드(모바일) 전용: 상단 취소와 동일한 박스 크기(btn-danger 유지) */
+/* ??(???? ???: ??? ???? ??????? ???(btn-danger ????) */
 .edit-product-modal__sku-row .edit-product-modal__sku-delete {
   flex: 0 0 auto;
   width: auto;
@@ -2225,7 +2224,7 @@ label {
   cursor: not-allowed;
 }
 
-/* 카드 전용: 삭제 확인 — 화면 중앙(상단 add-product 오버레이 규칙 미사용) */
+/* ?? ???: ???? ??? ????? ??(??? add-product ?????? ?? ???? */
 .modal-overlay.product-delete-confirm-overlay {
   align-items: center;
   justify-content: center;
@@ -2267,7 +2266,7 @@ label {
   box-sizing: border-box;
 }
 
-/* 상품 CSV 업로드 실패 안내 */
+/* ??? CSV ???????? ??? */
 .modal-overlay.csv-upload-error-overlay {
   align-items: center;
   justify-content: center;
@@ -2360,7 +2359,7 @@ label {
   margin-top: 6px;
 }
 
-/* 이미지 URL ~ 메모2: 세로 여백 축소 */
+/* ????? URL ~ ??2: ??? ??? ?? */
 .add-product-modal-form .add-product-modal-url-memos {
   display: flex;
   flex-direction: column;
@@ -2384,7 +2383,7 @@ label {
   padding: 35px 14px 12px;
 }
 
-/* VariantEditor: 줄바꿈·넘침 방지, 입력 폭 약간 축소 */
+/* VariantEditor: ??????????, ??? ????? ?? */
 .variant-editor {
   font-size: calc(1rem - 1pt);
   max-width: 100%;
@@ -2445,7 +2444,7 @@ label {
   max-width: none;
 }
 
-/* 상품 수정 모달: 옵션 수량 칸 식별성을 위해 숫자 기본색을 빨간색으로 표시 */
+/* ??? ??? ??: ??? ??? ???????? ??? ??? ????? ?????????? */
 .edit-product-modal .variant-editor-row .variant-editor-stock-input {
   color: #c0392b;
 }
@@ -2518,7 +2517,7 @@ label {
   outline-offset: 2px;
 }
 
-/* 모달 내 상품 메모: 옵션 행 메모 입력과 동일한 칩 스타일·전체 폭 */
+/* ?? ????? ??: ??? ???? ????????????????????????*/
 .modal-form .variant-editor-product-memo-label {
   display: block;
   margin-top: 10px;
@@ -2578,7 +2577,7 @@ label {
   line-height: 1;
 }
 
-/* 모바일: variant row 더 좁은 화면 대응 */
+/* ???? variant row ????? ??? ????*/
 @media (max-width: 768px) {
   .edit-variant-row {
     grid-template-columns: minmax(108px, 1.6fr) 52px minmax(66px, 0.8fr) minmax(66px, 0.8fr) 36px;
@@ -2742,7 +2741,7 @@ label {
 
   .products-page {
     padding-top: calc(var(--products-mobile-topbar-h, 0px) + 8px);
-    /* 하단 `.toolbar-bottom-bar`와 겹치지 않게: 높이만큼만(바는 padding-bottom에 env(safe-area-inset-bottom) 포함 → 이중 합산 금지) */
+    /* ??? `.toolbar-bottom-bar`?? ??? ???: ????????? padding-bottom??env(safe-area-inset-bottom) ??? ????? ??? ???) */
     padding-bottom: var(--products-mobile-bottombar-h, 0px);
   }
 
@@ -2751,7 +2750,7 @@ label {
     padding-right: 10px;
   }
 
-  /* 상품 개수는 왼쪽, 토글 3개는 콘텐츠 영역(카드·목록과 동일한 패딩 안쪽) 오른쪽 끝에 정렬 */
+  /* ??? ???????, ???? 3?? ???????(??????????????? ???) ???????? ??? */
   .products-sticky-controls .products-count-bar {
     grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
     column-gap: 6px;
@@ -2945,8 +2944,8 @@ label {
 
 @media (max-width: 768px) {
   /*
-   * 하단 고정 액션 바 높이(대략): border-top 1px + padding-top 8 + 버튼 36px + padding-bottom 8 + env(safe-area-inset-bottom)
-   * → 약 53px + safe-area. 실제 픽셀은 ProductsClient에서 offsetHeight로 --products-mobile-bottombar-h에 설정.
+   * ??? ?? ??? ?????(????: border-top 1px + padding-top 8 + ?? 36px + padding-bottom 8 + env(safe-area-inset-bottom)
+   * ????53px + safe-area. ??? ?????? ProductsClient??? offsetHeight??--products-mobile-bottombar-h?????.
    */
   .toolbar-bottom-bar {
     display: flex;  
@@ -3111,7 +3110,7 @@ label {
   padding-bottom: 4px;
   padding-left: 3px;
   padding-right: 3px;
-  min-height: 30px;
+  min-height: 28px;
 }
 
 .transaction-form-grid__customer {
@@ -3121,7 +3120,7 @@ label {
   border: 1px solid color-mix(in srgb, var(--accent) 35%, #ffffff);
 }
 
-/* PC: 날짜 입력 2열을 공급자 입력 아래(품목 리스트 위)에 배치 */
+/* PC: ??? ??? 2??? ??????? ???(??? ?????????? */
 .transaction-date-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3220,9 +3219,9 @@ label {
   font-weight: 600;
 }
 
-/* 출력용 시트: 화면 밖 고정폭 캡처 영역(html2canvas 등에서 ref 타깃) */
+/* ???????: ??? ???????? ???(html2canvas ?????ref ???? */
 .transaction-print-hidden-host {
-  /* 시트 860px + 좌우 패딩 40px×2 ≈ 940px 캡처 폭 */
+  /* ??? 860px + ?? ??? 40px?2 ??940px ?? ??*/
   --ts-print-sheet-w: 860px;
   position: fixed;
   left: -14000px;
@@ -3283,7 +3282,7 @@ label {
   padding: 4px 10px;
 }
 
-/* PC에서만 상단 메뉴(제목+버튼군) 가운데 정렬 */
+/* PC???????? ??(???+???? ???? ??? */
 @media (min-width: 961px) {
   .transaction-preview-dialog__toolbar {
     justify-content: center;
@@ -3314,19 +3313,19 @@ label {
   -webkit-overflow-scrolling: touch;
 }
 
-/* 숨김 캡처 원본 DOM은 어떤 경우에도 축소/이동 변형 금지 */
+/* ???? ?? ??? DOM?? ??? ????? ??/??? ?????? */
 .transaction-print-hidden-host [data-ts-print-sheet] {
   transform: none !important;
   transform-origin: initial !important;
 }
 
-/* JPG 캡처 전용: 기기·미디어쿼리와 무관한 고정 데스크톱 레이아웃 */
+/* JPG ?? ???: ??????????? ??????? ?????? ?????? */
 .transaction-print-hidden-host [data-ts-print-sheet].ts-print-capture-fixed {
   width: var(--ts-print-sheet-w) !important;
   min-width: var(--ts-print-sheet-w) !important;
   max-width: var(--ts-print-sheet-w) !important;
   margin-inline: auto !important;
-  /* JPG 전용: 제목 상단 여백 약 40% 축소 (기존 24px → 14px) */
+  /* JPG ???: ??? ??? ??? ??40% ?? (?? 24px ??14px) */
   padding-top: 14px !important;
 }
 
@@ -3357,7 +3356,7 @@ label {
   color: #666 !important;
 }
 
-/* JPG 캡처: 인감은 공급자 텍스트 위로 오버랩 */
+/* JPG ??: ????? ???????????? ?????*/
 .transaction-print-hidden-host img.ts-print-stamp {
   position: absolute !important;
   width: 76px !important;
@@ -3391,7 +3390,7 @@ label {
     gap: 2px;
   }
 
-  /* 모바일 입력란: 2칸(상호/사업자번호) → 3칸(성명/주소/업태) → 1칸(종목) */
+  /* ?????????: 2?????/???????? ??3?????/??/???) ??1????) */
   .transaction-form-grid > .transaction-form-grid__customer:nth-child(1),
   .transaction-form-grid > .transaction-form-grid__customer:nth-child(2) {
     grid-column: span 3;
@@ -3458,7 +3457,7 @@ label {
     width: 100%;
   }
 
-  /* 모바일: 품목 액션 버튼 높이를 하단 다운로드(.btn)와 동일한 체감 높이로 */
+  /* ???? ??? ??? ?? ???????? ?????(.btn)?? ??????? ?????*/
   .transaction-item-row__actions .btn.btn-compact {
     height: auto;
     min-height: 0;
@@ -3472,7 +3471,7 @@ label {
   }
 
   .transaction-item-row__grid input {
-    min-height: 30px;
+    min-height: 28px;
     padding-top: 5px;
     padding-bottom: 5px;
   }
@@ -3514,6 +3513,289 @@ label {
   max-width: 720px;
   padding-left: 6px;
   padding-right: 6px;
+}
+
+@media (min-width: 1024px) {
+  .oqm-page.products-page {
+    background: #e8eaed;
+  }
+
+  .oqm-page .products-content-container {
+    max-width: 1200px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+.oqm-page-content {
+  display: block;
+}
+
+.oqm-sidebar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.oqm-input-card--basic,
+.oqm-input-card--quantity {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.oqm-input-card--summary {
+  display: none;
+}
+
+.oqm-input-card__title {
+  display: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.oqm-summary-dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.oqm-summary-dl__row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 8px 12px;
+  align-items: start;
+}
+
+.oqm-summary-dl__dt {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.oqm-summary-dl__dd {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.oqm-results-panel__head {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.oqm-results-panel__title {
+  margin: 0;
+}
+
+.oqm-results-summary-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (min-width: 1024px) {
+  .oqm-page-content {
+    display: grid;
+    grid-template-columns: 500px 1fr;
+    gap: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    align-items: start;
+  }
+
+  .oqm-page .oqm-page-title {
+    font-size: 1.58rem;
+  }
+
+  .oqm-input-card__title {
+    font-size: 1.06rem;
+  }
+
+  .oqm-summary-dl__dt {
+    font-size: 0.9rem;
+  }
+
+  .oqm-summary-dl__dd {
+    font-size: 0.98rem;
+  }
+
+  .oqm-results-panel__title {
+    font-size: 1.22rem;
+  }
+
+  .oqm-results-summary-badges .oqm-badge {
+    font-size: 0.88rem;
+    padding: 5px 12px;
+  }
+
+  .oqm-page .oqm-select,
+  .oqm-page .oqm-input:not(.oqm-input--qty-mtx) {
+    font-size: 0.96rem;
+    padding: 9px 12px;
+  }
+
+  .oqm-page .oqm-field--category-select .oqm-field__label,
+  .oqm-page .oqm-field--product-scope .oqm-field__label {
+    font-size: 15px;
+  }
+
+  .oqm-page .oqm-quick-total,
+  .oqm-page .oqm-quick-total--tight {
+    font-size: 0.92rem;
+  }
+
+  .oqm-page .oqm-input.oqm-input--qty-mtx {
+    font-size: 1.06rem;
+    min-height: 44px;
+    padding: 6px 4px;
+    line-height: 1.2;
+    border-color: #e7e9ee;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  .oqm-page .oqm-input--qty {
+    font-size: 1rem;
+    line-height: 1.25;
+    border-color: #e7e9ee;
+  }
+
+  .oqm-page .oqm-input.oqm-input--qty-mtx:focus,
+  .oqm-page .oqm-input--qty:focus {
+    border-color: #cfd6e1;
+    outline-color: rgba(31, 111, 139, 0.25);
+  }
+
+  .oqm-page .oqm-size-mode-btn {
+    font-size: 0.86rem;
+    padding: 8px 10px;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-apparel-matrix {
+    gap: 14px;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-apparel-grid {
+    column-gap: 6px;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-apparel-grid__role,
+  .oqm-page .oqm-input-card--quantity .oqm-apparel-grid__qty-lab {
+    font-size: 0.9rem;
+    line-height: 1.2;
+    padding-left: 4px;
+    padding-right: 10px;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-apparel-grid__size {
+    font-size: 0.94rem;
+    line-height: 1.22;
+    padding: 2px 0;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-quick-total--tight {
+    font-size: 1rem;
+    margin-top: 10px;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-btn-clear-quantities {
+    font-size: 0.92rem;
+    min-height: 40px;
+    padding: 8px 12px;
+    align-self: flex-end;
+    margin-top: 8px;
+  }
+
+  .oqm-page .oqm-category-hint {
+    font-size: 0.82rem;
+  }
+
+  .oqm-page .oqm-result-empty {
+    font-size: 0.95rem;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-matrix-wrap {
+    padding: 24px 22px;
+    border-radius: 18px;
+    border: 1px solid #cfd6e1;
+    background: #fcfdff;
+  }
+
+  .oqm-page .oqm-input-card--quantity .oqm-matrix-wrap--compact {
+    padding: 24px 22px;
+  }
+
+  .oqm-sidebar-stack {
+    gap: 24px;
+  }
+
+  .oqm-page-content__sidebar {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .oqm-page-content__results.oqm-results-panel {
+    min-height: 0;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 26px 14px 30px;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 24px;
+    background-clip: padding-box;
+    isolation: isolate;
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.09), 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
+  .oqm-page .oqm-card {
+    background: #fff;
+    border-radius: 22px;
+    background-clip: padding-box;
+    overflow: hidden;
+    isolation: isolate;
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    border: 1px solid #e8eaed;
+    padding: 22px 24px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.08), 0 2px 10px rgba(0, 0, 0, 0.04);
+  }
+
+  .oqm-input-card--summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .oqm-input-card__title {
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .oqm-results-panel__head {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+
+  .oqm-results-panel.oqm-section--results {
+    margin-bottom: 20px;
+  }
 }
 
 .oqm-page-title {
@@ -3621,7 +3903,7 @@ label {
   width: auto;
   max-width: none;
   min-height: 34px;
-  padding: 6px 12px;
+  padding: 5px 10px;
   font-size: 0.78rem;
 }
 
@@ -3664,7 +3946,7 @@ label {
   min-width: 0;
 }
 
-/* 카테고리·품목명 셀렉트: 라벨·선택 글자 길이에 맞춰 너비 유동 (좁은 화면에서는 줄바꿈 후 100% 이하) */
+/* ???????????????: ??????? ????????? ??? ??? (??? ??????????????100% ???) */
 .oqm-quick-head-primary > .oqm-field--category-select,
 .oqm-quick-head-primary > .oqm-field--product-scope {
   flex: 0 1 auto;
@@ -3800,7 +4082,7 @@ label {
   padding: 12px;
 }
 
-/* ----- 의류 사이즈: compact 그리드 표 (남/여/공용) ----- */
+/* ----- ??? ????? compact ??????(??????) ----- */
 .oqm-matrix-wrap--compact {
   padding: 6px 4px 8px;
 }
@@ -3904,7 +4186,7 @@ label {
   gap: 8px 12px;
 }
 
-/* 공용: 왼쪽 열 위→아래, 오른쪽 열 위→아래 + 하단 총합계(블록 전체 오른쪽 정렬) */
+/* ??: ??? ????????, ????????????? + ??? ?????? ??? ????????) */
 .oqm-matrix-unisex--cols-down {
   display: flex;
   flex-direction: row;
@@ -4063,7 +4345,7 @@ label {
   margin-bottom: 10px;
 }
 
-/* ----- 요약 ----- */
+/* ----- ??? ----- */
 .oqm-summary-strip {
   display: flex;
   flex-direction: column;
@@ -4239,7 +4521,7 @@ label {
   font-size: 0.85rem;
 }
 
-/* ----- 추론 패널 ----- */
+/* ----- ?? ??? ----- */
 .oqm-inference-panel {
   font-size: 0.85rem;
   color: var(--muted);
@@ -4312,7 +4594,7 @@ label {
   word-break: break-all;
 }
 
-/* ----- 입력 행 카드 ----- */
+/* ----- ??? ???? ----- */
 .oqm-input-list {
   list-style: none;
   margin: 0;
@@ -4417,7 +4699,7 @@ label {
   font-variant-numeric: tabular-nums;
 }
 
-/* 의류 사이즈 그리드: .oqm-input 기본 패딩보다 뒤에 두어 덮어씀 */
+/* ??? ????????? .oqm-input ?? ????? ??? ??? ?????? */
 .oqm-input.oqm-input--qty-mtx {
   display: block;
   width: 100%;
@@ -4455,7 +4737,7 @@ label {
   margin: 0;
 }
 
-/* ----- 매칭 결과: compact 리스트 (모바일 우선) ----- */
+/* ----- ?? ??: compact ????(???????) ----- */
 .oqm-result-list {
   display: flex;
   flex-direction: column;
@@ -4499,6 +4781,85 @@ label {
   -webkit-tap-highlight-color: transparent;
 }
 
+.oqm-result-card__main {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.oqm-result-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.oqm-result-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  background: #f0ebe4;
+  color: #3d3830;
+  border: 1px solid #e2dbd2;
+}
+
+.oqm-result-chip__size {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #3d3830;
+}
+
+.oqm-result-chip__sep {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.45;
+  margin: 0 1px;
+  user-select: none;
+}
+
+.oqm-result-chip__qty {
+  font-weight: 500;
+  font-size: 0.94em;
+  font-variant-numeric: tabular-nums;
+  color: #4a453c;
+}
+
+.oqm-result-chip--shortage {
+  background: #fdecef;
+  border-color: #f0c4cd;
+  color: #8b1532;
+}
+
+.oqm-result-chip--shortage .oqm-result-chip__size {
+  color: #6b1228;
+}
+
+.oqm-result-chip--shortage .oqm-result-chip__sep {
+  opacity: 0.5;
+  color: #8b1532;
+}
+
+.oqm-result-chip--shortage .oqm-result-chip__qty {
+  color: #c41e3a;
+  font-weight: 500;
+}
+
+.oqm-result-chip--more {
+  background: #e8e4de;
+  color: var(--muted);
+  border-style: dashed;
+  font-weight: 700;
+}
+
 .oqm-result-row:hover {
   background: #faf8f5;
 }
@@ -4531,7 +4892,7 @@ label {
   height: 66px;
   border-radius: 8px;
   overflow: hidden;
-  background: #e8e4de;
+  background: #fff;
   border: 1px solid #e0dad2;
 }
 
@@ -4541,6 +4902,7 @@ label {
   height: 100%;
   object-fit: cover;
   object-position: center;
+  background: transparent;
 }
 
 .oqm-result-thumb__ph {
@@ -4606,6 +4968,193 @@ label {
   white-space: nowrap;
   padding: 3px 7px;
   border-radius: 999px;
+}
+
+@media (min-width: 1024px) {
+  .oqm-result-list {
+    gap: 10px;
+    border: none;
+    border-radius: 0;
+    overflow: visible;
+    background: transparent;
+  }
+
+  .oqm-result-list__li {
+    border-top: none;
+  }
+
+  .oqm-result-card__main {
+    gap: 7px;
+  }
+
+  .oqm-result-card__chips {
+    column-gap: 6px;
+    row-gap: 6px;
+    margin-top: 3px;
+  }
+
+  .oqm-result-row__body {
+    gap: 2px;
+  }
+
+  .oqm-result-row__title {
+    font-size: 1.02rem;
+  }
+
+  .oqm-result-row__sku {
+    font-size: 0.86rem;
+  }
+
+  .oqm-result-row__short {
+    font-size: 0.8rem;
+  }
+
+  .oqm-result-row.oqm-result-card {
+    --oqm-row-pad: 13px 8px;
+    align-items: center;
+    gap: 16px;
+    border-radius: 18px;
+    background: #fff;
+    background-clip: padding-box;
+    overflow: hidden;
+    isolation: isolate;
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    border: 1px solid #e8eaed;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.03);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+
+  .oqm-result-row.oqm-result-card:hover {
+    background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.09), 0 2px 6px rgba(0, 0, 0, 0.04);
+    transform: translateY(-2px);
+  }
+
+  .oqm-result-thumb {
+    width: 108px;
+    height: 108px;
+    border-radius: 18px;
+  }
+
+  .oqm-result-thumb__ph {
+    min-height: 0;
+  }
+
+  .oqm-result-row .oqm-result-thumb__img {
+    object-fit: contain;
+    object-position: center;
+    transform: none;
+    padding: 2px;
+    box-sizing: border-box;
+  }
+
+  .oqm-result-row__badge {
+    font-size: 0.8rem;
+    padding: 4px 10px;
+  }
+
+  .oqm-result-row__badge.oqm-result-card__status-badge {
+    align-self: center;
+    flex-shrink: 0;
+  }
+
+  /* PC: ??? chip ????? ??? ???????8px), ???????????*/
+  .oqm-result-row .oqm-result-chip:not(.oqm-result-chip--more) {
+    border-radius: 8px;
+    padding: 5px 9px;
+    min-height: 28px;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    box-sizing: border-box;
+    border-width: 1px;
+    border-style: solid;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+  }
+
+  .oqm-result-row .oqm-result-chip--ok {
+    background: #f4fbf7;
+    border-color: #e3f0ea;
+    color: #3d5e4d;
+  }
+
+  .oqm-result-row .oqm-result-chip--ok .oqm-result-chip__size {
+    color: #3a6b55;
+    font-weight: 700;
+  }
+
+  .oqm-result-row .oqm-result-chip--ok .oqm-result-chip__sep {
+    color: #6fa588;
+    opacity: 0.4;
+    margin: 0 3px;
+  }
+
+  .oqm-result-row .oqm-result-chip--ok .oqm-result-chip__qty {
+    color: #4f7964;
+    font-weight: 500;
+    font-size: 0.9em;
+  }
+
+  .oqm-result-row .oqm-result-chip--shortage {
+    background: #fff7f8;
+    border-color: #f0e3e6;
+    color: #8f4a52;
+  }
+
+  .oqm-result-row .oqm-result-chip--shortage .oqm-result-chip__size {
+    color: #a54550;
+    font-weight: 700;
+  }
+
+  .oqm-result-row .oqm-result-chip--shortage .oqm-result-chip__sep {
+    color: #c8959d;
+    opacity: 0.4;
+    margin: 0 3px;
+  }
+
+  .oqm-result-row .oqm-result-chip--shortage .oqm-result-chip__qty {
+    color: #b55f6a;
+    font-weight: 500;
+    font-size: 0.9em;
+  }
+
+  .oqm-result-row .oqm-result-chip--zero {
+    background: #f9fafb;
+    border-color: #eceef1;
+    color: #6f7782;
+  }
+
+  .oqm-result-row .oqm-result-chip--zero .oqm-result-chip__size {
+    color: #5d6570;
+    font-weight: 600;
+  }
+
+  .oqm-result-row .oqm-result-chip--zero .oqm-result-chip__sep {
+    color: #a3aab4;
+    opacity: 0.45;
+    margin: 0 3px;
+  }
+
+  .oqm-result-row .oqm-result-chip--zero .oqm-result-chip__qty {
+    color: #828a96;
+    font-weight: 500;
+    font-size: 0.9em;
+  }
+
+  .oqm-result-row .oqm-result-chip--more {
+    border-radius: 8px;
+    padding: 5px 9px;
+    min-height: 28px;
+    font-size: 0.88rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    box-sizing: border-box;
+    background: #f1f3f6;
+    border: 1px solid #e4e7ec;
+    color: #5c6470;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+  }
 }
 
 .oqm-detail-sheet {
@@ -4699,7 +5248,7 @@ label {
   overflow: hidden;
 }
 
-/* 수량 매칭 상세 시트 — 이미지 확대 영역만 (전역 img 미적용) */
+/* ??? ?? ??? ??? ??????? ???? ?????(??? img ???? */
 .oqm-image-modal {
   background: #fff;
 }

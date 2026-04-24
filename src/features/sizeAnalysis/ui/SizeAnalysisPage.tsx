@@ -133,6 +133,11 @@ export function SizeAnalysisPage() {
       .sort((a, b) => a.club.localeCompare(b.club, "ko"));
   }, [rows]);
 
+  const clubViewDataKey = useMemo(
+    () => clubGroupedRows.map((c) => `${c.club}:${c.totalQty}:${c.rows.length}`).join("|"),
+    [clubGroupedRows]
+  );
+
   async function uploadFile(file: File) {
     setError("");
     setMappingSaved(false);
@@ -276,15 +281,17 @@ export function SizeAnalysisPage() {
 
       <AnalysisSummaryCards summary={summary} />
       <AnalysisStatusFilter value={statusFilter} onChange={onStatusChange} />
-      <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} />
-      {detailViewMode === "all" ? (
+      <div className="size-analysis-result-region">
+        <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} />
+        {detailViewMode === "all" ? (
         <>
           <AnalysisRowsTable rows={rows} />
-          <ClubSizeSummaryTable rows={clubSizeRows} />
+            <ClubSizeSummaryTable normRows={rows} rows={clubSizeRows} />
         </>
-      ) : (
-        <ClubGroupedView rows={clubGroupedRows} />
-      )}
+        ) : (
+          <ClubGroupedView key={clubViewDataKey} rows={clubGroupedRows} />
+        )}
+      </div>
 
       {error ? <p className="size-analysis-error">{error}</p> : null}
     </main>
@@ -565,9 +572,13 @@ export function DetailViewSwitch({
   onChange: (mode: "all" | "club") => void;
 }) {
   return (
-    <section className="size-analysis-card">
-      <h3>보기 전환</h3>
-      <div className="size-analysis-view-switch">
+    <section className="size-analysis-card size-analysis-view-switch-card">
+      <h3 className="size-analysis-view-switch__heading">보기 전환</h3>
+      <div
+        className="size-analysis-view-switch size-analysis-view-switch--segmented"
+        role="group"
+        aria-label="결과 보기 전환"
+      >
         <button
           type="button"
           className={`btn ${mode === "all" ? "btn-primary" : "btn-secondary"}`}
@@ -587,6 +598,12 @@ export function DetailViewSwitch({
   );
 }
 
+function defaultExpandedClubSet(items: Array<{ club: string }>) {
+  const s = new Set<string>();
+  for (let i = 0; i < Math.min(2, items.length); i += 1) s.add(items[i]!.club);
+  return s;
+}
+
 export function ClubGroupedView({
   rows,
 }: {
@@ -596,39 +613,92 @@ export function ClubGroupedView({
     rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }>;
   }>;
 }) {
+  const [expanded, setExpanded] = useState(() => defaultExpandedClubSet(rows));
+
+  if (rows.length === 0) return null;
+
+  function toggleClub(name: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
   return (
-    <section className="size-analysis-card">
+    <section className="size-analysis-card size-analysis-club-group-view">
       <h3>클럽별 보기</h3>
       <div className="size-analysis-club-group-list">
-        {rows.map((club) => (
-          <article key={club.club} className="size-analysis-club-group-card">
-            <div className="size-analysis-club-group-head">
-              <strong>{club.club}</strong>
-              <span>총 {club.totalQty}</span>
-            </div>
-            <div className="size-analysis-club-group-rows">
-              {club.rows.map((r, idx) => (
-                <div
-                  key={`${club.club}-${r.gender}-${r.size}-${idx}`}
-                  className={[
-                    "size-analysis-club-group-row",
-                    r.hasReview && "size-analysis-club-size-tr--review",
-                    r.hasUnresolved && "size-analysis-club-size-tr--unresolved",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  <span className="size-analysis-club-group-gender">{r.gender || "공용"}</span>
-                  <span>{r.size}</span>
-                  <span>{r.qty}개</span>
-                  <span>
-                    {r.hasReview ? "(검토필요)" : r.hasUnresolved ? "(미분류)" : ""}
+        {rows.map((club, idx) => {
+          const isOpen = expanded.has(club.club);
+          const panelId = `size-analysis-club-panel-${idx}`;
+          return (
+            <article key={`${idx}-${club.club}`} className="size-analysis-club-group-card">
+              <button
+                type="button"
+                className="size-analysis-club-group-head"
+                onClick={() => toggleClub(club.club)}
+                aria-expanded={isOpen}
+                aria-controls={panelId}
+                aria-label={`${club.club} 상세 ${isOpen ? "접기" : "펼치기"}`}
+              >
+                <span className="size-analysis-club-group-head__name">{club.club}</span>
+                <span className="size-analysis-club-group-head__right">
+                  <span className="size-analysis-club-group-head__total">총 {club.totalQty}개</span>
+                  <span className="size-analysis-club-group-chevron" aria-hidden>
+                    <svg
+                      className={isOpen ? "size-analysis-club-group-chevron__svg is-open" : "size-analysis-club-group-chevron__svg"}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M6 9l6 6 6-6" />
+                    </svg>
                   </span>
+                </span>
+              </button>
+              {isOpen ? (
+                <div id={panelId} className="size-analysis-club-group-rows">
+                  {club.rows.map((r, ridx) => {
+                    const g = String(r.gender ?? "").trim();
+                    const sizePart = [g ? `${g} ${r.size}`.trim() : String(r.size), `${r.qty}개`].filter(Boolean).join(" · ");
+                    return (
+                    <div
+                      key={`${club.club}-${r.gender}-${r.size}-${ridx}`}
+                      className={[
+                        "size-analysis-club-group-row",
+                        r.hasReview && "size-analysis-club-size-tr--review",
+                        r.hasUnresolved && "size-analysis-club-size-tr--unresolved",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      <p className="size-analysis-club-line-mobile">
+                        <span className="size-analysis-club-line-mobile__text">{sizePart}</span>
+                        {r.hasReview ? (
+                          <span className="size-analysis-mini-pill size-analysis-mini-pill--review">검토필요</span>
+                        ) : r.hasUnresolved ? (
+                          <span className="size-analysis-mini-pill size-analysis-mini-pill--unresolved">미분류</span>
+                        ) : null}
+                      </p>
+                      <div className="size-analysis-club-line-desktop">
+                        <span className="size-analysis-club-group-gender">{g || "—"}</span>
+                        <span>{r.size}</span>
+                        <span>{r.qty}개</span>
+                        <span>{r.hasReview ? "(검토필요)" : r.hasUnresolved ? "(미분류)" : ""}</span>
+                      </div>
+                    </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-          </article>
-        ))}
+              ) : null}
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -682,11 +752,85 @@ export function AnalysisStatusFilter({ value, onChange }: { value: string; onCha
   );
 }
 
+function normalizedRowLine1(r: any): string {
+  const club = String(r.clubNameRaw ?? "").trim();
+  const name = String(r.memberNameRaw ?? "").trim();
+  const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
+  const size = String(r.standardizedSize ?? r.sizeRaw ?? "").trim();
+  const q = r.qtyParsed ?? r.qtyRaw;
+  let qtyStr = "";
+  if (q !== "" && q != null) {
+    const n = Number(q);
+    qtyStr = Number.isFinite(n) ? `${n}개` : String(q).trim();
+  }
+  const parts: string[] = [];
+  if (club) parts.push(club);
+  if (name) parts.push(name);
+  if (gender && size) {
+    parts.push(`${gender} ${size}`);
+  } else if (size) {
+    parts.push(size);
+  } else if (gender) {
+    parts.push(gender);
+  }
+  if (qtyStr) parts.push(qtyStr);
+  return parts.join(" · ");
+}
+
+/** 모바일 요약: 검토/미분류/수정완료는 뱃지로, 본문에는 원본행·신뢰도만(중복 강조 방지) */
+function normalizedRowLine2Parts(r: any): {
+  subline: string;
+  pill: "needs_review" | "unresolved" | "corrected" | null;
+} {
+  const src =
+    r.sourceRowIndex != null && r.sourceRowIndex !== "" ? `원본행 ${r.sourceRowIndex}` : "";
+  const conf = `신뢰도 ${Number(r.parseConfidence ?? 0).toFixed(2)}`;
+  const st = String(r.parseStatus ?? "");
+  if (st === "needs_review" || st === "unresolved" || st === "corrected") {
+    return {
+      subline: [src, conf].filter((x) => x && x.length > 0).join(" · "),
+      pill: st as "needs_review" | "unresolved" | "corrected",
+    };
+  }
+  const statusLabel = labelParseStatus(r.parseStatus);
+  return {
+    subline: [src, statusLabel, conf].filter((x) => x && x.length > 0).join(" · "),
+    pill: null,
+  };
+}
+
+function normCompactClass(st: string | undefined) {
+  if (st === "needs_review") return "size-analysis-norm-compact size-analysis-norm-compact--review";
+  if (st === "unresolved") return "size-analysis-norm-compact size-analysis-norm-compact--unresolved";
+  if (st === "corrected") return "size-analysis-norm-compact size-analysis-norm-compact--corrected";
+  return "size-analysis-norm-compact";
+}
+
 export function AnalysisRowsTable({ rows }: { rows: any[] }) {
   return (
-    <section className="size-analysis-card">
+    <section className="size-analysis-card size-analysis-norm-section">
       <h3>7) 정규화 행</h3>
-      <div className="size-analysis-table-wrap">
+      <div className="size-analysis-norm-compact-list size-analysis-norm-compact-list--mobile" aria-label="정규화 행(요약)">
+        {rows.map((r) => {
+          const { subline, pill } = normalizedRowLine2Parts(r);
+          return (
+            <article key={r.id} className={normCompactClass(r.parseStatus)}>
+              <p className="size-analysis-norm-compact__line1">{normalizedRowLine1(r)}</p>
+              <div className="size-analysis-norm-compact__row2">
+                <p className="size-analysis-norm-compact__line2">{subline}</p>
+                {pill === "needs_review" ? (
+                  <span className="size-analysis-mini-pill size-analysis-mini-pill--review">검토필요</span>
+                ) : pill === "unresolved" ? (
+                  <span className="size-analysis-mini-pill size-analysis-mini-pill--unresolved">미분류</span>
+                ) : pill === "corrected" ? (
+                  <span className="size-analysis-mini-pill size-analysis-mini-pill--corrected">수정완료</span>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <div className="size-analysis-table-wrap size-analysis-norm-table-wrap--desktop">
         <table className="size-analysis-table size-analysis-table--normalized">
           <thead>
             <tr>
@@ -744,41 +888,253 @@ function compareSizeLabel(a: string, b: string): number {
   return aa.localeCompare(bb, "ko");
 }
 
+const LETTER_SIZES_ORDER = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "FREE", "F"] as const;
+
+/** 집계 행(요약)과 정규화 행의 클럽 키를 맞춤 */
+function normClubFromNormRow(r: { clubNameNormalized?: string | null; clubNameRaw?: string | null }): string {
+  return String(r.clubNameNormalized ?? r.clubNameRaw ?? "미분류").trim() || "미분류";
+}
+
+/**
+ * 매트릭스 행·집계 gender 키: 여 / 남 / 공용(빈 값·기타)
+ */
+function rowKeyGenderForAgg(g: string | null | undefined): "여" | "남" | "공용" {
+  const t = String(g ?? "").trim();
+  if (t === "남") return "남";
+  if (t === "여") return "여";
+  return "공용";
+}
+
+function compareSizeForMatrix(a: string, b: string): number {
+  const na = String(a ?? "").trim();
+  const nb = String(b ?? "").trim();
+  const aNum = /^\d+$/.test(na);
+  const bNum = /^\d+$/.test(nb);
+  if (aNum && bNum) return Number(na) - Number(nb);
+  if (aNum) return -1;
+  if (bNum) return 1;
+  const ua = na.toUpperCase();
+  const ub = nb.toUpperCase();
+  const ia = (LETTER_SIZES_ORDER as readonly string[]).indexOf(ua);
+  const ib = (LETTER_SIZES_ORDER as readonly string[]).indexOf(ub);
+  if (ia >= 0 && ib >= 0) return ia - ib;
+  if (ia >= 0) return -1;
+  if (ib >= 0) return 1;
+  return na.localeCompare(nb, "ko");
+}
+
+type DupByClub = Map<string, { persons: number; sheets: number }>;
+
+/** 동일 클럽에서 같은 이름이 2행 이상이면 중복. 인원 수·총 장수(해당 행 수량 합) 집계 */
+function duplicateSummaryByClub(normRows: any[]): DupByClub {
+  const m = new Map<string, Map<string, { lineCount: number; sheetSum: number }>>();
+  for (const r of normRows) {
+    if (r.excluded) continue;
+    const name = String(r.memberNameRaw ?? "").trim();
+    if (!name) continue;
+    const club = normClubFromNormRow(r);
+    if (!m.has(club)) m.set(club, new Map());
+    const byName = m.get(club)!;
+    if (!byName.has(name)) byName.set(name, { lineCount: 0, sheetSum: 0 });
+    const o = byName.get(name)!;
+    o.lineCount += 1;
+    const q = r.qtyParsed;
+    o.sheetSum += Number.isFinite(Number(q)) ? Number(q) : 0;
+  }
+  const out: DupByClub = new Map();
+  for (const [club, byName] of m) {
+    let persons = 0;
+    let sheets = 0;
+    for (const o of byName.values()) {
+      if (o.lineCount > 1) {
+        persons += 1;
+        sheets += o.sheetSum;
+      }
+    }
+    out.set(club, { persons, sheets });
+  }
+  return out;
+}
+
+type CellMeta = { hasReview: boolean; hasUnres: boolean; hasCorrected: boolean };
+function buildCellStatusMap(normRows: any[]): Map<string, CellMeta> {
+  const map = new Map<string, CellMeta>();
+  for (const r of normRows) {
+    if (r.excluded) continue;
+    const club = normClubFromNormRow(r);
+    const gk = rowKeyGenderForAgg(String(r.genderNormalized ?? r.genderRaw ?? ""));
+    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+    const key = `${club}\0${gk}\0${size}`;
+    const st = String(r.parseStatus ?? "");
+    const cur = map.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false };
+    if (st === "needs_review") cur.hasReview = true;
+    if (st === "unresolved") cur.hasUnres = true;
+    if (st === "corrected") cur.hasCorrected = true;
+    map.set(key, cur);
+  }
+  return map;
+}
+
+function groupClubAggRows(rows: Array<{ club: string; gender: string; size: string; qty: number }>) {
+  const by = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const c = r.club;
+    if (!by.has(c)) by.set(c, []);
+    by.get(c)!.push(r);
+  }
+  return by;
+}
+
+function clubAggMatrixHeadline(
+  club: string,
+  clubRows: Array<{ club: string; gender: string; size: string; qty: number }>,
+  totalQty: number,
+  dup: { persons: number; sheets: number } | undefined
+): string {
+  const by: Record<"여" | "남" | "공용", number> = { 여: 0, 남: 0, 공용: 0 };
+  for (const r of clubRows) {
+    const gk = rowKeyGenderForAgg(r.gender);
+    by[gk] += r.qty;
+  }
+  const gParts: string[] = [];
+  if (by.여 > 0) gParts.push(`여:${by.여}장`);
+  if (by.남 > 0) gParts.push(`남:${by.남}장`);
+  if (by.공용 > 0) gParts.push(`공용:${by.공용}장`);
+  const gStr = gParts.length ? `${gParts.join(" ")} ` : "";
+  const dupText = !dup || dup.persons === 0 ? "중복자 없음" : `중복 ${dup.persons}명/${dup.sheets}장`;
+  return `${club} (${gStr}합계:${totalQty}장 / ${dupText})`;
+}
+
+function clubAggMobileLine(r: { club: string; gender: string; size: string; qty: number }): string {
+  const club = String(r.club ?? "").trim() || "미분류";
+  const g = String(r.gender ?? "").trim();
+  const size = String(r.size ?? "").trim() || "미분류";
+  if (g === "공용") {
+    return `${club} · 공용 ${size} · ${r.qty}개`;
+  }
+  if (g) {
+    return `${club} · ${g} ${size} · ${r.qty}개`;
+  }
+  return `${club} · ${size} · ${r.qty}개`;
+}
+
+const GENDER_ROW_ORDER: Array<"여" | "남" | "공용"> = ["여", "남", "공용"];
+
 export function ClubSizeSummaryTable({
   rows,
+  normRows,
 }: {
   rows: Array<{ club: string; gender: string; size: string; qty: number }>;
+  /** 필터·제외가 반영된 정규화 행(중복·셀 상태용) */
+  normRows: any[];
 }) {
+  const dupByClub = useMemo(() => duplicateSummaryByClub(normRows ?? []), [normRows]);
+  const statusByCell = useMemo(() => buildCellStatusMap(normRows ?? []), [normRows]);
+
+  const matrixBlocks = useMemo(() => {
+    if (rows.length === 0) return [];
+    const by = groupClubAggRows(rows);
+    const clubs = Array.from(by.keys()).sort((a, b) => a.localeCompare(b, "ko"));
+    return clubs.map((club) => {
+      const clubRows = by.get(club) ?? [];
+      const totalQty = clubRows.reduce((s, r) => s + r.qty, 0);
+      const sizes = Array.from(new Set(clubRows.map((r) => r.size))).sort(compareSizeForMatrix);
+      const gSeen = new Set<"여" | "남" | "공용">();
+      for (const r of clubRows) gSeen.add(rowKeyGenderForAgg(r.gender));
+      const rowKeys = GENDER_ROW_ORDER.filter((g) => gSeen.has(g));
+      const qtyMap = new Map<string, number>();
+      for (const r of clubRows) {
+        const gk = rowKeyGenderForAgg(r.gender);
+        const k = `${gk}\0${r.size}`;
+        qtyMap.set(k, (qtyMap.get(k) ?? 0) + r.qty);
+      }
+      return {
+        club,
+        clubRows,
+        totalQty,
+        sizes,
+        rowKeys,
+        qtyMap,
+        headline: clubAggMatrixHeadline(club, clubRows, totalQty, dupByClub.get(club)),
+      };
+    });
+  }, [rows, dupByClub]);
+
   if (rows.length === 0) return null;
+
   return (
-    <section className="size-analysis-card size-analysis-club-size-card">
-      <h3>8) 클럽/사이즈 집계</h3>
-      <p className="size-analysis-muted size-analysis-club-size-hint">
+    <section className="size-analysis-card size-analysis-club-size-card size-analysis-club-agg-section">
+      <h3>8) 클럽/성별/사이즈 집계</h3>
+      <p className="size-analysis-muted size-analysis-club-size-hint size-analysis-club-agg-hint">
         수량은 자동·검토·수정·미분류를 모두 합산하며, 클럽/성별/사이즈 기준으로 집계합니다.
       </p>
-      <div className="size-analysis-table-wrap">
-        <table className="size-analysis-table size-analysis-table--club-size">
-          <thead>
-            <tr>
-              <th>클럽</th>
-              <th>성별</th>
-              <th>사이즈</th>
-              <th>수량</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, idx) => {
-              return (
-                <tr key={`${r.club}-${r.gender ?? ""}-${r.size}-${idx}`}>
-                  <td data-label="클럽">{r.club}</td>
-                  <td data-label="성별">{r.gender ?? ""}</td>
-                  <td data-label="사이즈">{r.size}</td>
-                  <td data-label="수량">{r.qty}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="size-analysis-club-agg-compact--mobile" aria-label="집계(요약)">
+        {rows.map((r, idx) => (
+          <div key={`${r.club}-${r.gender ?? ""}-${r.size}-${idx}`} className="size-analysis-club-agg-line">
+            {clubAggMobileLine(r)}
+          </div>
+        ))}
+      </div>
+      <div className="size-analysis-club-agg-mtx--desktop" aria-label="집계(클럽별 매트릭스)">
+        {matrixBlocks.map((b) => (
+          <div key={b.club} className="size-analysis-club-agg-mtx-block">
+            <p className="size-analysis-club-agg-mtx-clubline">{b.headline}</p>
+            <div className="size-analysis-club-agg-mtx-scroll">
+              <table className="size-analysis-club-agg-mtx">
+                <thead>
+                  <tr>
+                    <th className="size-analysis-club-agg-mtx-corner" scope="col" aria-label="성별·사이즈">
+                      {"\u200b"}
+                    </th>
+                    {b.sizes.map((sz) => (
+                      <th key={sz} scope="col">
+                        {sz}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {b.rowKeys.map((gk) => (
+                    <tr key={gk}>
+                      <th className="size-analysis-club-agg-mtx-gh" scope="row">
+                        {gk}
+                      </th>
+                      {b.sizes.map((sz) => {
+                        const q = b.qtyMap.get(`${gk}\0${sz}`) ?? 0;
+                        const meta = statusByCell.get(`${b.club}\0${gk}\0${sz}`) ?? {
+                          hasReview: false,
+                          hasUnres: false,
+                          hasCorrected: false,
+                        };
+                        const stBits: string[] = [];
+                        if (meta.hasReview) stBits.push("검토필요");
+                        if (meta.hasUnres) stBits.push("미분류");
+                        if (meta.hasCorrected) stBits.push("수정완료");
+                        const stLabel = stBits.length ? stBits.join(", ") : undefined;
+                        let stateClass = "";
+                        if (meta.hasReview) stateClass = "size-analysis-club-agg-mtx-cell--review";
+                        else if (meta.hasUnres) stateClass = "size-analysis-club-agg-mtx-cell--unres";
+                        else if (meta.hasCorrected) stateClass = "size-analysis-club-agg-mtx-cell--corrected";
+                        const cellClass = stateClass;
+                        const show = q > 0 ? String(q) : "";
+                        return (
+                          <td
+                            key={`${gk}-${sz}`}
+                            className={cellClass}
+                            title={stLabel}
+                            aria-label={stLabel ? `${gk}·${sz} ${show || "0"} (${stLabel})` : show ? `${gk}·${sz} ${show}` : undefined}
+                          >
+                            {show}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
       </div>
     </section>
   );

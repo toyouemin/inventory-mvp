@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { detectHeaderRow, detectStructureType, suggestFieldMapping } from "./structure";
-import { parseRepeatedSlots, parseSingleRowPerson, parseSizeMatrix } from "./strategies";
+import { parseRepeatedSlots, parseSingleRowPerson, parseSizeMatrix, parseUnknownManualItem } from "./strategies";
 import type { FieldMapping, NormalizedRow, StructureType, WorkbookSnapshot } from "./types";
 
 function sheetOrThrow(snapshot: WorkbookSnapshot, sheetName: string) {
@@ -119,7 +119,15 @@ export async function runAnalysis(jobId: string) {
   if (mappingJson.structureType === "single_row_person") rows = parseSingleRowPerson(jobId, sheet, mappingJson);
   else if (mappingJson.structureType === "repeated_slots") rows = parseRepeatedSlots(jobId, sheet, mappingJson);
   else if (mappingJson.structureType === "size_matrix") rows = parseSizeMatrix(jobId, sheet, mappingJson);
-  else throw new Error("unknown 구조는 사용자 수동 매핑 확정 후 지원됩니다.");
+  else if (mappingJson.structureType === "unknown") {
+    const f = mappingJson.fields;
+    if (f.name === undefined || f.club === undefined || f.item === undefined) {
+      throw new Error("unknown 구조에서는 이름·클럽·주문내용(품목) 열이 모두 지정된 뒤 매핑을 저장해 주세요.");
+    }
+    rows = parseUnknownManualItem(jobId, sheet, mappingJson);
+  } else {
+    throw new Error("지원하지 않는 structureType 입니다.");
+  }
 
   await prisma.sizeAnalysisRow.deleteMany({ where: { jobId } });
   if (rows.length > 0) {

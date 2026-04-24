@@ -9,6 +9,53 @@ type Mapping = {
   slotGroups?: Array<Record<string, number | undefined>>;
 };
 
+/** 화면 표시 전용(내부 API/DB 값은 영문 유지) */
+const STRUCTURE_TYPE_LABEL: Record<Mapping["structureType"], string> = {
+  single_row_person: "사람별 1행",
+  repeated_slots: "반복 슬롯형",
+  size_matrix: "사이즈표형",
+  unknown: "직접 매핑",
+};
+
+const FIELD_ROLE_LABEL: Record<string, string> = {
+  club: "클럽",
+  name: "이름",
+  gender: "성별",
+  size: "사이즈",
+  qty: "수량",
+  item: "주문내용",
+  note: "비고",
+};
+
+const STATUS_FILTER_OPTIONS = ["all", "auto_confirmed", "needs_review", "unresolved", "corrected", "excluded"] as const;
+
+const STATUS_FILTER_LABEL: Record<(typeof STATUS_FILTER_OPTIONS)[number], string> = {
+  all: "전체",
+  auto_confirmed: "자동확정",
+  needs_review: "검토필요",
+  unresolved: "미분류",
+  corrected: "수정완료",
+  excluded: "제외",
+};
+
+const PARSE_STATUS_LABEL: Record<string, string> = {
+  auto_confirmed: "자동확정",
+  needs_review: "검토필요",
+  unresolved: "미분류",
+  corrected: "수정완료",
+  excluded: "제외",
+};
+
+function labelParseStatus(v: string | null | undefined): string {
+  if (v == null || v === "") return "";
+  return PARSE_STATUS_LABEL[v] ?? v;
+}
+
+function labelStructureType(v: string | null | undefined): string {
+  if (v == null || v === "") return "";
+  return STRUCTURE_TYPE_LABEL[v as Mapping["structureType"]] ?? v;
+}
+
 export function SizeAnalysisPage() {
   const [jobId, setJobId] = useState<string>("");
   const [sheets, setSheets] = useState<Array<{ name: string; rowCount: number }>>([]);
@@ -225,7 +272,7 @@ export function StructureDetectionPanel({
       {detectResult ? (
         <div className="size-analysis-grid">
           <div>추천 헤더 행: {detectResult.headerRowIndex}</div>
-          <div>추천 구조 유형: {detectResult.structureType}</div>
+          <div>추천 구조 유형: {labelStructureType(detectResult.structureType)}</div>
         </div>
       ) : null}
     </section>
@@ -255,10 +302,10 @@ export function FieldMappingEditor({
             value={mapping.structureType}
             onChange={(e) => onChange({ ...mapping, structureType: e.target.value as Mapping["structureType"] })}
           >
-            <option value="single_row_person">single_row_person</option>
-            <option value="repeated_slots">repeated_slots</option>
-            <option value="size_matrix">size_matrix</option>
-            <option value="unknown">unknown</option>
+            <option value="single_row_person">{STRUCTURE_TYPE_LABEL.single_row_person}</option>
+            <option value="repeated_slots">{STRUCTURE_TYPE_LABEL.repeated_slots}</option>
+            <option value="size_matrix">{STRUCTURE_TYPE_LABEL.size_matrix}</option>
+            <option value="unknown">{STRUCTURE_TYPE_LABEL.unknown}</option>
           </select>
         </label>
         <label>
@@ -271,7 +318,7 @@ export function FieldMappingEditor({
         </label>
         {roles.map((role) => (
           <label key={role}>
-            {role}
+            {FIELD_ROLE_LABEL[role] ?? role}
             <input
               type="number"
               value={mapping.fields[role] ?? ""}
@@ -299,6 +346,7 @@ export function AnalysisSummaryCards({ summary }: { summary: any }) {
     ["자동확정", summary.auto_confirmed],
     ["검토필요", summary.needs_review],
     ["미분류", summary.unresolved],
+    ["수정완료", summary.corrected],
     ["제외", summary.excluded],
     ["원본 총수량", summary.originalTotalQty],
     ["최종 집계 수량", summary.aggregatedTotalQty],
@@ -320,18 +368,18 @@ export function AnalysisSummaryCards({ summary }: { summary: any }) {
 }
 
 export function AnalysisStatusFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const options = ["all", "auto_confirmed", "needs_review", "unresolved", "corrected", "excluded"];
   return (
     <section className="size-analysis-card">
       <h3>6) 상태 필터</h3>
       <div className="size-analysis-filter-row">
-        {options.map((opt) => (
+        {STATUS_FILTER_OPTIONS.map((opt) => (
           <button
             key={opt}
             className={`btn ${value === opt ? "btn-primary" : "btn-secondary"}`}
             onClick={() => void onChange(opt)}
+            type="button"
           >
-            {opt}
+            {STATUS_FILTER_LABEL[opt]}
           </button>
         ))}
       </div>
@@ -366,7 +414,7 @@ export function AnalysisRowsTable({ rows }: { rows: any[] }) {
                 <td data-label="성별">{r.genderNormalized ?? r.genderRaw ?? ""}</td>
                 <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
                 <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
-                <td data-label="상태">{r.parseStatus}</td>
+                <td data-label="상태">{labelParseStatus(r.parseStatus)}</td>
                 <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>
               </tr>
             ))}

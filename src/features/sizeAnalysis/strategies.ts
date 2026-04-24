@@ -1,4 +1,11 @@
-import { extractSizeGenderQty, normalizeGender, parseQty, preprocessCell } from "./normalize";
+import {
+  extractSizeGenderQty,
+  normalizeGender,
+  parseManualItemOrderSegment,
+  parseQty,
+  preprocessCell,
+  splitOrderItemSegments,
+} from "./normalize";
 import type { FieldMapping, NormalizedRow, SheetSnapshot } from "./types";
 
 function cell(row: string[], index?: number): string | undefined {
@@ -93,6 +100,120 @@ export function parseRepeatedSlots(jobId: string, sheet: SheetSnapshot, mapping:
     });
   }
   return out;
+}
+
+/**
+ * structureType: unknown + 사용자가 이름/클럽/item(주문내용) 열을 지정한 경우.
+ * item 셀을 `/, 쉼표, 줄바꿈`으로 나눈 뒤 각 토막을 주문 1행으로 정규화합니다.
+ */
+export function parseUnknownManualItem(jobId: string, sheet: SheetSnapshot, mapping: FieldMapping): NormalizedRow[] {
+  const out: NormalizedRow[] = [];
+  const nameCol = mapping.fields.name;
+  const clubCol = mapping.fields.club;
+  const itemCol = mapping.fields.item;
+  if (nameCol === undefined || clubCol === undefined || itemCol === undefined) {
+    return out;
+  }
+
+  const start = mapping.headerRowIndex + 1;
+  for (let i = start; i < sheet.rows.length; i += 1) {
+    const row = sheet.rows[i] ?? [];
+    const nameRaw = cell(row, nameCol);
+    const clubRaw = cell(row, clubCol);
+    const itemText = cell(row, itemCol) ?? "";
+    const allEmpty = !preprocessCell(nameRaw) && !preprocessCell(clubRaw) && !preprocessCell(itemText);
+    if (allEmpty) {
+      out.push({
+        jobId,
+        sourceSheet: sheet.name,
+        sourceRowIndex: i,
+        memberNameRaw: nameRaw,
+        clubNameRaw: clubRaw,
+        itemRaw: itemText,
+        userCorrected: false,
+        excluded: true,
+        parseStatus: "excluded",
+        parseConfidence: 1,
+        parseReason: "빈 행 제외",
+      });
+      continue;
+    }
+    if (!preprocessCell(itemText)) {
+      out.push({
+        jobId,
+        sourceSheet: sheet.name,
+        sourceRowIndex: i,
+        sourceGroupIndex: 0,
+        memberNameRaw: nameRaw,
+        clubNameRaw: clubRaw,
+        itemRaw: itemText,
+        clubNameNormalized: preprocessCell(clubRaw),
+        parseStatus: "needs_review",
+        parseConfidence: 0.32,
+        parseReason: "주문내용(품목) 셀 없음",
+        userCorrected: false,
+        excluded: false,
+      });
+      continue;
+    }
+
+    const segments = splitOrderItemSegments(itemText);
+    if (segments.length === 0) {
+      out.push({
+        jobId,
+        sourceSheet: sheet.name,
+        sourceRowIndex: i,
+        sourceGroupIndex: 0,
+        memberNameRaw: nameRaw,
+        clubNameRaw: clubRaw,
+        itemRaw: itemText,
+        clubNameNormalized: preprocessCell(clubRaw),
+        parseStatus: "unresolved",
+        parseConfidence: 0.1,
+        parseReason: "주문 토막을 나눌 수 없음",
+        userCorrected: false,
+        excluded: false,
+      });
+      continue;
+    }
+
+    segments.forEach((seg, groupIndex) => {
+      const piece = parseManualItemOrderSegment(seg);
+      const gRaw = koreanGenderAtStart(seg) ?? piece.gender;
+      out.push({
+        jobId,
+        sourceSheet: sheet.name,
+        sourceRowIndex: i,
+        sourceGroupIndex: groupIndex,
+        clubNameRaw: clubRaw,
+        memberNameRaw: nameRaw,
+        genderRaw: gRaw,
+        itemRaw: seg,
+        sizeRaw: seg,
+        qtyRaw: piece.qty != null ? String(piece.qty) : seg,
+        clubNameNormalized: preprocessCell(clubRaw),
+        genderNormalized: piece.gender ?? normalizeGender(seg),
+        standardizedSize: piece.size,
+        qtyParsed: piece.qty,
+        parseStatus: piece.status,
+        parseConfidence: piece.confidence,
+        parseReason: piece.reason,
+        userCorrected: false,
+        excluded: false,
+        metaJson: { strategy: "unknown_manual_item" as const },
+      });
+    });
+  }
+  return out;
+}
+
+function koreanGenderAtStart(raw: string | undefined): string | undefined {
+  if (raw == null) return undefined;
+  const t = String(raw).trim();
+  if (/^남/i.test(t)) return "남";
+  if (/^여/i.test(t)) return "여";
+  if (/^공용/i.test(t)) return "공용";
+  return undefined;
 }
 
 export function parseSizeMatrix(jobId: string, sheet: SheetSnapshot, mapping: FieldMapping): NormalizedRow[] {

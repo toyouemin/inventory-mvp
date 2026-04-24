@@ -13,7 +13,8 @@
     "verify:thp": "npx tsx scripts/verify-thp-sku.mts",
     "verify:bundae-oqm": "npx tsx scripts/verify-bundae-oqm-pipeline.mts",
     "debug:stock-e2e": "node scripts/stock-adjust-e2e.mjs",
-    "test:amount-to-korean": "npx tsx src/features/transactionStatement/amountToKoreanText.test.ts"
+    "test:amount-to-korean": "npx tsx src/features/transactionStatement/amountToKoreanText.test.ts",
+    "test:size-analysis-unknown": "npx tsx src/features/sizeAnalysis/unknownManualItem.test.mts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",

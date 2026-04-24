@@ -1,4 +1,4 @@
-import type { ParsePiece } from "./types";
+import type { ParsePiece, ParseStatus } from "./types";
 
 const GENDER_RULES: Array<{ re: RegExp; value: "남" | "여" | "공용" }> = [
   { re: /\b(남|남자|남성|MALE|MAN)\b/i, value: "남" },
@@ -120,5 +120,107 @@ export function parseQty(raw: string | null | undefined): number | undefined {
   if (!m) return undefined;
   const n = Number(m[1]);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * item 열 "주문내용" 텍스트를 개별 주문 토막으로 나눕니다(슬래시, 쉼표, 줄바꿈).
+ */
+export function splitOrderItemSegments(itemText: string | null | undefined): string[] {
+  if (itemText == null) return [];
+  return String(itemText)
+    .split(/(?:\r\n|\r|\n|[/／]|[,，])/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+const ALPHA_SIZE_TOKEN = String.raw`4XL|3XL|2XL|XXL|XXXL|XXXXL|XL|XS|FREE|L|M|S`;
+const RE_ALPHA_SIZE_QTY = new RegExp(
+  `^\\s*(${ALPHA_SIZE_TOKEN})\\s+(\\d{1,4})\\s*(?:장|개|EA|PCS)?\\s*$`,
+  "i"
+);
+const RE_GENDER_NUMSIZE_QTY = /^\s*(남|여|공용)\s*([0-9]{2,3})\s+(\d{1,4})\s*(?:장|개|EA|PCS)?\s*$/i;
+const RE_NUM_NUM = /^\s*([0-9]{2,3})\s+(\d{1,4})\s*(?:장|개|EA|PCS)?\s*$/;
+const RE_GENDER_ALPHA_QTY = new RegExp(
+  `^\\s*(남|여|공용)\\s*(${ALPHA_SIZE_TOKEN})\\s+(\\d{1,4})\\s*(?:장|개|EA|PCS)?\\s*$`,
+  "i"
+);
+
+/**
+ * unknown 구조 · 수동 item 텍스트 파싱용: 토막 한 덩이에서 사이즈/성별/수량을 판정합니다.
+ */
+export function parseManualItemOrderSegment(raw: string | null | undefined): ParsePiece {
+  const t = String(raw ?? "").trim();
+  if (!t) {
+    return { confidence: 0, reason: "빈 토막", status: "unresolved" as ParseStatus };
+  }
+
+  let m = t.match(RE_GENDER_NUMSIZE_QTY);
+  if (m) {
+    const g = m[1] as string;
+    const sizeNorm = normalizeSize(m[2]);
+    const q = Number(m[3]);
+    const gNorm: "남" | "여" | "공용" = g === "남" ? "남" : g === "여" ? "여" : "공용";
+    if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
+      return {
+        gender: gNorm,
+        size: sizeNorm,
+        qty: q,
+        confidence: 0.94,
+        reason: "수동: 성별+숫자사이즈+수량",
+        status: "auto_confirmed",
+      };
+    }
+  }
+
+  m = t.match(RE_GENDER_ALPHA_QTY);
+  if (m) {
+    const g = m[1] as string;
+    const rawSize = m[2];
+    const q = Number(m[3]);
+    const sizeNorm = normalizeSize(rawSize);
+    const gNorm: "남" | "여" | "공용" = g === "남" ? "남" : g === "여" ? "여" : "공용";
+    if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || (ALPHA_SIZES as readonly string[]).includes(sizeNorm)) && Number.isFinite(q) && q > 0) {
+      return {
+        gender: gNorm,
+        size: sizeNorm,
+        qty: q,
+        confidence: 0.9,
+        reason: "수동: 성별+알파사이즈+수량",
+        status: "auto_confirmed",
+      };
+    }
+  }
+
+  m = t.match(RE_ALPHA_SIZE_QTY);
+  if (m) {
+    const rawSize = m[1];
+    const q = Number(m[2]);
+    const sizeNorm = normalizeSize(rawSize);
+    if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || (ALPHA_SIZES as readonly string[]).includes(sizeNorm)) && Number.isFinite(q) && q > 0) {
+      return { size: sizeNorm, qty: q, confidence: 0.9, reason: "수동: 알파사이즈+수량", status: "auto_confirmed" };
+    }
+  }
+
+  m = t.match(RE_NUM_NUM);
+  if (m) {
+    const a = m[1];
+    const b = m[2];
+    const sizeNorm = normalizeSize(a);
+    const q = Number(b);
+    if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
+      if (q > 200) {
+        return {
+          size: sizeNorm,
+          qty: q,
+          confidence: 0.4,
+          reason: "수량이 비정상적으로 큼(검토)",
+          status: "needs_review",
+        };
+      }
+      return { size: sizeNorm, qty: q, confidence: 0.9, reason: "수동: 숫자사이즈+수량", status: "auto_confirmed" };
+    }
+  }
+
+  return extractSizeGenderQty(t);
 }
 

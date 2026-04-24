@@ -139,10 +139,9 @@ function summarize(rows: NormalizedRow[]) {
   for (const row of rows) {
     counts[row.parseStatus] += 1;
     const qty = row.qtyParsed ?? 0;
-    if (!row.excluded) {
-      originalTotalQty += qty;
-      aggregatedTotalQty += qty;
-    }
+    // 원본 총수량은 중복/제외 여부와 무관하게 모든 유효 행 qty 합
+    originalTotalQty += qty;
+    if (!row.excluded) aggregatedTotalQty += qty;
   }
   return {
     ...counts,

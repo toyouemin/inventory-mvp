@@ -31,8 +31,8 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
   for (const row of rows) {
     statusCounts[row.parseStatus] += 1;
     const qty = row.qtyParsed ?? 0;
+    originalTotalQty += qty;
     if (!row.excluded) {
-      originalTotalQty += qty;
       aggregatedTotalQty += qty;
       const club = row.clubNameNormalized || "미분류";
         const gender = String(row.genderNormalized ?? "").trim();

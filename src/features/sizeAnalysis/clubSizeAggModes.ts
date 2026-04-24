@@ -1,9 +1,10 @@
 /**
- * 사이즈 분석 — 클럽/성별/사이즈 집계: 총 수량 / 중복자(동일 시트·행+동일 주문) / 중복 제외(중복 태그 제거)
+ * 사이즈 분석 — 클럽/성별/사이즈 집계: 총 수량 / 중복자(duplicateGroupKey) / 중복 제외(중복 태그 제거)
  * rows 원본은 변경하지 않습니다.
  */
 
 import { buildColumnSizesForClub } from "./clubAggMatrixColumns";
+import { duplicateGroupKeyFromRow, normalizeClubForDuplicate } from "./duplicateKeyNormalize";
 import { matrixDisplayFromSizeFields } from "./matrixSizeDisplay";
 
 export type ClubSizeAggMode = "total" | "duplicate" | "deduped";
@@ -35,23 +36,47 @@ function personNameKeyForDupGroup(r: { memberNameRaw?: unknown; memberName?: unk
     .replace(/\s+/g, " ");
 }
 
-/** 동일 엑셀 행(시트+sourceRow) 안에서 “같은 주문”이 두 번인지: 클럽·이름·사이즈·성별·수량 */
-function orderLineSigForDuplicate(r: any): string {
-  return [
-    normClubFromNormRow(r),
-    personNameKeyForDupGroup(r),
-    String(r.standardizedSize ?? r.sizeRaw ?? "")
-      .trim()
-      .replace(/\s+/g, " "),
-    String(r.genderNormalized ?? r.genderRaw ?? "")
-      .trim()
-      .replace(/\s+/g, " "),
-    String(rowQtyParsed(r)),
-  ].join("\0");
+function personDupKey(r: any): string | null {
+  const name = personNameKeyForDupGroup(r);
+  if (!name) return null;
+  const club = normClubFromNormRow(r);
+  return `${club}\0${name}`;
 }
 
-function sameRowAndOrderKey(r: any): string {
-  return [r.sourceSheet ?? "", String(r.sourceRowIndex ?? ""), orderLineSigForDuplicate(r)].join("\0");
+function sizeLine(standardizedSize: string | null | undefined): "M" | "W" | null {
+  const s = String(standardizedSize ?? "").trim().toUpperCase();
+  if (/^M\d{2,3}$/.test(s)) return "M";
+  if (/^W\d{2,3}$/.test(s)) return "W";
+  return null;
+}
+
+function normalizeBinaryGender(raw: string | null | undefined): "남" | "여" | null {
+  const t = String(raw ?? "").trim();
+  if (!t) return null;
+  if (/^(남|남자|m)$/i.test(t)) return "남";
+  if (/^(여|여자|w)$/i.test(t)) return "여";
+  return null;
+}
+
+function preferredLineForRow(r: any): "M" | "W" | null {
+  const line = sizeLine(r.standardizedSize);
+  if (line) return line;
+  const raw = String(r.sizeRaw ?? "").trim();
+  if (/^남|남자/i.test(raw)) return "M";
+  if (/^여|여자/i.test(raw)) return "W";
+  return null;
+}
+
+function pickKeepEntry(list: Array<{ r: any; i: number }>): { r: any; i: number } {
+  const g = normalizeBinaryGender(list[0]?.r?.genderNormalized ?? list[0]?.r?.genderRaw);
+  if (g === "남") {
+    const hit = list.find((x) => preferredLineForRow(x.r) === "M");
+    if (hit) return hit;
+  } else if (g === "여") {
+    const hit = list.find((x) => preferredLineForRow(x.r) === "W");
+    if (hit) return hit;
+  }
+  return list[0]!;
 }
 
 export function rowQtyParsed(r: any): number {
@@ -63,9 +88,16 @@ export function rowQtyParsed(r: any): number {
  * 정규화 행 배열에서 행을 유일히 가리킬 키(DB id 우선, 없으면 배열 인덱스).
  * (과거 `src:sourceRow`는 한 원본 행→여러 norm 행이 같은 키로 묶이는 오류가 있음)
  */
-export function stableRowKeyForDup(r: any, rowIndex: number): string {
+export function stableRowId(r: any, rowIndex: number): string {
   if (r != null && r.id != null && String(r.id) !== "") return String(r.id);
-  return `ix:${rowIndex}`;
+  const src = `${r?.sourceSheet ?? ""}:${r?.sourceRowIndex ?? ""}:${r?.sourceGroupIndex ?? ""}`;
+  const sig = `${normClubFromNormRow(r)}:${personNameKeyForDupGroup(r)}:${String(r?.standardizedSize ?? r?.sizeRaw ?? "")}:${rowQtyParsed(r)}`;
+  return `row:${src}:${sig}:${rowIndex}`;
+}
+
+/** 호환용 alias (기존 호출부 유지) */
+export function stableRowKeyForDup(r: any, rowIndex: number): string {
+  return stableRowId(r, rowIndex);
 }
 
 export function rowKeyGenderForAgg(g: string | null | undefined): "여" | "남" | "공용" {
@@ -166,7 +198,7 @@ export function buildAggRowsDuplicate(rows: any[], duplicateRowIds: Set<string>)
   const detailMap = new Map<string, AggRow>();
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
-    if (!duplicateRowIds.has(stableRowKeyForDup(r, i))) continue;
+    if (!duplicateRowIds.has(stableRowId(r, i))) continue;
     const club = normClubFromNormRow(r);
     const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
@@ -192,22 +224,14 @@ export function compareRowsBySourceThenIndex(a: { r: any; i: number }, b: { r: a
   return a.i - b.i;
 }
 
-/** 동일 (시트+행+주문시그) 내 둘 이상 — 앞에 있는 슬롯·행이 대표, 뒤가 중복 */
-function compareRowsForDuplicateTie(a: { r: any; i: number }, b: { r: any; i: number }): number {
-  const ga = a.r.sourceGroupIndex != null && a.r.sourceGroupIndex !== "" ? Number(a.r.sourceGroupIndex) : 0;
-  const gb = b.r.sourceGroupIndex != null && b.r.sourceGroupIndex !== "" ? Number(b.r.sourceGroupIndex) : 0;
-  if (Number.isFinite(ga) && Number.isFinite(gb) && ga !== gb) return ga - gb;
-  return a.i - b.i;
-}
-
 /**
- * `analyzeDuplicateRows`로 표시한 **동일 엑셀행·동일주문** 중복 행만 수량에서 제외 (나머지는 전부 합산)
+ * `analyzeDuplicateRows`로 표시한 **동일 클럽+이름(중복 key)** 중복 행만 수량에서 제외 (나머지는 전부 합산)
  */
 export function buildAggRowsDedupedFirst(rows: any[], duplicateRowIds: Set<string>): AggRow[] {
   const detailMap = new Map<string, AggRow>();
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
-    if (duplicateRowIds.has(stableRowKeyForDup(r, i))) continue;
+    if (duplicateRowIds.has(stableRowId(r, i))) continue;
     const club = normClubFromNormRow(r);
     const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
@@ -245,37 +269,35 @@ export type DuplicateAnalysis = {
 };
 
 /**
- * 중복(중복자): **다른** 엑셀행이면 서로 다른 주문으로 모두 정상(사람+사이즈 같아도 2주문 가능).
- * 동일 `sourceSheet` + `sourceRowIndex`에서 동일 `orderLineSig`(클럽·이름·사이즈·성별·수량)이
- * 2행 이상이면(슬롯/파싱으로 같은 줄이 두 번) 둘째부터 중복.
- * - duplicateRowIds: 중복으로 표시하는 행(뱃지·엑셀)
- * - duplicatePersonCount: 중복 **행** 수(기존 필드명 유지, UI에서 건·명 표시)
- * - dupByClub: 클럽별 중복 **건수** / 중복 **수량** 합
+ * 중복 기준: key = `duplicateGroupKeyFromRow` (normalizeClub + "::" + normalizeName, 원본 raw 정규화만)
+ * - 같은 key 그룹이면 1행만 정상, 나머지 중복
+ * - 유지행 선택: 성별(남/여)에 맞는 M/W·남/여 계열 우선, 없으면 입력 첫 행
  */
 export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
-  const byOrderKey = new Map<string, { r: any; i: number }[]>();
+  const byPerson = new Map<string, { r: any; i: number }[]>();
+  const duplicateRowIds = new Set<string>();
+
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
-    if (r.excluded) continue;
-    const k = sameRowAndOrderKey(r);
-    if (!byOrderKey.has(k)) byOrderKey.set(k, []);
-    byOrderKey.get(k)!.push({ r, i });
+    const pk = personDupKey(r);
+    if (!pk) continue;
+    if (!byPerson.has(pk)) byPerson.set(pk, []);
+    byPerson.get(pk)!.push({ r, i });
   }
 
-  const duplicateRowIds = new Set<string>();
-  for (const list of byOrderKey.values()) {
+  for (const list of byPerson.values()) {
     if (list.length < 2) continue;
-    const sorted = [...list].sort(compareRowsForDuplicateTie);
-    for (let j = 1; j < sorted.length; j += 1) {
-      const { r, i } = sorted[j]!;
-      duplicateRowIds.add(stableRowKeyForDup(r, i));
+    const keep = pickKeepEntry(list);
+    for (const x of list) {
+      if (x.i !== keep.i) {
+        duplicateRowIds.add(stableRowId(x.r, x.i));
+      }
     }
   }
 
   let totalQty = 0;
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
-    if (r.excluded) continue;
     totalQty += rowQtyParsed(r);
   }
 
@@ -283,8 +305,7 @@ export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
   const dupByClub = new Map<string, { persons: number; sheets: number }>();
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
-    if (r.excluded) continue;
-    if (!duplicateRowIds.has(stableRowKeyForDup(r, i))) continue;
+    if (!duplicateRowIds.has(stableRowId(r, i))) continue;
     const q = rowQtyParsed(r);
     duplicateQtyTotal += q;
     const club = normClubFromNormRow(r);
@@ -296,6 +317,42 @@ export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
 
   const normalQty = totalQty - duplicateQtyTotal;
   const duplicatePersonCount = duplicateRowIds.size;
+
+  console.log(
+    "[size-analysis][전체] originalTotalQty=",
+    totalQty,
+    "duplicateQty=",
+    duplicateQtyTotal,
+    "dedupedQty=",
+    normalQty
+  );
+
+  const targetClubKey = "88민턴";
+  const clubRows = rows
+    .map((r, i) => ({ r, i }))
+    .filter(
+      ({ r }) =>
+        normalizeClubForDuplicate(String(r.clubNameRaw ?? r.clubNameNormalized ?? "")) === targetClubKey
+    );
+  if (clubRows.length > 0) {
+    const clubTotalQty = clubRows.reduce((s, x) => s + rowQtyParsed(x.r), 0);
+    const clubDupRows = clubRows.filter(({ r, i }) => duplicateRowIds.has(stableRowId(r, i)));
+    const clubDupQty = clubDupRows.reduce((s, x) => s + rowQtyParsed(x.r), 0);
+    const clubNormalQty = clubTotalQty - clubDupQty;
+    console.log("[size-analysis][88민턴] totalQty=", clubTotalQty);
+    console.log("[size-analysis][88민턴] duplicateQty=", clubDupQty);
+    console.log("[size-analysis][88민턴] dedupedQty=", clubNormalQty);
+    console.table(
+      clubDupRows.map(({ r }) => ({
+        originalRowNumber: (r.sourceRowIndex ?? 0) + 1,
+        club: String(r.clubNameRaw ?? r.clubNameNormalized ?? "").trim() || "미분류",
+        name: String(r.memberNameRaw ?? r.memberName ?? "").trim() || "—",
+        gender: String(r.genderNormalized ?? r.genderRaw ?? "").trim() || "—",
+        size: String(r.standardizedSize ?? r.sizeRaw ?? "").trim() || "—",
+      }))
+    );
+  }
+
   return {
     duplicateRowIds,
     dupByClub,

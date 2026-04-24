@@ -5,6 +5,7 @@ const EXCLUDE_REASON_USER_LABEL: Record<string, string> = {
   duplicate_gender_filter: "중복 (성별 기준 필터)",
   duplicate_same_size: "중복 (동일 사이즈)",
   duplicate_first_row_kept: "중복 (대표값 유지)",
+  duplicate_person_group: "중복 (동일 클럽·이름 그룹)",
 };
 
 const EXCLUDE_REASON_DETAIL_LABEL: Record<string, string> = {
@@ -12,6 +13,7 @@ const EXCLUDE_REASON_DETAIL_LABEL: Record<string, string> = {
   duplicate_same_size: "동일 사이즈",
   /** first_row + 동일 사이즈 메커니즘을 둘 다 표기할 때 reason과 조합 */
   first_row_keeper: "대표값 유지",
+  same_club_same_name_keep_one: "같은 클럽·이름에서 1건만 유지",
 };
 
 /**

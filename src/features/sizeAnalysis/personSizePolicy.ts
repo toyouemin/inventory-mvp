@@ -1,4 +1,6 @@
+import { labelExcludeForDisplay } from "./excludeReasonLabels";
 import type { NormalizedRow } from "./types";
+import { duplicateGroupKeyFromRow } from "./duplicateKeyNormalize";
 import { extractSizeGenderQty, normalizeGender, normalizeSize } from "./normalize";
 
 const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115", "120"]);
@@ -127,11 +129,97 @@ export function normalizePersonWithFallback(sizeRaw: string | undefined, genderR
   return primary;
 }
 
+function mwLine(standardizedSize: string | undefined): "M" | "W" | null {
+  if (!standardizedSize) return null;
+  if (/^M\d{2,3}$/i.test(standardizedSize)) return "M";
+  if (/^W\d{2,3}$/i.test(standardizedSize)) return "W";
+  return null;
+}
+
+function normalizeBinaryGender(raw: string | undefined): "남" | "여" | null {
+  const t = String(raw ?? "").trim();
+  if (!t) return null;
+  if (/^(남|남자|m)$/i.test(t)) return "남";
+  if (/^(여|여자|w)$/i.test(t)) return "여";
+  const g = normalizeGender(t);
+  return g === "남" || g === "여" ? g : null;
+}
+
+function lineForKeepPreference(r: NormalizedRow): "M" | "W" | null {
+  const fromStd = mwLine(r.standardizedSize);
+  if (fromStd) return fromStd;
+  const raw = String(r.sizeRaw ?? "").trim();
+  if (/^남|남자/i.test(raw)) return "M";
+  if (/^여|여자/i.test(raw)) return "W";
+  return null;
+}
+
+function pickKeepIndex(indices: number[], rows: NormalizedRow[]): number {
+  const first = rows[indices[0]!]!;
+  const g = normalizeBinaryGender(first.genderNormalized ?? first.genderRaw);
+  if (g === "남") {
+    const want = indices.find((i) => lineForKeepPreference(rows[i]!) === "M");
+    if (want != null) return want;
+  } else if (g === "여") {
+    const want = indices.find((i) => lineForKeepPreference(rows[i]!) === "W");
+    if (want != null) return want;
+  }
+  return indices[0]!;
+}
+
+function personGroupKeyForDuplicate(r: NormalizedRow): string | null {
+  return duplicateGroupKeyFromRow(r);
+}
+
 /**
- * “클럽+이름+동일 사이즈” **사람 기준** 중복은 적용하지 않습니다.
- * 동일 원본 셀(시트+행)에서 **완전히 같은 주문 시그니처**가 둘 이상이면
- * `analyzeDuplicateRows`에서만 중복으로 잡습니다.
+ * 중복 기준:
+ * - 같은 클럽 + 같은 이름 그룹에서 1행만 정상 유지, 나머지는 중복자
+ * - 유지행 선택: 성별(남/여)에 맞는 M/W 계열 우선, 없으면 입력 첫 행
  */
 export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[] {
-  return rows.map((r) => ({ ...r }));
+  const result = rows.map((r) => ({ ...r }));
+  const byPerson = new Map<string, number[]>();
+  const excludeIdx = new Set<number>();
+
+  result.forEach((r, i) => {
+    if (r.excluded) return;
+    const k = personGroupKeyForDuplicate(r);
+    if (!k) return;
+    if (!byPerson.has(k)) byPerson.set(k, []);
+    byPerson.get(k)!.push(i);
+  });
+
+  for (const indices of byPerson.values()) {
+    if (indices.length < 2) continue;
+    const keepIdx = pickKeepIndex(indices, result);
+    for (const i of indices) {
+      if (i !== keepIdx) {
+        excludeIdx.add(i);
+      }
+    }
+  }
+
+  for (let i = 0; i < result.length; i += 1) {
+    if (!excludeIdx.has(i)) continue;
+    const prev = result[i]!;
+    const excludeReason = "duplicate_person_group";
+    const excludeDetail = "same_club_same_name_keep_one";
+    const display = labelExcludeForDisplay({
+      excluded: true,
+      parseStatus: "excluded",
+      excludeReason,
+      excludeDetail,
+    });
+    result[i] = {
+      ...prev,
+      excluded: true,
+      parseStatus: "excluded",
+      parseConfidence: 0.78,
+      excludeReason,
+      excludeDetail,
+      parseReason: display || prev.parseReason,
+    };
+  }
+
+  return result;
 }

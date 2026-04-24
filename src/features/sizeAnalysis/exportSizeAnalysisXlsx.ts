@@ -212,7 +212,7 @@ function buildStyledAoaSheet(
  */
 export function downloadSizeAnalysisResultXlsx(rows: any[], duplicateAnalysis: DupInput): void {
   const aoa1 = buildSheetAll(rows, duplicateAnalysis.duplicateRowIds);
-  const aoa3 = buildSheetDupMembers(rows);
+  const aoa3 = buildSheetDupMembers(rows, duplicateAnalysis.duplicateRowIds);
   const aoa4 = buildSheetReview(rows);
 
   const wb = XLSX.utils.book_new();
@@ -408,30 +408,29 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
   return ws;
 }
 
-function buildSheetDupMembers(rows: any[]) {
+function buildSheetDupMembers(rows: any[], duplicateRowIds: Set<string>) {
   const header = ["클럽", "이름", "구분", "원본행", "성별", "사이즈", "수량"];
-  const byName = new Map<string, { r: any; i: number }[]>();
+  const byName = new Map<string, { r: any; i: number; dup: boolean }[]>();
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
-    if (r.excluded) continue;
     const name = String(r.memberNameRaw ?? "").trim();
     if (!name) continue;
     const club = normClubFromNormRow(r);
     const k = `${club}\0${name}`;
     if (!byName.has(k)) byName.set(k, []);
-    byName.get(k)!.push({ r, i });
+    byName.get(k)!.push({ r, i, dup: duplicateRowIds.has(stableRowKeyForDup(r, i)) });
   }
   const body: (string | number)[][] = [];
   const keys = Array.from(byName.keys()).sort((a, c) => a.localeCompare(c, "ko"));
   for (const k of keys) {
     const list = byName.get(k)!;
-    if (list.length < 2) continue;
+    if (!list.some((x) => x.dup)) continue;
     const ordered = [...list].sort(compareRowsBySourceThenIndex);
-    ordered.forEach(({ r, i }, j) => {
+    ordered.forEach(({ r, i, dup }) => {
       body.push([
         normClubFromNormRow(r),
         r.memberNameRaw ?? "",
-        j === 0 ? "정상" : "중복",
+        dup ? "중복" : "정상",
         r.sourceRowIndex ?? "",
         r.genderNormalized ?? r.genderRaw ?? "",
         r.standardizedSize ?? r.sizeRaw ?? "",

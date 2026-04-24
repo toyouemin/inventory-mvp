@@ -38,6 +38,11 @@ type TransactionStatementFormData = {
 
 type DocumentType = "statement" | "estimate";
 
+const DEFAULT_ESTIMATE_MANAGER_NAME = "김승민";
+const DEFAULT_ESTIMATE_MANAGER_PHONE = "010-8521-9709";
+/** 견적서 하단·견적 엑셀 입금계좌 (거래명세표 푸터 `STATEMENT_PRINT_FOOTER.bankLine`과 별도) */
+const DEFAULT_ESTIMATE_BANK_ACCOUNT = "(신한 140-009-456830 주식회사 세림통상)";
+
 const FIXED_SUPPLIER = {
   name: "(주)세림통상",
   bizNo: "131-86-32310",
@@ -49,9 +54,8 @@ const FIXED_SUPPLIER = {
   ceoName: "김영례",
   tel: "",
   fax: "",
-  bankAccount: "",
-  managerName: "",
-  managerPhone: "",
+  managerName: DEFAULT_ESTIMATE_MANAGER_NAME,
+  managerPhone: DEFAULT_ESTIMATE_MANAGER_PHONE,
   email: "",
 } as const;
 
@@ -107,6 +111,15 @@ function buildStatementBaseFileName(customerName: string, issueDateYmd: string):
   const digits = issueDateYmd.replace(/-/g, "");
   const yyMMdd = digits.length >= 8 ? digits.slice(2, 8) : digits;
   return `${name}-거래명세표-${yyMMdd}`;
+}
+
+/** 견적서 JPG: 행사명-260424 */
+function buildEstimateJpgBaseFileName(eventName: string, issueDateYmd: string): string {
+  const trimmed = eventName.trim();
+  const name = trimmed ? trimmed.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_") : "행사미입력";
+  const digits = issueDateYmd.replace(/-/g, "");
+  const yyMMdd = digits.length >= 8 ? digits.slice(2, 8) : digits;
+  return `${name}-${yyMMdd}`;
 }
 
 /** 숨김 캡처 호스트와 동일한 가로(860+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
@@ -184,8 +197,8 @@ export default function TransactionStatementPage() {
     issueDate: formatYmd(new Date()),
     tradeDate: formatYmd(new Date()),
     estimateEventName: "",
-    estimateManagerName: "",
-    estimateManagerPhone: "",
+    estimateManagerName: DEFAULT_ESTIMATE_MANAGER_NAME,
+    estimateManagerPhone: DEFAULT_ESTIMATE_MANAGER_PHONE,
     items: [makeRow(1)],
   });
   const [downloading, setDownloading] = useState(false);
@@ -408,7 +421,7 @@ export default function TransactionStatementPage() {
             address: FIXED_SUPPLIER.address,
             tel: FIXED_SUPPLIER.tel,
             fax: FIXED_SUPPLIER.fax,
-            bankAccount: FIXED_SUPPLIER.bankAccount,
+            bankAccount: DEFAULT_ESTIMATE_BANK_ACCOUNT,
             managerName: formData.estimateManagerName.trim() || FIXED_SUPPLIER.managerName,
             managerPhone: formData.estimateManagerPhone.trim() || FIXED_SUPPLIER.managerPhone,
             email: FIXED_SUPPLIER.email,
@@ -546,21 +559,21 @@ export default function TransactionStatementPage() {
     try {
       await waitForFontsAndNextPaint();
 
-      const sheetEl = target.querySelector("[data-ts-print-sheet]") as HTMLElement | null;
+      const sheetEl =
+        (target.querySelector("[data-ts-print-sheet]") as HTMLElement | null) ??
+        (target.querySelector("[data-estimate-print-sheet]") as HTMLElement | null);
       const titleEl = target.querySelector(".ts-print-title") as HTMLElement | null;
       const issueEl = target.querySelector(".ts-print-issue-date") as HTMLElement | null;
-      if (sheetEl && titleEl && issueEl) {
+      if (sheetEl) {
         const hostWidthPx = Math.round(target.getBoundingClientRect().width);
         const sheetWidthPx = Math.round(sheetEl.getBoundingClientRect().width);
-        const titleFontSize = getComputedStyle(titleEl).fontSize;
-        const issueDateFontSize = getComputedStyle(issueEl).fontSize;
+        const payload: Record<string, unknown> = { documentType, hostWidthPx, sheetWidthPx };
+        if (titleEl && issueEl) {
+          payload.titleFontSize = getComputedStyle(titleEl).fontSize;
+          payload.issueDateFontSize = getComputedStyle(issueEl).fontSize;
+        }
         // eslint-disable-next-line no-console -- JPG 캡처 고정 레이아웃 검증(모바일/PC 동일성)
-        console.log("[Statement JPG capture]", {
-          hostWidthPx,
-          sheetWidthPx,
-          titleFontSize,
-          issueDateFontSize,
-        });
+        console.log("[Transaction JPG capture]", payload);
       }
 
       const canvas = await html2canvas(target, {
@@ -573,8 +586,11 @@ export default function TransactionStatementPage() {
         scrollX: STATEMENT_JPG_HTML2CANVAS_VIEW.scrollX,
         scrollY: STATEMENT_JPG_HTML2CANVAS_VIEW.scrollY,
       });
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
-      const fileName = `${buildStatementBaseFileName(formData.customerName, formData.issueDate)}.jpg`;
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.98);
+      const fileName =
+        documentType === "estimate"
+          ? `${buildEstimateJpgBaseFileName(formData.estimateEventName, formData.issueDate)}.jpg`
+          : `${buildStatementBaseFileName(formData.customerName, formData.issueDate)}.jpg`;
       const anchor = document.createElement("a");
       anchor.href = dataUrl;
       anchor.download = fileName;
@@ -895,7 +911,7 @@ export default function TransactionStatementPage() {
                 address: FIXED_SUPPLIER.address,
                 tel: FIXED_SUPPLIER.tel,
                 fax: FIXED_SUPPLIER.fax,
-                bankAccount: FIXED_SUPPLIER.bankAccount,
+                bankAccount: DEFAULT_ESTIMATE_BANK_ACCOUNT,
                 managerName: formData.estimateManagerName || FIXED_SUPPLIER.managerName,
                 managerPhone: formData.estimateManagerPhone || FIXED_SUPPLIER.managerPhone,
                 email: FIXED_SUPPLIER.email,
@@ -965,7 +981,7 @@ export default function TransactionStatementPage() {
                   address: FIXED_SUPPLIER.address,
                   tel: FIXED_SUPPLIER.tel,
                   fax: FIXED_SUPPLIER.fax,
-                  bankAccount: FIXED_SUPPLIER.bankAccount,
+                  bankAccount: DEFAULT_ESTIMATE_BANK_ACCOUNT,
                   managerName: formData.estimateManagerName || FIXED_SUPPLIER.managerName,
                   managerPhone: formData.estimateManagerPhone || FIXED_SUPPLIER.managerPhone,
                   email: FIXED_SUPPLIER.email,

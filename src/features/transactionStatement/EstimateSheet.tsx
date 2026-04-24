@@ -58,11 +58,18 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
 
       <div className="estimate-sheet__top">
         <div className="estimate-sheet__receiver">
-          <div>견적일 : {data.date || ""}</div>
-          <div>
-            수 신 : <strong>{data.receiverName || ""}</strong>
+          <div className="estimate-sheet__receiver-row">
+            <span className="estimate-sheet__receiver-label">견적일</span>
+            <span className="estimate-sheet__receiver-value">{data.date || ""}</span>
           </div>
-          <div>행사명 : {data.eventName || ""}</div>
+          <div className="estimate-sheet__receiver-row">
+            <span className="estimate-sheet__receiver-label">수신</span>
+            <strong className="estimate-sheet__receiver-value estimate-sheet__receiver-value--name">{data.receiverName || ""}</strong>
+          </div>
+          <div className="estimate-sheet__receiver-row">
+            <span className="estimate-sheet__receiver-label">행사명</span>
+            <span className="estimate-sheet__receiver-value">{data.eventName || ""}</span>
+          </div>
         </div>
 
         <div className="estimate-sheet__supplier">
@@ -82,8 +89,20 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
                 <td>{supplier.companyName || ""}</td>
                 <th>대표</th>
                 <td className="estimate-sheet__ceo">
-                  <span>{supplier.ceoName || ""}</span>
-                  <img src="/stamp.png" alt="" className="estimate-sheet__stamp-inline" />
+                  <span className="estimate-sheet__ceo-line">
+                    <span>{supplier.ceoName || ""}</span>
+                    <span className="estimate-sheet__ceo-seal">
+                      <span className="estimate-sheet__ceo-in">(인)</span>
+                      <img
+                        src="/images/transaction-template-image1.png"
+                        alt=""
+                        width={76}
+                        height={76}
+                        decoding="async"
+                        className="estimate-sheet__stamp-seal"
+                      />
+                    </span>
+                  </span>
                 </td>
               </tr>
               <tr>
@@ -196,7 +215,7 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
       <div className="estimate-sheet__footer">
         <div className="estimate-sheet__footer-notice">
           <div>* 입금계좌 : {supplier.bankAccount || ""}</div>
-          <div>* 세금계산서 100% 발행합니다.</div>
+          <div>* 세금계산서 100% 발행합니다. (카드결재시 수수료 3% 별도)</div>
           <div>* 상기 견적은 본 대회시에만 적용하며, A/S 가능합니다.</div>
           <div>* 품목은 요청 및 상황에 따라 변동 될 수 있습니다.</div>
           <div>* 문의사항은 홈페이지를 참고하시거나 본사로 연락 바랍니다.</div>

@@ -31,17 +31,49 @@
 
 .estimate-sheet__receiver {
   flex: 0 0 360px;
-  border: 1px solid #000;
-  padding: 8px 10px;
+  margin-top: 10px;
+  border: none;
+  background: transparent;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
+  align-items: flex-start;
+  text-align: left;
 }
 
-.estimate-sheet__receiver > div:last-child {
+.estimate-sheet__receiver-row {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 7px;
+  width: 100%;
+}
+
+.estimate-sheet__receiver-row:last-child {
+  margin-bottom: 0;
+}
+
+.estimate-sheet__receiver-label {
+  flex: 0 0 70px;
+  width: 70px;
+  display: inline-block;
+  box-sizing: border-box;
+}
+
+.estimate-sheet__receiver-label::after {
+  content: ":";
+  margin-right: 0.35em;
+}
+
+.estimate-sheet__receiver-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.estimate-sheet__receiver-value--name {
   font-weight: 700;
-  font-size: 1.4em;
-  line-height: 1.2;
+  font-size: 16px;
+  line-height: 1.35;
 }
 
 .estimate-sheet__supplier {
@@ -118,12 +150,45 @@
   overflow: visible;
 }
 
-.estimate-sheet__stamp-inline {
-  width: 42px;
-  height: auto;
-  margin-left: 6px;
+/* 거래명세서 .stampOverlay / 인감 이미지와 동일한 표시 크기·투명도 (대표 셀은 인라인·(인) 기준) */
+.estimate-sheet__ceo-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.estimate-sheet__ceo-seal {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 76px;
+  height: 1.15em;
   vertical-align: middle;
-  opacity: 0.9;
+}
+
+.estimate-sheet__ceo-in {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 0;
+  font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.estimate-sheet__stamp-seal {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 76px;
+  max-width: 76px;
+  height: auto;
+  object-fit: contain;
+  pointer-events: none;
+  opacity: 0.95;
 }
 
 .estimate-sheet__notice {
@@ -325,9 +390,8 @@
   border-right: 0;
 }
 
-/* 견적서 내부 선 두께 1px 통일 */
+/* 견적서 내부 선 두께 1px 통일 (수신 블록은 테두리 없음) */
 .estimate-sheet__root,
-.estimate-sheet__receiver,
 .estimate-sheet__supplier table,
 .estimate-sheet__supplier th,
 .estimate-sheet__supplier td,
@@ -3775,6 +3839,20 @@ label {
   padding-top: 14px !important;
 }
 
+/* 견적서 JPG: 거래명세표와 동일 호스트에서 860px 고정·변환 리셋(html2canvas 선명도) */
+.transaction-print-hidden-host [data-estimate-print-sheet] {
+  transform: none !important;
+  transform-origin: initial !important;
+}
+
+.transaction-print-hidden-host [data-estimate-print-sheet].estimate-sheet__capture-fixed {
+  width: var(--ts-print-sheet-w) !important;
+  min-width: var(--ts-print-sheet-w) !important;
+  max-width: var(--ts-print-sheet-w) !important;
+  margin-inline: auto !important;
+  box-sizing: border-box !important;
+}
+
 .transaction-print-hidden-host .ts-print-title {
   font-size: 40px !important;
   line-height: 0.9 !important;
@@ -3817,7 +3895,8 @@ label {
   transform: none !important;
 }
 
-.transaction-preview-dialog .transaction-preview-dialog__scroll > [data-ts-print-sheet] {
+.transaction-preview-dialog .transaction-preview-dialog__scroll > [data-ts-print-sheet],
+.transaction-preview-dialog .transaction-preview-dialog__scroll > [data-estimate-print-sheet] {
   flex-shrink: 0;
   width: var(--ts-capture-width, 860px);
   max-width: none;

@@ -7,6 +7,7 @@ import {
   buildAggRowsDuplicate,
   buildAggRowsTotal,
   buildClubAggBlock,
+  compareRowsBySourceThenIndex,
   normClubFromNormRow,
   rowQtyParsed,
   stableRowKeyForDup,
@@ -30,6 +31,8 @@ type DupInput = { duplicateRowIds: Set<string>; dupByClub: Map<string, { persons
 
 const BORDER_COLOR = { rgb: "FFBBBBBB" } as const;
 const thin = { style: "thin" as const, color: BORDER_COLOR };
+/** 클럽 블록 구분 — 제목 행 상단 */
+const CLUB_BLOCK_SEP_TOP = { style: "thick" as const, color: { rgb: "FF444444" } };
 
 const mergeBorder = {
   top: thin,
@@ -39,6 +42,10 @@ const mergeBorder = {
 } as const;
 
 const TITLE_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFE8E8E8" } };
+/** 클럽별집계 — 블록 제목 행 전용 */
+const CLUB_AGG_TITLE_FILL_TOTAL = { patternType: "solid" as const, fgColor: { rgb: "FFF2F2F2" } };
+const CLUB_AGG_TITLE_FILL_DEDUPED = { patternType: "solid" as const, fgColor: { rgb: "FFE2F0D9" } };
+const CLUB_AGG_TITLE_FILL_DUPLICATE = { patternType: "solid" as const, fgColor: { rgb: "FFFCE4D6" } };
 const HEADER_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFCFD9EA" } };
 const EMPH_DUP_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFFF4CC" } };
 const EMPH_REVIEW_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFFF1E6" } };
@@ -49,6 +56,23 @@ function styleTitle(): import("xlsx-js-style").CellStyle {
   return {
     font: { bold: true },
     fill: TITLE_FILL,
+    alignment: { horizontal: "center", vertical: "center" },
+    border: mergeBorder,
+  };
+}
+
+function styleClubAggBlockTitle(
+  kind: "total" | "deduped" | "duplicate"
+): import("xlsx-js-style").CellStyle {
+  const fill =
+    kind === "total"
+      ? CLUB_AGG_TITLE_FILL_TOTAL
+      : kind === "deduped"
+        ? CLUB_AGG_TITLE_FILL_DEDUPED
+        : CLUB_AGG_TITLE_FILL_DUPLICATE;
+  return {
+    font: { bold: true },
+    fill,
     alignment: { horizontal: "center", vertical: "center" },
     border: mergeBorder,
   };
@@ -261,7 +285,9 @@ function appendClubMatrixSection(
   merges: import("xlsx").Range[],
   rIn: number,
   b: ReturnType<typeof buildClubAggBlock>,
-  titleText: string
+  titleText: string,
+  titleStyle: import("xlsx-js-style").CellStyle,
+  clubBlockTopSeparator: boolean
 ): { r: number; cMax: number } {
   let r = rIn;
   const colSizes = b.columnSizes;
@@ -271,11 +297,15 @@ function appendClubMatrixSection(
   const lastSumCol = 1 + L;
   let cMax = colCount - 1;
 
+  const titleRowStyle = clubBlockTopSeparator
+    ? mergeStyle(titleStyle, { border: { top: CLUB_BLOCK_SEP_TOP } })
+    : titleStyle;
+
   const titleR = r;
-  ws[enc({ r: titleR, c: 0 })] = { v: titleText, t: "s", s: styleTitle() };
+  ws[enc({ r: titleR, c: 0 })] = { v: titleText, t: "s", s: titleRowStyle };
   merges.push({ s: { r: titleR, c: 0 }, e: { r: titleR, c: lastCol } });
   for (let c = 1; c <= lastCol; c += 1) {
-    ws[enc({ r: titleR, c })] = { v: "", t: "s", s: styleTitle() };
+    ws[enc({ r: titleR, c })] = { v: "", t: "s", s: titleRowStyle };
   }
 
   r += 1;
@@ -337,9 +367,9 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
   const enc = XLSX.utils.encode_cell;
 
   const modes = [
-    { label: "총 수량", flat: buildAggRowsTotal(rows) },
-    { label: "중복자 수량", flat: buildAggRowsDuplicate(rows, duplicateRowIds) },
-    { label: "중복 제외 수량", flat: buildAggRowsDedupedFirst(rows) },
+    { kind: "total" as const, label: "총 수량", flat: buildAggRowsTotal(rows) },
+    { kind: "deduped" as const, label: "중복 제외 수량", flat: buildAggRowsDedupedFirst(rows) },
+    { kind: "duplicate" as const, label: "중복자 수량", flat: buildAggRowsDuplicate(rows, duplicateRowIds) },
   ] as const;
 
   const clubsOrdered = unionClubsOrdered(modes.map((m) => m.flat));
@@ -355,17 +385,26 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
 
   for (let bi = 0; bi < clubsOrdered.length; bi += 1) {
     const club = clubsOrdered[bi]!;
-    if (bi > 0) r += 1;
     for (let mi = 0; mi < modes.length; mi += 1) {
       const mode = modes[mi]!;
       if (mi > 0) r += 1;
       const clubRows = mode.flat.filter((x) => x.club === club);
       const b = buildClubAggBlock(club, clubRows);
-      const titleText = `${b.club} · ${mode.label} ${b.totalQty}개`;
-      const out = appendClubMatrixSection(ws, enc, merges, r, b, titleText);
+      const titleText = `${bi + 1}. ${b.club} · ${mode.label} ${b.totalQty}개`;
+      const out = appendClubMatrixSection(
+        ws,
+        enc,
+        merges,
+        r,
+        b,
+        titleText,
+        styleClubAggBlockTitle(mode.kind),
+        bi > 0 && mi === 0
+      );
       r = out.r;
       cMax = Math.max(cMax, out.cMax);
     }
+    r += 1;
   }
 
   const rMax = r - 1;
@@ -377,7 +416,7 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
 }
 
 function buildSheetDupMembers(rows: any[]) {
-  const header = ["클럽", "이름", "원본행", "성별", "사이즈", "수량"];
+  const header = ["클럽", "이름", "구분", "원본행", "성별", "사이즈", "수량"];
   const byName = new Map<string, { r: any; i: number }[]>();
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
@@ -394,21 +433,18 @@ function buildSheetDupMembers(rows: any[]) {
   for (const k of keys) {
     const list = byName.get(k)!;
     if (list.length < 2) continue;
-    const ordered = [...list].sort(
-      (a, b) =>
-        (Number(a.r.sourceRowIndex) || 0) - (Number(b.r.sourceRowIndex) || 0) ||
-        stableRowKeyForDup(a.r, a.i).localeCompare(stableRowKeyForDup(b.r, b.i))
-    );
-    for (const { r, i } of ordered) {
+    const ordered = [...list].sort(compareRowsBySourceThenIndex);
+    ordered.forEach(({ r, i }, j) => {
       body.push([
         normClubFromNormRow(r),
         r.memberNameRaw ?? "",
+        j === 0 ? "정상" : "중복",
         r.sourceRowIndex ?? "",
         r.genderNormalized ?? r.genderRaw ?? "",
         r.standardizedSize ?? r.sizeRaw ?? "",
         rowQtyParsed(r),
       ]);
-    }
+    });
   }
   if (body.length === 0) {
     return [header, ["(해당하는 중복 행이 없습니다)"]];
@@ -419,12 +455,12 @@ function buildSheetDupMembers(rows: any[]) {
 function buildSheetDupStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet {
   if (aoa.length <= 1) {
     return buildStyledAoaSheet(aoa, {
-      centerCols: new Set([2, 3, 4, 5]),
+      centerCols: new Set([2, 3, 4, 5, 6]),
       emptyMessage: "(해당하는 중복 행이 없습니다)",
     });
   }
   return buildStyledAoaSheet(aoa, {
-    centerCols: new Set([2, 3, 4, 5]),
+    centerCols: new Set([2, 3, 4, 5, 6]),
     groupKeyByRow: (row, r) => (r === 0 ? "" : `${String(row[0] ?? "")}\0${String(row[1] ?? "")}`),
     highlightCell: (row, r, c) => {
       if (r < 1) return null;

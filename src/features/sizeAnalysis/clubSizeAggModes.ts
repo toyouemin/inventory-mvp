@@ -131,7 +131,7 @@ export function buildAggRowsDuplicate(rows: any[], duplicateRowIds: Set<string>)
   return sortedAggRowsFromDetailMap(detailMap);
 }
 
-function compareRowsBySourceThenIndex(a: { r: any; i: number }, b: { r: any; i: number }): number {
+export function compareRowsBySourceThenIndex(a: { r: any; i: number }, b: { r: any; i: number }): number {
   const ha = a.r.sourceRowIndex != null && String(a.r.sourceRowIndex).trim() !== "";
   const hb = b.r.sourceRowIndex != null && String(b.r.sourceRowIndex).trim() !== "";
   if (ha && hb) {
@@ -204,4 +204,66 @@ export function unionClubsOrdered(flats: AggRow[][]): string[] {
   const s = new Set<string>();
   for (const flat of flats) for (const r of flat) s.add(r.club);
   return [...s].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
+export type DuplicateAnalysis = {
+  duplicateRowIds: Set<string>;
+  dupByClub: Map<string, { persons: number; sheets: number }>;
+  duplicatePersonCount: number;
+  duplicateQtyTotal: number;
+  normalQty: number;
+  totalQty: number;
+};
+
+/**
+ * 같은 클럽+이름(비어 있지 않음)이 2행 이상이면 중복 그룹 1건으로 칩니다.
+ * - duplicatePersonCount: 그룹 개수(기존과 동일)
+ * - duplicateQtyTotal: 각 그룹에서 원본행 순 첫 행을 제외한 나머지 행 수량만 합산 (= 총 − 중복 제외)
+ * - duplicateRowIds: 위 ‘나머지’ 행만(뱃지·엑셀 중복여부)
+ * - dupByClub.sheets: 클럽별 중복분 수량 합
+ */
+export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
+  const duplicateRowIds = new Set<string>();
+  const byKey = new Map<string, { r: any; i: number }[]>();
+  let totalQty = 0;
+  for (let i = 0; i < rows.length; i += 1) {
+    const r = rows[i]!;
+    if (r.excluded) continue;
+    totalQty += rowQtyParsed(r);
+    const name = String(r.memberNameRaw ?? "").trim();
+    if (!name) continue;
+    const club = normClubFromNormRow(r);
+    const k = `${club}\0${name}`;
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push({ r, i });
+  }
+  const dupByClub = new Map<string, { persons: number; sheets: number }>();
+  let duplicatePersonCount = 0;
+  let duplicateQtyTotal = 0;
+  for (const list of byKey.values()) {
+    if (list.length < 2) continue;
+    duplicatePersonCount += 1;
+    const sorted = [...list].sort(compareRowsBySourceThenIndex);
+    const club = normClubFromNormRow(sorted[0]!.r);
+    let clubDupQty = 0;
+    for (let j = 1; j < sorted.length; j += 1) {
+      const { r, i } = sorted[j]!;
+      duplicateRowIds.add(stableRowKeyForDup(r, i));
+      clubDupQty += rowQtyParsed(r);
+    }
+    duplicateQtyTotal += clubDupQty;
+    const d = dupByClub.get(club) ?? { persons: 0, sheets: 0 };
+    d.persons += 1;
+    d.sheets += clubDupQty;
+    dupByClub.set(club, d);
+  }
+  const normalQty = totalQty - duplicateQtyTotal;
+  return {
+    duplicateRowIds,
+    dupByClub,
+    duplicatePersonCount,
+    duplicateQtyTotal,
+    normalQty,
+    totalQty,
+  };
 }

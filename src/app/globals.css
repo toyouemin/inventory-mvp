@@ -2676,18 +2676,24 @@ label {
     box-sizing: border-box;
     line-height: 1.2;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     border-right: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
   }
 
   .app-main-nav > a {
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: clamp(16px, 1.2vw, 20px);
   }
 
+  /* 홈페이지 details 드롭메뉴 — absolute 패널이 잘리지 않도록 */
   .app-main-nav > .nav-dropdown {
     position: relative;
+    overflow: visible;
+  }
+
+  .app-main-nav > .nav-dropdown[open] {
+    z-index: 30;
   }
 
   .app-main-nav > .nav-dropdown .nav-dropdown__summary {
@@ -6027,9 +6033,32 @@ label {
 }
 
 .size-analysis-dup-pc-table td:nth-child(3),
-.size-analysis-dup-pc-table td:nth-child(6) {
+.size-analysis-dup-pc-table td:nth-child(4),
+.size-analysis-dup-pc-table td:nth-child(7) {
   text-align: center;
   white-space: nowrap;
+}
+
+.size-analysis-dup-line-tag--ok {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #065f46;
+  background: #d1fae5;
+  padding: 1px 6px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.size-analysis-dup-line-tag--dup {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #9a3412;
+  background: #ffedd5;
+  padding: 1px 6px;
+  border-radius: 4px;
+  vertical-align: middle;
 }
 
 .size-analysis-dup-pc-tbody-group {
@@ -6246,9 +6275,110 @@ label {
   width: 100%;
 }
 
-.size-analysis-club-agg-mtx--desktop {
+/* 클럽별 보기: 넓은 화면에서만 아코디언 아래 전체 매트릭스 */
+.size-analysis-club-group-mtx-pc {
   display: none;
   width: 100%;
+}
+
+/* 8) 집계: 모바일·PC 공통 매트릭스 컨테이너 */
+.size-analysis-club-agg-mtx-host {
+  display: block;
+  width: 100%;
+}
+
+.size-analysis-club-group-mtx-wrap {
+  width: 100%;
+  min-width: 0;
+}
+
+/* 클럽별 보기 모바일: 총/제외/중복 3매트릭스 세로 스택 */
+.size-analysis-club-group-mobile-agg-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.size-analysis-club-group-mobile-agg-stack .size-analysis-club-agg-mtx-block--short-headline .size-analysis-club-agg-mtx-clubline {
+  margin: 0 0 3px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+/* 클럽/성별/사이즈 집계 매트릭스 — 공통(모바일 촘촘, min-width:769px에서 PC 크기로 확대) */
+.size-analysis-club-agg-mtx-block {
+  margin-bottom: 10px;
+}
+
+.size-analysis-club-agg-mtx-block:last-child {
+  margin-bottom: 0;
+}
+
+.size-analysis-club-agg-mtx-clubline {
+  margin: 0 0 4px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #111827;
+  word-break: keep-all;
+}
+
+.size-analysis-club-agg-mtx-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.size-analysis-club-agg-mtx {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+  background: #fff;
+}
+
+.size-analysis-club-agg-mtx th,
+.size-analysis-club-agg-mtx td {
+  border: 1px solid #e5e7eb;
+  padding: 4px 6px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+.size-analysis-club-agg-mtx thead th {
+  background: #f9fafb;
+  font-weight: 700;
+  color: #374151;
+}
+
+.size-analysis-club-agg-mtx-gh {
+  background: #f3f4f6;
+  font-weight: 700;
+  text-align: center;
+}
+
+.size-analysis-club-agg-mtx-corner {
+  width: 1.25rem;
+  min-width: 1.75rem;
+  background: #f3f4f6;
+}
+
+.size-analysis-club-agg-mtx-cell--review {
+  background: #fffbeb !important;
+}
+
+.size-analysis-club-agg-mtx-cell--unres {
+  background: #f3f4f6 !important;
+}
+
+.size-analysis-club-agg-mtx-cell--corrected {
+  background: #ecfdf5 !important;
 }
 
 .size-analysis-norm-compact {
@@ -6821,13 +6951,17 @@ label {
   }
 
   .size-analysis-club-agg-compact--mobile {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
+    display: none !important;
   }
 
-  .size-analysis-club-agg-mtx--desktop {
-    display: none !important;
+  .size-analysis-club-agg-mtx {
+    font-size: 0.6875rem;
+  }
+
+  .size-analysis-club-agg-mtx th,
+  .size-analysis-club-agg-mtx td {
+    padding: 4px 5px;
+    line-height: 1.2;
   }
 
   .size-analysis-club-agg-hint {
@@ -6969,7 +7103,7 @@ label {
     display: none !important;
   }
 
-  .size-analysis-club-agg-mtx--desktop {
+  .size-analysis-club-group-mtx-pc {
     display: block !important;
   }
 
@@ -6989,70 +7123,26 @@ label {
     margin-bottom: 14px;
   }
 
-  .size-analysis-club-agg-mtx-block:last-child {
-    margin-bottom: 0;
-  }
-
   .size-analysis-club-agg-mtx-clubline {
     margin: 0 0 6px;
     font-size: 0.88rem;
-    font-weight: 700;
     line-height: 1.35;
-    color: #111827;
-    word-break: keep-all;
-  }
-
-  .size-analysis-club-agg-mtx-scroll {
-    width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
 
   .size-analysis-club-agg-mtx {
-    width: 100%;
     min-width: min(100%, 520px);
-    border-collapse: collapse;
     font-size: 0.875rem;
-    background: #fff;
   }
 
   .size-analysis-club-agg-mtx th,
   .size-analysis-club-agg-mtx td {
-    border: 1px solid #e5e7eb;
     padding: 5px 7px;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .size-analysis-club-agg-mtx thead th {
-    background: #f9fafb;
-    font-weight: 700;
-    color: #374151;
-  }
-
-  .size-analysis-club-agg-mtx-gh {
-    background: #f3f4f6;
-    font-weight: 700;
-    text-align: center;
+    line-height: normal;
   }
 
   .size-analysis-club-agg-mtx-corner {
     width: 1.5rem;
     min-width: 2.4rem;
-    background: #f3f4f6;
-  }
-
-  .size-analysis-club-agg-mtx-cell--review {
-    background: #fffbeb !important;
-  }
-
-  .size-analysis-club-agg-mtx-cell--unres {
-    background: #f3f4f6 !important;
-  }
-
-  .size-analysis-club-agg-mtx-cell--corrected {
-    background: #ecfdf5 !important;
   }
 
   .size-analysis-club-line-mobile {

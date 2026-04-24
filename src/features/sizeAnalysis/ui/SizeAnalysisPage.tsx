@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { downloadSizeAnalysisResultXlsx } from "@/features/sizeAnalysis/exportSizeAnalysisXlsx";
 import {
   excelColumnLetterFromOneBased,
   findDuplicateColumnIndices,
@@ -348,6 +349,20 @@ export function SizeAnalysisPage() {
 
       <AnalysisSummaryCards summary={summary} duplicateAnalysis={duplicateAnalysis} statusFilter={statusFilter} />
       <AnalysisStatusFilter value={statusFilter} onChange={onStatusChange} />
+      <section className="size-analysis-card size-analysis-xlsx-export">
+        <h3>엑셀 내보내기</h3>
+        <p className="size-analysis-muted size-analysis-xlsx-export__hint">
+          현재 화면의 목록(필터 반영)과 중복 집계를 기준으로, 시트(전체목록·클럽별집계·중복자·검토필요) 4개를 저장합니다.
+        </p>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={rows.length === 0}
+          onClick={() => downloadSizeAnalysisResultXlsx(rows, duplicateAnalysis)}
+        >
+          엑셀 다운로드 (.xlsx)
+        </button>
+      </section>
       <div className="size-analysis-result-region">
         <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} />
         {detailViewMode === "all" ? (
@@ -1174,17 +1189,17 @@ function clubAggMatrixHeadline(
   return `${club} (${gStr}합계:${totalQty}개 / ${dupText})`;
 }
 
-function clubAggMobileLine(r: { club: string; gender: string; size: string; qty: number }): string {
-  const club = String(r.club ?? "").trim() || "미분류";
+/** 모바일 compact: 클럽 제목 밑 한 줄(성별/사이즈/수량만, `rows`·집계 데이터는 그대로) */
+function clubAggMobileLineInner(r: { gender: string; size: string; qty: number }): string {
   const g = String(r.gender ?? "").trim();
   const size = String(r.size ?? "").trim() || "미분류";
   if (g === "공용") {
-    return `${club} · 공용 ${size} · ${r.qty}개`;
+    return `공용 ${size} · ${r.qty}개`;
   }
   if (g) {
-    return `${club} · ${g} ${size} · ${r.qty}개`;
+    return `${g} ${size} · ${r.qty}개`;
   }
-  return `${club} · ${size} · ${r.qty}개`;
+  return `${size} · ${r.qty}개`;
 }
 
 const GENDER_ROW_ORDER: Array<"여" | "남" | "공용"> = ["여", "남", "공용"];
@@ -1240,9 +1255,14 @@ export function ClubSizeSummaryTable({
         수량은 자동·검토·수정·미분류를 모두 합산하며, 클럽/성별/사이즈 기준으로 집계합니다.
       </p>
       <div className="size-analysis-club-agg-compact--mobile" aria-label="집계(요약)">
-        {rows.map((r, idx) => (
-          <div key={`${r.club}-${r.gender ?? ""}-${r.size}-${idx}`} className="size-analysis-club-agg-line">
-            {clubAggMobileLine(r)}
+        {matrixBlocks.map((b) => (
+          <div key={b.club} className="size-analysis-club-agg-mgroup">
+            <p className="size-analysis-club-agg-mgroup__head">{b.club}</p>
+            {b.clubRows.map((r, idx) => (
+              <div key={`${b.club}-${r.gender ?? ""}-${r.size}-${idx}`} className="size-analysis-club-agg-line">
+                {clubAggMobileLineInner(r)}
+              </div>
+            ))}
           </div>
         ))}
       </div>

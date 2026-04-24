@@ -6094,6 +6094,26 @@ label {
   color: #6b7280;
 }
 
+/* 모바일 8)집계: 클럽별로 묶은 블록(PC에서는 compact 영역 display:none) */
+.size-analysis-club-agg-mgroup {
+  min-width: 0;
+}
+
+.size-analysis-club-agg-mgroup__head {
+  margin: 0;
+  padding: 0 0 1px 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #0f172a;
+}
+
+.size-analysis-club-agg-mgroup:not(:first-child) {
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px solid #eef0f3;
+}
+
 .size-analysis-club-agg-line {
   font-size: 0.875rem;
   line-height: 1.35;
@@ -6102,7 +6122,7 @@ label {
   color: #111827;
 }
 
-.size-analysis-club-agg-line:last-child {
+.size-analysis-club-agg-mgroup .size-analysis-club-agg-line:last-child {
   border-bottom: 0;
   padding-bottom: 2px;
 }
@@ -6598,6 +6618,16 @@ label {
     font-size: 0.72rem;
     line-height: 1.3;
     margin: 0 0 2px 0;
+  }
+
+  .size-analysis-club-agg-mgroup:not(:first-child) {
+    margin-top: 3px;
+    padding-top: 2px;
+  }
+
+  .size-analysis-club-agg-mgroup__head {
+    font-size: 0.84rem;
+    padding-bottom: 0;
   }
 
   .size-analysis-club-agg-line {

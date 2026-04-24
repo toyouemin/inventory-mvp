@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { sanitizeForPrismaJson } from "@/lib/sanitizeForPrismaJson";
 import { detectHeaderRow, detectStructureType, extractPeopleFromRows, suggestFieldMapping } from "./structure";
 import { parseRepeatedSlots, parseSingleRowPerson, parseSizeMatrix, parseUnknownManualItem } from "./strategies";
-import { extractSizeGenderQty, normalizeGender, normalizeSize, preprocessCell } from "./normalize";
+import { preprocessCell } from "./normalize";
+import { applyDuplicateSizePolicy, normalizePersonSizePolicy } from "./personSizePolicy";
 import type { FieldMapping, NormalizedRow, PersonRecord, StructureType, WorkbookSnapshot } from "./types";
 
 function sheetOrThrow(snapshot: WorkbookSnapshot, sheetName: string) {
@@ -33,8 +34,7 @@ function buildPeopleWorkbook(workbook: WorkbookSnapshot): WorkbookSnapshot {
 
 function normalizedRowsFromPeople(jobId: string, sheetName: string, people: PersonRecord[]): NormalizedRow[] {
   return people.map((person, idx) => {
-    const parsed = extractSizeGenderQty([person.gender, person.size].filter((x) => preprocessCell(x)).join(" "));
-    const standardizedSize = parsed.size ?? normalizeSize(person.size);
+    const pol = normalizePersonSizePolicy(person.size, person.gender);
     return {
       jobId,
       sourceSheet: sheetName,
@@ -45,12 +45,12 @@ function normalizedRowsFromPeople(jobId: string, sheetName: string, people: Pers
       sizeRaw: person.size,
       qtyRaw: "1",
       clubNameNormalized: preprocessCell(person.club),
-      genderNormalized: parsed.gender ?? normalizeGender(person.gender),
-      standardizedSize,
+      genderNormalized: pol.genderNormalized,
+      standardizedSize: pol.standardizedSize,
       qtyParsed: 1,
-      parseStatus: standardizedSize ? "auto_confirmed" : "needs_review",
-      parseConfidence: standardizedSize ? 0.9 : 0.45,
-      parseReason: standardizedSize ? "people 배열 기반 파싱" : "사이즈 정규화 실패",
+      parseStatus: pol.parseStatus,
+      parseConfidence: pol.parseConfidence,
+      parseReason: pol.parseReason,
       userCorrected: false,
       excluded: false,
     };
@@ -187,6 +187,8 @@ export async function runAnalysis(jobId: string) {
     throw new Error("지원하지 않는 structureType 입니다.");
   }
 
+  rows = applyDuplicateSizePolicy(rows);
+
   await prisma.sizeAnalysisRow.deleteMany({ where: { jobId } });
   if (rows.length > 0) {
     await prisma.sizeAnalysisRow.createMany({
@@ -210,6 +212,8 @@ export async function runAnalysis(jobId: string) {
         parseReason: r.parseReason ?? null,
         userCorrected: r.userCorrected,
         excluded: !!r.excluded,
+        excludeReason: r.excludeReason ?? null,
+        excludeDetail: r.excludeDetail ?? null,
         metaJson: sanitizeForPrismaJson(r.metaJson ?? {}),
       })),
     });

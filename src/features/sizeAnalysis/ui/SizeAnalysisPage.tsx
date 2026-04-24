@@ -18,6 +18,7 @@ import {
   type ClubSizeAggMode,
   type DuplicateAnalysis,
 } from "@/features/sizeAnalysis/clubSizeAggModes";
+import { labelExcludeForDisplayWithFallback } from "@/features/sizeAnalysis/excludeReasonLabels";
 import { downloadSizeAnalysisResultXlsx } from "@/features/sizeAnalysis/exportSizeAnalysisXlsx";
 import {
   excelColumnLetterFromOneBased,
@@ -97,7 +98,7 @@ function logExcludedRows(rows: any[], statusFilter: string): void {
     gender: String(r?.genderRaw ?? r?.genderNormalized ?? "").trim(),
     size: String(r?.sizeRaw ?? r?.standardizedSize ?? "").trim(),
     qty: r?.qtyRaw ?? r?.qtyParsed ?? "",
-    excludedReason: String(r?.parseReason ?? "").trim() || "(사유 없음)",
+    excludedReason: labelExcludeForDisplayWithFallback(r) || "(사유 없음)",
   }));
 
   // 제외 조건 점검을 위한 디버깅 출력
@@ -1096,6 +1097,13 @@ function normalizedRowLine2Parts(r: any): {
     r.sourceRowIndex != null && r.sourceRowIndex !== "" ? `원본행 ${r.sourceRowIndex}` : "";
   const conf = `신뢰도 ${Number(r.parseConfidence ?? 0).toFixed(2)}`;
   const st = String(r.parseStatus ?? "");
+  if (st === "excluded" || r.excluded) {
+    const ex = labelExcludeForDisplayWithFallback(r);
+    return {
+      subline: [src, ex, conf].filter((x) => x && x.length > 0).join(" · "),
+      pill: null,
+    };
+  }
   if (st === "needs_review" || st === "unresolved" || st === "corrected") {
     return {
       subline: [src, conf].filter((x) => x && x.length > 0).join(" · "),
@@ -1155,6 +1163,7 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
               <th>사이즈</th>
               <th>수량</th>
               <th>상태</th>
+              <th>제외 사유</th>
               <th>신뢰도</th>
             </tr>
           </thead>
@@ -1175,6 +1184,9 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
                   <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
                   <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
                   <td data-label="상태">{labelParseStatus(r.parseStatus)}</td>
+                  <td data-label="제외 사유">
+                    {r.parseStatus === "excluded" || r.excluded ? labelExcludeForDisplayWithFallback(r) : ""}
+                  </td>
                   <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>
                 </tr>
               );

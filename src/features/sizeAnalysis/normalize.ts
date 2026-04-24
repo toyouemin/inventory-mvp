@@ -25,6 +25,12 @@ export function preprocessCell(value: string | null | undefined): string {
 }
 
 export function normalizeGender(raw: string | null | undefined): "남" | "여" | "공용" | undefined {
+  const t0 = String(raw ?? "").trim();
+  if (t0) {
+    if (/^남(?:자|성)?$/i.test(t0) || /^male$/i.test(t0) || /^man$/i.test(t0)) return "남";
+    if (/^여(?:자|성)?$/i.test(t0) || /^female$/i.test(t0) || /^woman$/i.test(t0)) return "여";
+    if (t0 === "공용" || /^unisex$/i.test(t0)) return "공용";
+  }
   const s = preprocessCell(raw);
   if (!s) return undefined;
   for (const rule of GENDER_RULES) {

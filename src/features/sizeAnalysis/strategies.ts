@@ -2,68 +2,18 @@ import {
   extractSizeGenderQty,
   isLikelySizeQtyConflation,
   normalizeGender,
-  normalizeSize,
   parseManualItemOrderSegment,
   parseQty,
   preprocessCell,
   splitOrderItemSegments,
 } from "./normalize";
+import { normalizePersonSizePolicy, normalizePersonWithFallback } from "./personSizePolicy";
 import type { FieldMapping, NormalizedRow, SheetSnapshot } from "./types";
 
 function cell(row: string[], index?: number): string | undefined {
   if (index === undefined || index < 0 || index >= row.length) return undefined;
   const v = row[index];
   return v == null ? undefined : String(v);
-}
-
-function baseStatus(
-  parsed: ReturnType<typeof extractSizeGenderQty>,
-  sizeRaw: string | undefined,
-  genderRaw: string | undefined,
-  qtyRaw: string | undefined
-): Pick<NormalizedRow, "genderNormalized" | "standardizedSize" | "qtyParsed" | "parseStatus" | "parseConfidence" | "parseReason"> {
-  const qtyFromRaw = parseQty(qtyRaw);
-  const gender = parsed.gender ?? normalizeGender(genderRaw);
-  const qty = parsed.qty ?? qtyFromRaw;
-  const size = parsed.size ?? extractSizeGenderQty(sizeRaw).size;
-  return {
-    genderNormalized: gender,
-    standardizedSize: size,
-    qtyParsed: qty,
-    parseStatus: parsed.status,
-    parseConfidence: parsed.confidence,
-    parseReason: parsed.reason,
-  };
-}
-
-function pickQtyForSingleRowPerson(
-  hasQtyColumn: boolean,
-  qtyRaw: string | undefined,
-  parsed: ReturnType<typeof extractSizeGenderQty>,
-  standardizedSize: string | undefined
-): { qty: number; parseStatus: NormalizedRow["parseStatus"]; parseConfidence: number; parseReason: string } {
-  if (hasQtyColumn) {
-    const q = parseQty(qtyRaw);
-    const qty = q != null && Number.isFinite(q) && q > 0 ? q : 1;
-    const ok = !!standardizedSize;
-    return {
-      qty,
-      parseStatus: ok ? "auto_confirmed" : (parsed.status as NormalizedRow["parseStatus"]),
-      parseConfidence: ok ? 0.9 : parsed.confidence,
-      parseReason: ok ? "열 분리(사이즈/수량)" : parsed.reason,
-    };
-  }
-  let q = parsed.qty;
-  if (isLikelySizeQtyConflation(standardizedSize, q)) {
-    q = undefined;
-  }
-  const qty = q != null && q > 0 ? q : 1;
-  return {
-    qty,
-    parseStatus: parsed.status,
-    parseConfidence: parsed.confidence,
-    parseReason: parsed.reason,
-  };
 }
 
 /** club/name/gender/size/qty가 모두 비어 있으면 완전 빈 행으로 간주 */
@@ -109,11 +59,9 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
     }
 
     if (hasQtyColumn) {
-      // 수량 열이 있을 때: 성별+사이즈만 합쳐 파싱(수량은 qty 열만 사용; 합쳐 넣으면 95가 수량으로 잡힘)
-      const sizeInput = [genderRaw, sizeRaw].filter((x) => preprocessCell(x)).join(" ");
-      const parsed = extractSizeGenderQty(sizeInput);
-      const standardizedSize = parsed.size ?? normalizeSize(sizeRaw);
-      const { qty, parseStatus, parseConfidence, parseReason } = pickQtyForSingleRowPerson(true, qtyRaw, parsed, standardizedSize);
+      const pol = normalizePersonSizePolicy(sizeRaw, genderRaw);
+      const q = parseQty(qtyRaw);
+      const qty = q != null && Number.isFinite(q) && q > 0 ? q : 1;
       out.push({
         jobId,
         sourceSheet: sheet.name,
@@ -125,21 +73,30 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
         sizeRaw,
         qtyRaw,
         clubNameNormalized: preprocessCell(clubRaw),
-        genderNormalized: parsed.gender ?? normalizeGender(genderRaw),
-        standardizedSize,
+        genderNormalized: pol.genderNormalized,
+        standardizedSize: pol.standardizedSize,
         qtyParsed: qty,
-        parseStatus,
-        parseConfidence,
-        parseReason,
+        parseStatus: pol.parseStatus,
+        parseConfidence: pol.parseConfidence,
+        parseReason: pol.parseReason,
         userCorrected: false,
         excluded: false,
       });
     } else {
-      // 수량 열 없을 때: item까지 합쳐 텍스트 파싱, 사이즈=수량 혼동은 보정
       const full = [genderRaw, sizeRaw, itemRaw].filter((x) => preprocessCell(x)).join(" ");
+      const pol = normalizePersonWithFallback(sizeRaw, genderRaw, full);
       const parsedFull = extractSizeGenderQty(full);
-      const standardizedSize = parsedFull.size ?? normalizeSize(sizeRaw);
-      const { qty, parseStatus, parseConfidence, parseReason } = pickQtyForSingleRowPerson(false, undefined, parsedFull, standardizedSize);
+      let q = parsedFull.qty;
+      if (isLikelySizeQtyConflation(pol.standardizedSize, q)) {
+        q = undefined;
+      }
+      if (pol.standardizedSize && /^[MW]\d{2,3}$/i.test(pol.standardizedSize) && q != null) {
+        const d = pol.standardizedSize.replace(/^[MW]/i, "");
+        if (d === String(q)) {
+          q = undefined;
+        }
+      }
+      const qty = q != null && q > 0 ? q : 1;
       out.push({
         jobId,
         sourceSheet: sheet.name,
@@ -151,12 +108,12 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
         sizeRaw,
         qtyRaw,
         clubNameNormalized: preprocessCell(clubRaw),
-        genderNormalized: parsedFull.gender ?? normalizeGender(genderRaw),
-        standardizedSize,
+        genderNormalized: pol.genderNormalized ?? parsedFull.gender ?? normalizeGender(genderRaw),
+        standardizedSize: pol.standardizedSize,
         qtyParsed: qty,
-        parseStatus,
-        parseConfidence,
-        parseReason,
+        parseStatus: pol.parseStatus,
+        parseConfidence: pol.parseConfidence,
+        parseReason: pol.parseReason,
         userCorrected: false,
         excluded: false,
       });
@@ -177,7 +134,8 @@ export function parseRepeatedSlots(jobId: string, sheet: SheetSnapshot, mapping:
       const sizeRaw = cell(row, g.size);
       const qtyRaw = cell(row, g.qty);
       const genderRaw = cell(row, g.gender);
-      const parsed = extractSizeGenderQty([genderRaw, sizeRaw, qtyRaw].filter(Boolean).join(" "));
+      const merged = [genderRaw, sizeRaw, qtyRaw].filter(Boolean).join(" ");
+      const pol = normalizePersonWithFallback(sizeRaw, genderRaw, merged);
       const empty = isCoreFieldsAllEmpty({
         clubRaw,
         nameRaw,
@@ -189,6 +147,8 @@ export function parseRepeatedSlots(jobId: string, sheet: SheetSnapshot, mapping:
         // 완전 빈 슬롯은 생성하지 않음
         return;
       }
+      const fromLegacy = extractSizeGenderQty(merged);
+      const qtyP = fromLegacy.qty ?? parseQty(qtyRaw) ?? 1;
       out.push({
         jobId,
         sourceSheet: sheet.name,
@@ -201,9 +161,14 @@ export function parseRepeatedSlots(jobId: string, sheet: SheetSnapshot, mapping:
         sizeRaw,
         qtyRaw,
         clubNameNormalized: preprocessCell(clubRaw),
+        genderNormalized: pol.genderNormalized,
+        standardizedSize: pol.standardizedSize,
+        qtyParsed: qtyP,
+        parseStatus: pol.parseStatus,
+        parseConfidence: pol.parseConfidence,
+        parseReason: pol.parseReason,
         userCorrected: false,
         excluded: false,
-        ...baseStatus(parsed, sizeRaw, genderRaw, qtyRaw),
       });
     });
   }

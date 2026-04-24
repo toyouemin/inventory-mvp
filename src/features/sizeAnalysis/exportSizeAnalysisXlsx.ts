@@ -13,6 +13,7 @@ import {
   stableRowKeyForDup,
   unionClubsOrdered,
 } from "./clubSizeAggModes";
+import { labelExcludeForDisplayWithFallback } from "./excludeReasonLabels";
 
 const PARSE_STATUS_LABEL: Record<string, string> = {
   auto_confirmed: "자동확정",
@@ -243,8 +244,11 @@ export function downloadSizeAnalysisResultXlsx(rows: any[], duplicateAnalysis: D
 }
 
 function buildSheetAll(rows: any[], duplicateRowIds: Set<string>) {
-  const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "신뢰도", "중복여부"];
-  const body = rows.map((r, i) => [
+  const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "제외 사유", "신뢰도", "중복여부"];
+  const body = rows.map((r, i) => {
+    const st = String(r.parseStatus ?? "");
+    const ex = st === "excluded" || r.excluded ? labelExcludeForDisplayWithFallback(r) : "";
+    return [
     r.sourceRowIndex ?? "",
     r.clubNameRaw ?? r.clubNameNormalized ?? "",
     r.memberNameRaw ?? "",
@@ -252,20 +256,22 @@ function buildSheetAll(rows: any[], duplicateRowIds: Set<string>) {
     r.standardizedSize ?? r.sizeRaw ?? "",
     r.qtyParsed ?? r.qtyRaw ?? "",
     labelParseStatus(r.parseStatus),
+    ex,
     Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
     duplicateRowIds.has(stableRowKeyForDup(r, i)) ? "예" : "아니오",
-  ]);
+  ];
+  });
   return [header, ...body];
 }
 
 function buildSheetAllStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet {
   return buildStyledAoaSheet(aoa, {
-    centerCols: new Set([0, 3, 4, 5, 7, 8]),
+    centerCols: new Set([0, 3, 4, 5, 6, 7, 8, 9]),
     freezeHeader: true,
     emptyMessage: "(전체목록 데이터가 없습니다)",
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
-      if (c === 8 && String(row[8] ?? "") === "예") {
+      if (c === 9 && String(row[9] ?? "") === "예") {
         return { fill: EMPH_DUP_FILL, font: { bold: true } };
       }
       if (c === 6 && String(row[6] ?? "") === "검토필요") {

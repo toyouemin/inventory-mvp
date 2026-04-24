@@ -27,16 +27,16 @@ const mappingSplit = {
 const rows = parseSingleRowPerson(jobId, loadSample2Sheet(), mappingSplit);
 assert.equal(rows.length, 3, `expected 3 data rows, got ${rows.length}`);
 
-assert.equal(rows[0]!.standardizedSize, "95");
+assert.equal(rows[0]!.standardizedSize, "M95");
 assert.equal(rows[0]!.qtyParsed, 2, "qty must come from 수량 column, not 95 from size");
-assert.equal(rows[1]!.standardizedSize, "100");
+assert.equal(rows[1]!.standardizedSize, "W100");
 assert.equal(rows[1]!.qtyParsed, 1);
-assert.equal(rows[2]!.standardizedSize, "105");
+assert.equal(rows[2]!.standardizedSize, "M105");
 assert.equal(rows[2]!.qtyParsed, 3);
 
-assert.equal(rows[0]!.parseStatus, "auto_confirmed");
-assert.equal(rows[1]!.parseStatus, "auto_confirmed");
-assert.equal(rows[2]!.parseStatus, "auto_confirmed");
+assert.equal(rows[0]!.parseStatus, "corrected");
+assert.equal(rows[1]!.parseStatus, "corrected");
+assert.equal(rows[2]!.parseStatus, "corrected");
 
 // 수량 열 없음: "남 95"만 있을 때 95→수량 오인 → 1
 const conflationSheet = {
@@ -53,7 +53,8 @@ const mappingNoQty = {
 };
 const cRows = parseSingleRowPerson(jobId, conflationSheet, mappingNoQty);
 assert.equal(cRows.length, 1);
-assert.equal(cRows[0]!.standardizedSize, "95");
+assert.equal(cRows[0]!.standardizedSize, "M95");
+assert.equal(cRows[0]!.parseStatus, "corrected");
 assert.equal(cRows[0]!.qtyParsed, 1, "default qty when conflated with size, no qty column");
 
 console.log("singleRowPerson test passed", { sample2Rows: rows.length });

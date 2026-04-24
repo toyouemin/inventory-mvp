@@ -52,6 +52,10 @@ export type NormalizedRow = {
   parseReason?: string;
   userCorrected: boolean;
   excluded?: boolean;
+  /** Prisma/중복: duplicate_gender_filter | duplicate_first_row_kept | duplicate_same_size */
+  excludeReason?: string;
+  /** 예: duplicate_same_size (first_row + 동일 사이즈 조합 시) */
+  excludeDetail?: string;
   metaJson?: Record<string, unknown>;
 };
 

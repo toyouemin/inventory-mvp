@@ -132,6 +132,9 @@ model SizeAnalysisRow {
   parseReason        String?
   userCorrected      Boolean @default(false)
   excluded           Boolean @default(false)
+  // excludeReason: duplicate_gender_filter | duplicate_first_row_kept | duplicate_same_size
+  excludeReason      String?
+  excludeDetail      String?
   metaJson           Json?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt

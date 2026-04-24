@@ -4,10 +4,18 @@ export type ParseStatus = "auto_confirmed" | "needs_review" | "unresolved" | "co
 export type SheetSnapshot = {
   name: string;
   rows: string[][];
+  people?: PersonRecord[];
 };
 
 export type WorkbookSnapshot = {
   sheets: SheetSnapshot[];
+};
+
+export type PersonRecord = {
+  club: string;
+  name: string;
+  gender: string;
+  size: string;
 };
 
 export type DetectStructureRequest = {

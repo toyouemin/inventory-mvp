@@ -45,35 +45,24 @@
 }
 
 .estimate-sheet__supplier {
-  width: 398px;
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
 }
 
-.estimate-sheet__supplier-col-role {
-  width: 38px;
-}
-
-.estimate-sheet__supplier-col-label {
-  width: 52px;
-}
-
-.estimate-sheet__supplier-col-label-narrow {
-  width: 42px;
-}
-
-.estimate-sheet__supplier-col-value,
-.estimate-sheet__supplier-col-value-narrow {
+.estimate-sheet__supplier table {
   width: auto;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  border: 1px solid #000;
 }
 
-.estimate-sheet__supplier table,
 .estimate-sheet__items {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-}
-
-.estimate-sheet__supplier table {
-  border: 1px solid #000;
 }
 
 .estimate-sheet__supplier th,
@@ -118,8 +107,9 @@
   white-space: normal;
 }
 
-.estimate-sheet__supplier tr:last-child td {
-  min-width: 112px;
+.estimate-sheet__supplier-address {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .estimate-sheet__ceo {

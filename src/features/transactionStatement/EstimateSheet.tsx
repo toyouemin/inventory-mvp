@@ -67,13 +67,6 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
 
         <div className="estimate-sheet__supplier">
           <table>
-            <colgroup>
-              <col className="estimate-sheet__supplier-col-role" />
-              <col className="estimate-sheet__supplier-col-label" />
-              <col className="estimate-sheet__supplier-col-value" />
-              <col className="estimate-sheet__supplier-col-label-narrow" />
-              <col className="estimate-sheet__supplier-col-value-narrow" />
-            </colgroup>
             <tbody>
               <tr>
                 <th rowSpan={4} className="estimate-sheet__supplier-role">
@@ -95,7 +88,9 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
               </tr>
               <tr>
                 <th>주소</th>
-                <td colSpan={3}>{supplier.address || ""}</td>
+                <td colSpan={3} className="estimate-sheet__supplier-address">
+                  {supplier.address || ""}
+                </td>
               </tr>
               <tr>
                 <th>전화</th>

@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { detectHeaderRow, detectStructureType, suggestFieldMapping } from "./structure";
+import { sanitizeForPrismaJson } from "@/lib/sanitizeForPrismaJson";
+import { detectHeaderRow, detectStructureType, extractPeopleFromRows, suggestFieldMapping } from "./structure";
 import { parseRepeatedSlots, parseSingleRowPerson, parseSizeMatrix, parseUnknownManualItem } from "./strategies";
-import type { FieldMapping, NormalizedRow, StructureType, WorkbookSnapshot } from "./types";
+import { extractSizeGenderQty, normalizeGender, normalizeSize, preprocessCell } from "./normalize";
+import type { FieldMapping, NormalizedRow, PersonRecord, StructureType, WorkbookSnapshot } from "./types";
 
 function sheetOrThrow(snapshot: WorkbookSnapshot, sheetName: string) {
   const sheet = snapshot.sheets.find((s) => s.name === sheetName);
@@ -9,24 +11,72 @@ function sheetOrThrow(snapshot: WorkbookSnapshot, sheetName: string) {
   return sheet;
 }
 
+function buildPeopleWorkbook(workbook: WorkbookSnapshot): WorkbookSnapshot {
+  return {
+    sheets: workbook.sheets.map((sheet) => {
+      const headerRowIndex = detectHeaderRow(sheet.rows);
+      const structureType = detectStructureType(sheet.rows, headerRowIndex);
+      const mapping = suggestFieldMapping(sheet.rows, structureType, headerRowIndex);
+      const people = extractPeopleFromRows(sheet.rows, mapping).map((person) => ({
+        club: person.club ?? "",
+        name: person.name ?? "",
+        gender: person.gender ?? "",
+        size: person.size ?? "",
+      }));
+      return {
+        ...sheet,
+        people,
+      };
+    }),
+  };
+}
+
+function normalizedRowsFromPeople(jobId: string, sheetName: string, people: PersonRecord[]): NormalizedRow[] {
+  return people.map((person, idx) => {
+    const parsed = extractSizeGenderQty([person.gender, person.size].filter((x) => preprocessCell(x)).join(" "));
+    const standardizedSize = parsed.size ?? normalizeSize(person.size);
+    return {
+      jobId,
+      sourceSheet: sheetName,
+      sourceRowIndex: idx,
+      clubNameRaw: person.club,
+      memberNameRaw: person.name,
+      genderRaw: person.gender,
+      sizeRaw: person.size,
+      qtyRaw: "1",
+      clubNameNormalized: preprocessCell(person.club),
+      genderNormalized: parsed.gender ?? normalizeGender(person.gender),
+      standardizedSize,
+      qtyParsed: 1,
+      parseStatus: standardizedSize ? "auto_confirmed" : "needs_review",
+      parseConfidence: standardizedSize ? 0.9 : 0.45,
+      parseReason: standardizedSize ? "people 배열 기반 파싱" : "사이즈 정규화 실패",
+      userCorrected: false,
+      excluded: false,
+    };
+  });
+}
+
 export async function createSizeAnalysisJob(args: { fileName: string; fileType: string; workbook: WorkbookSnapshot }) {
-  const { workbook } = args;
+  const workbookWithPeople = buildPeopleWorkbook(args.workbook);
+  // sheets.rows·people·mapping 전체: Prisma JSON에 `undefined`가 남지 않도록 최종 1회 deep sanitize
+  const workbookSnapshot = sanitizeForPrismaJson(workbookWithPeople);
   const created = await prisma.sizeAnalysisJob.create({
     data: {
       fileName: args.fileName,
       fileType: args.fileType,
-      workbookSnapshot: workbook as unknown as object,
+      workbookSnapshot,
     },
   });
 
-  if (workbook.sheets.length > 0) {
+  if (workbookWithPeople.sheets.length > 0) {
     await prisma.sizeAnalysisSheet.createMany({
-      data: workbook.sheets.map((s) => ({
+      data: workbookWithPeople.sheets.map((s) => ({
         jobId: created.id,
         name: s.name,
         rowCount: s.rows.length,
         colCount: Math.max(0, ...s.rows.map((r) => r.length)),
-        previewRows: s.rows.slice(0, 30) as unknown as object,
+        previewRows: sanitizeForPrismaJson(s.rows.slice(0, 30)),
       })),
     });
   }
@@ -64,7 +114,7 @@ export async function saveMapping(jobId: string, sheetName: string, mapping: Fie
       sheetName,
       structureType: mapping.structureType as StructureType,
       headerRowIndex: mapping.headerRowIndex,
-      mappingJson: mapping as unknown as object,
+      mappingJson: sanitizeForPrismaJson(mapping),
       userConfirmed: true,
     },
   });
@@ -114,11 +164,19 @@ export async function runAnalysis(jobId: string) {
   const mappingJson = mapping.mappingJson as unknown as FieldMapping;
   const workbook = job.workbookSnapshot as unknown as WorkbookSnapshot;
   const sheet = sheetOrThrow(workbook, job.selectedSheetName);
+  const people = (sheet.people ?? []).map((p) => ({
+    club: p.club ?? "",
+    name: p.name ?? "",
+    gender: p.gender ?? "",
+    size: p.size ?? "",
+  }));
 
   let rows: NormalizedRow[] = [];
-  if (mappingJson.structureType === "single_row_person") rows = parseSingleRowPerson(jobId, sheet, mappingJson);
-  else if (mappingJson.structureType === "repeated_slots") rows = parseRepeatedSlots(jobId, sheet, mappingJson);
-  else if (mappingJson.structureType === "size_matrix") rows = parseSizeMatrix(jobId, sheet, mappingJson);
+  if (mappingJson.structureType === "single_row_person") {
+    rows = people.length > 0 ? normalizedRowsFromPeople(jobId, sheet.name, people) : parseSingleRowPerson(jobId, sheet, mappingJson);
+  } else if (mappingJson.structureType === "repeated_slots") {
+    rows = people.length > 0 ? normalizedRowsFromPeople(jobId, sheet.name, people) : parseRepeatedSlots(jobId, sheet, mappingJson);
+  } else if (mappingJson.structureType === "size_matrix") rows = parseSizeMatrix(jobId, sheet, mappingJson);
   else if (mappingJson.structureType === "unknown") {
     const f = mappingJson.fields;
     if (f.name === undefined || f.club === undefined || f.item === undefined) {
@@ -136,23 +194,23 @@ export async function runAnalysis(jobId: string) {
         jobId,
         sourceSheet: r.sourceSheet,
         sourceRowIndex: r.sourceRowIndex,
-        sourceGroupIndex: r.sourceGroupIndex,
-        clubNameRaw: r.clubNameRaw,
-        memberNameRaw: r.memberNameRaw,
-        genderRaw: r.genderRaw,
-        itemRaw: r.itemRaw,
-        sizeRaw: r.sizeRaw,
-        qtyRaw: r.qtyRaw,
-        clubNameNormalized: r.clubNameNormalized,
-        genderNormalized: r.genderNormalized,
-        standardizedSize: r.standardizedSize,
-        qtyParsed: r.qtyParsed,
+        sourceGroupIndex: r.sourceGroupIndex ?? null,
+        clubNameRaw: r.clubNameRaw ?? null,
+        memberNameRaw: r.memberNameRaw ?? null,
+        genderRaw: r.genderRaw ?? null,
+        itemRaw: r.itemRaw ?? null,
+        sizeRaw: r.sizeRaw ?? null,
+        qtyRaw: r.qtyRaw ?? null,
+        clubNameNormalized: r.clubNameNormalized ?? null,
+        genderNormalized: r.genderNormalized ?? null,
+        standardizedSize: r.standardizedSize ?? null,
+        qtyParsed: r.qtyParsed ?? null,
         parseStatus: r.parseStatus,
         parseConfidence: r.parseConfidence,
-        parseReason: r.parseReason,
+        parseReason: r.parseReason ?? null,
         userCorrected: r.userCorrected,
         excluded: !!r.excluded,
-        metaJson: (r.metaJson ?? {}) as unknown as object,
+        metaJson: sanitizeForPrismaJson(r.metaJson ?? {}),
       })),
     });
   }
@@ -160,7 +218,7 @@ export async function runAnalysis(jobId: string) {
   const summary = summarize(rows);
   await prisma.sizeAnalysisJob.update({
     where: { id: jobId },
-    data: { verificationJson: summary as unknown as object },
+    data: { verificationJson: sanitizeForPrismaJson(summary) },
   });
   return summary;
 }

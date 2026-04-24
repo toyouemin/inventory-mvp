@@ -18,7 +18,10 @@ import {
   type ClubSizeAggMode,
   type DuplicateAnalysis,
 } from "@/features/sizeAnalysis/clubSizeAggModes";
-import { labelExcludeForDisplayWithFallback } from "@/features/sizeAnalysis/excludeReasonLabels";
+import {
+  labelExcludeForDisplayWithFallback,
+  labelSizeAnalysisParseStatusForRow,
+} from "@/features/sizeAnalysis/excludeReasonLabels";
 import { downloadSizeAnalysisResultXlsx } from "@/features/sizeAnalysis/exportSizeAnalysisXlsx";
 import {
   excelColumnLetterFromOneBased,
@@ -61,6 +64,7 @@ const STATUS_FILTER_LABEL: Record<(typeof STATUS_FILTER_OPTIONS)[number], string
   needs_review: "검토필요",
   unresolved: "미분류",
   corrected: "수정완료",
+  /** API 값은 `excluded` (중복·빈 수량 등 공통) */
   excluded: "제외",
 };
 
@@ -76,6 +80,7 @@ function labelParseStatus(v: string | null | undefined): string {
   if (v == null || v === "") return "";
   return PARSE_STATUS_LABEL[v] ?? v;
 }
+
 
 function labelStructureType(v: string | null | undefined): string {
   if (v == null || v === "") return "";
@@ -726,7 +731,7 @@ export function DuplicateMembersView({ rows }: { rows: any[] }) {
     <section className="size-analysis-card size-analysis-dup-only-section">
       <h3>중복자 보기</h3>
       <p className="size-analysis-muted size-analysis-dup-only-hint">
-        같은 클럽·이름이 2행 이상이면 중복 그룹입니다. 원본행 순 첫 행은 정상(중복 제외 집계에 반영), 둘째 행부터는 중복분
+        같은 클럽·이름(동일 인물)이 2행 이상이면 중복 그룹입니다. 아래 “중복자”는 같은 인물·같은 사이즈(또는 M/W) 반복에 한합니다. 이선화/전영금처럼 다른 이름이면 사이즈가 같아도 별도 인물로 냅둡니다. 원본행 순 첫 행은 정상(집계·대표), 둘째 행부터는 중복분
         수량·중복자 집계에만 포함됩니다.
       </p>
       <div className="size-analysis-dup-only-list--mobile">
@@ -1110,7 +1115,7 @@ function normalizedRowLine2Parts(r: any): {
       pill: st as "needs_review" | "unresolved" | "corrected",
     };
   }
-  const statusLabel = labelParseStatus(r.parseStatus);
+  const statusLabel = labelSizeAnalysisParseStatusForRow(r);
   return {
     subline: [src, statusLabel, conf].filter((x) => x && x.length > 0).join(" · "),
     pill: null,
@@ -1163,7 +1168,7 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
               <th>사이즈</th>
               <th>수량</th>
               <th>상태</th>
-              <th>제외 사유</th>
+              <th>중복 사유</th>
               <th>신뢰도</th>
             </tr>
           </thead>
@@ -1183,8 +1188,8 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
                   <td data-label="성별">{r.genderNormalized ?? r.genderRaw ?? ""}</td>
                   <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
                   <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
-                  <td data-label="상태">{labelParseStatus(r.parseStatus)}</td>
-                  <td data-label="제외 사유">
+                  <td data-label="상태">{labelSizeAnalysisParseStatusForRow(r)}</td>
+                  <td data-label="중복 사유">
                     {r.parseStatus === "excluded" || r.excluded ? labelExcludeForDisplayWithFallback(r) : ""}
                   </td>
                   <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>

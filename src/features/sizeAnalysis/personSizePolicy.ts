@@ -139,14 +139,19 @@ function mwLine(standardizedSize: string | undefined): "M" | "W" | null {
 export const DUPLICATE_KEY_NO_PERSON = "__NO_CLUB__::__NO_NAME__" as const;
 
 /**
- * 인물(클럽+이름) 그룹 키. 서로 다른 이름/클럽은 `::`로 분리·placeholder로 빈 셀 전역 병합 방지.
+ * 동일 사이즈·성별 M/W 중복 기준: **같은 사람** = `clubNameNormalized` + `memberName`(이름 열)만.
+ * - 클럽: 정규화 값 우선, 없으면 `clubNameRaw`를 preprocess(대문자/공백 정리) — 서로 다른 클럽이 한 그룹에 섞이지 않게 함
+ * - 이름: **전체대문자 등 토큰 합병을 하지 않고** `memberNameRaw`를 공백만 정리한 값으로 구분(이선화 ≠ 전영금)
  */
 export function personGroupKeyForDuplicate(r: NormalizedRow): string {
-  const c =
-    (r.clubNameNormalized && String(r.clubNameNormalized).trim()) || preprocessCell(r.clubNameRaw) || "";
-  const clubNameNormalized = c || "__NO_CLUB__";
-  const memberName = String(r.memberNameRaw ?? "").trim() || "__NO_NAME__";
-  return `${clubNameNormalized}::${memberName}`;
+  const normClub =
+    (r.clubNameNormalized != null && String(r.clubNameNormalized).replace(/\s+/g, " ").trim()) || "";
+  const fromRawClub = preprocessCell(r.clubNameRaw);
+  const clubKey = normClub || (fromRawClub && fromRawClub.length > 0 ? fromRawClub : "") || "__NO_CLUB__";
+  const nameKey = String(r.memberNameRaw ?? "")
+    .replace(/\s+/g, " ")
+    .trim() || "__NO_NAME__";
+  return `${clubKey}::${nameKey}`;
 }
 
 function orderKey(r: NormalizedRow): number {
@@ -154,8 +159,9 @@ function orderKey(r: NormalizedRow): number {
 }
 
 /**
- * 동일 인물(이름+클럽)·여러 행: M vs W가 동시에 있을 때만 성별로 한쪽 excluded.
- * 동일 사이즈 문자열이 반복되면 첫 번째만 유지.
+ * 같은 사람(클럽+이름 키가 동일)인 경우에만 중복·M/W 규칙을 적용합니다.
+ * 다른 사람인데 사이즈만 같으면(예: 이선화 W90, 전영금 W90) **서로 다른 그룹**이어서 중복자로 잡지 않습니다.
+ * 같은 사람 + 같은 `standardizedSize`가 반복될 때만 2행째부터 `excluded`(UI: 중복자)로 둡니다(삭제 아님).
  */
 export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[] {
   const result = rows.map((r) => ({ ...r }));
@@ -176,6 +182,18 @@ export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[]
       continue;
     }
     if (indices.length < 2) {
+      continue;
+    }
+    // Map 키로 묶인 행마다 personGroupKeyForDuplicate를 다시 맞춰, 다른 인물이 한 그룹에 없음을 보장
+    let groupKeysConsistent = true;
+    for (const idx of indices) {
+      if (personGroupKeyForDuplicate(result[idx]!) !== key) {
+        console.warn("applyDuplicateSizePolicy: group key mismatch, skip group", { key, idx });
+        groupKeysConsistent = false;
+        break;
+      }
+    }
+    if (!groupKeysConsistent) {
       continue;
     }
     const sortedIdx = [...indices].sort((a, b) => orderKey(result[a]!) - orderKey(result[b]!));

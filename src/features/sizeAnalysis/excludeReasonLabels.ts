@@ -58,4 +58,30 @@ export function labelExcludeForDisplayWithFallback(
   return "";
 }
 
+const PARSE_STATUS_BASE: Record<string, string> = {
+  auto_confirmed: "자동확정",
+  needs_review: "검토필요",
+  unresolved: "미분류",
+  corrected: "수정완료",
+  excluded: "제외",
+};
+
+/**
+ * `parseStatus`는 그대로 two면, `excluded`+`excludeReason`이 있으면 중복자(동일 사이즈 등),
+ * `excluded`만 있으면(예: 사이즈 표 빈 수량) "제외".
+ */
+export function labelSizeAnalysisParseStatusForRow(r: {
+  parseStatus?: string | null;
+  excludeReason?: string | null;
+}): string {
+  const st = String(r.parseStatus ?? "");
+  if (st === "excluded" && (r.excludeReason != null && String(r.excludeReason).trim() !== "")) {
+    return "중복자";
+  }
+  if (st === "excluded") {
+    return "제외";
+  }
+  return PARSE_STATUS_BASE[st] ?? st;
+}
+
 export { EXCLUDE_REASON_USER_LABEL, EXCLUDE_REASON_DETAIL_LABEL };

@@ -3,10 +3,13 @@
 import html2canvas from "html2canvas";
 import { useMemo, useRef, useState } from "react";
 import { amountToKoreanText } from "@/features/transactionStatement/amountToKoreanText";
+import { EstimateSheet } from "@/features/transactionStatement/EstimateSheet";
+import { exportEstimateExcel } from "@/features/transactionStatement/exportEstimateExcel";
 import {
   TransactionStatementPrintSheet,
   type TransactionStatementPrintFooter,
 } from "@/features/transactionStatement/TransactionStatementPrintSheet";
+import panelStyles from "@/features/transactionStatement/TransactionStatementScreenPanel.module.css";
 import { TransactionStatementScreenPanel } from "@/features/transactionStatement/TransactionStatementScreenPanel";
 
 type StatementItemFormRow = {
@@ -30,6 +33,8 @@ type TransactionStatementFormData = {
   items: StatementItemFormRow[];
 };
 
+type DocumentType = "statement" | "estimate";
+
 const FIXED_SUPPLIER = {
   name: "(주)세림통상",
   bizNo: "131-86-32310",
@@ -37,6 +42,14 @@ const FIXED_SUPPLIER = {
   address: "인천광역시 남동구 경신상로78 (구월동)",
   businessType: "도,소매.제조업",
   businessItem: "스포츠용품",
+  companyName: "(주)세림통상",
+  ceoName: "김영례",
+  tel: "",
+  fax: "",
+  bankAccount: "",
+  managerName: "",
+  managerPhone: "",
+  email: "",
 } as const;
 
 const TRANSACTION_STATEMENT_GUIDE_TEXT = "정보 입력→명세표 미리보기→JPG 저장→발송";
@@ -150,6 +163,7 @@ function normalizeBizNoInput(value: string): string {
 export default function TransactionStatementPage() {
   const printCaptureRef = useRef<HTMLDivElement>(null);
   const previewDialogRef = useRef<HTMLDialogElement>(null);
+  const [documentType, setDocumentType] = useState<DocumentType>("statement");
   const [formData, setFormData] = useState<TransactionStatementFormData>({
     customerName: "",
     customerBizNo: "",
@@ -309,6 +323,70 @@ export default function TransactionStatementPage() {
     if (downloading) return;
     setErrorMessage("");
 
+    if (documentType === "estimate") {
+      setDownloading(true);
+      try {
+        const payloadItems = computedRows
+          .filter((row) => row.name.trim() !== "")
+          .map((row) => ({
+            id: row.id,
+            category: row.spec.trim(),
+            name: row.name.trim(),
+            quantity: row.qtyNumber,
+            unit: "개",
+            unitPrice: row.unitPriceNumber,
+            isExtra: false,
+          }));
+
+        if (!formData.customerName.trim()) {
+          setErrorMessage("수신(거래처명)을 입력해 주세요.");
+          return;
+        }
+        if (payloadItems.length === 0) {
+          setErrorMessage("품목명을 1개 이상 입력해 주세요.");
+          return;
+        }
+
+        const bytes = exportEstimateExcel({
+          issueDate: formData.issueDate,
+          receiverName: formData.customerName.trim(),
+          eventName: "",
+          memo: "",
+          vatIncluded: showVatIncluded,
+          supplier: {
+            businessNumber: FIXED_SUPPLIER.bizNo,
+            companyName: FIXED_SUPPLIER.companyName,
+            ceoName: FIXED_SUPPLIER.ceoName,
+            address: FIXED_SUPPLIER.address,
+            tel: FIXED_SUPPLIER.tel,
+            fax: FIXED_SUPPLIER.fax,
+            bankAccount: FIXED_SUPPLIER.bankAccount,
+            managerName: FIXED_SUPPLIER.managerName,
+            managerPhone: FIXED_SUPPLIER.managerPhone,
+            email: FIXED_SUPPLIER.email,
+          },
+          items: payloadItems,
+        });
+
+        const blob = new Blob([new Uint8Array(bytes)], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        });
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = objectUrl;
+        anchor.download = `estimate-${formData.issueDate.replace(/-/g, "").slice(2)}.xlsx`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : "견적서 엑셀 다운로드에 실패했습니다.");
+      } finally {
+        setDownloading(false);
+      }
+      return;
+    }
+
     const tradeDateForItems = formData.tradeDate || formData.issueDate;
     const [tradeYear, tradeMonthRaw, tradeDayRaw] = tradeDateForItems.split("-");
     const tradeMonth = Number(tradeMonthRaw) || null;
@@ -462,6 +540,22 @@ export default function TransactionStatementPage() {
       <section className="card transaction-page__card">
         <h1>거래명세표 작성</h1>
         <p className="muted transaction-page__desc">{TRANSACTION_STATEMENT_GUIDE_TEXT}</p>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+          <button
+            type="button"
+            className={`btn btn-compact ${documentType === "statement" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setDocumentType("statement")}
+          >
+            거래명세서
+          </button>
+          <button
+            type="button"
+            className={`btn btn-compact ${documentType === "estimate" ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setDocumentType("estimate")}
+          >
+            견적서
+          </button>
+        </div>
 
         <div className="transaction-form-grid">
           <label className="transaction-form-grid__customer">
@@ -586,33 +680,94 @@ export default function TransactionStatementPage() {
           </div>
         </div>
 
-        <TransactionStatementScreenPanel
-          issueDate={formData.issueDate}
-          tradeDateYmd={formData.tradeDate || formData.issueDate}
-          supplierName={FIXED_SUPPLIER.name}
-          supplierBizNo={FIXED_SUPPLIER.bizNo}
-          supplierRepresentative={FIXED_SUPPLIER.representative}
-          customerName={formData.customerName}
-          customerBizNo={formData.customerBizNo}
-          customerRepresentative={formData.customerRepresentative}
-          lines={screenLines}
-          totalQty={totals.totalQty}
-          supplyAmount={settlement.supplyAmount}
-          taxAmount={settlement.taxAmount}
-          totalAmount={totals.totalAmount}
-          amountKoreanText={settlement.amountKoreanText}
-          showVatIncluded={showVatIncluded}
-          onShowVatIncludedChange={setShowVatIncluded}
-          onOpenPrintPreview={() => previewDialogRef.current?.showModal()}
-        />
+        {documentType === "statement" ? (
+          <TransactionStatementScreenPanel
+            issueDate={formData.issueDate}
+            tradeDateYmd={formData.tradeDate || formData.issueDate}
+            supplierName={FIXED_SUPPLIER.name}
+            supplierBizNo={FIXED_SUPPLIER.bizNo}
+            supplierRepresentative={FIXED_SUPPLIER.representative}
+            customerName={formData.customerName}
+            customerBizNo={formData.customerBizNo}
+            customerRepresentative={formData.customerRepresentative}
+            lines={screenLines}
+            totalQty={totals.totalQty}
+            supplyAmount={settlement.supplyAmount}
+            taxAmount={settlement.taxAmount}
+            totalAmount={totals.totalAmount}
+            amountKoreanText={settlement.amountKoreanText}
+            showVatIncluded={showVatIncluded}
+            onShowVatIncludedChange={setShowVatIncluded}
+            onOpenPrintPreview={() => previewDialogRef.current?.showModal()}
+          />
+        ) : (
+          <section className={panelStyles.panel}>
+            <div className={panelStyles.panelHeader}>
+              <h2 className={panelStyles.panelTitle}>견적서 요약</h2>
+              <label className={panelStyles.vatToggle}>
+                <span className={panelStyles.vatToggleLabel}>부가세 포함 표시</span>
+                <input
+                  type="checkbox"
+                  className={panelStyles.vatToggleInput}
+                  checked={showVatIncluded}
+                  onChange={(event) => setShowVatIncluded(event.target.checked)}
+                />
+                <span className={panelStyles.vatToggleTrack} aria-hidden />
+              </label>
+            </div>
+            <div className={panelStyles.previewRow}>
+              <button
+                type="button"
+                className={`btn btn-secondary btn-compact ${panelStyles.previewBtn}`}
+                onClick={() => previewDialogRef.current?.showModal()}
+              >
+                견적서 미리보기
+              </button>
+            </div>
+          </section>
+        )}
 
         <div ref={printCaptureRef} className="transaction-print-hidden-host" aria-hidden="true">
-          <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
+          {documentType === "statement" ? (
+            <TransactionStatementPrintSheet {...printSheetProps} captureFixed />
+          ) : (
+            <EstimateSheet
+              data={{
+                date: formData.issueDate,
+                receiverName: formData.customerName,
+                eventName: "",
+                memo: "",
+              }}
+              items={computedRows.map((row) => ({
+                id: row.id,
+                category: row.spec,
+                name: row.name,
+                quantity: row.qtyNumber,
+                unit: "개",
+                unitPrice: row.unitPriceNumber,
+                isExtra: false,
+              }))}
+              supplier={{
+                businessNumber: FIXED_SUPPLIER.bizNo,
+                companyName: FIXED_SUPPLIER.companyName,
+                ceoName: FIXED_SUPPLIER.ceoName,
+                address: FIXED_SUPPLIER.address,
+                tel: FIXED_SUPPLIER.tel,
+                fax: FIXED_SUPPLIER.fax,
+                bankAccount: FIXED_SUPPLIER.bankAccount,
+                managerName: FIXED_SUPPLIER.managerName,
+                managerPhone: FIXED_SUPPLIER.managerPhone,
+                email: FIXED_SUPPLIER.email,
+              }}
+              vatIncluded={showVatIncluded}
+              captureFixed
+            />
+          )}
         </div>
 
         <dialog ref={previewDialogRef} className="transaction-preview-dialog" aria-labelledby="transaction-preview-title">
           <div className="transaction-preview-dialog__toolbar">
-            <h2 id="transaction-preview-title">출력명세서</h2>
+            <h2 id="transaction-preview-title">{documentType === "statement" ? "출력명세서" : "견적서 미리보기"}</h2>
             <div className="transaction-preview-dialog__toolbarActions">
               <button
                 type="button"
@@ -643,7 +798,40 @@ export default function TransactionStatementPage() {
             </div>
           </div>
           <div className="transaction-preview-dialog__scroll">
-            <TransactionStatementPrintSheet {...printSheetProps} />
+            {documentType === "statement" ? (
+              <TransactionStatementPrintSheet {...printSheetProps} />
+            ) : (
+              <EstimateSheet
+                data={{
+                  date: formData.issueDate,
+                  receiverName: formData.customerName,
+                  eventName: "",
+                  memo: "",
+                }}
+                items={computedRows.map((row) => ({
+                  id: row.id,
+                  category: row.spec,
+                  name: row.name,
+                  quantity: row.qtyNumber,
+                  unit: "개",
+                  unitPrice: row.unitPriceNumber,
+                  isExtra: false,
+                }))}
+                supplier={{
+                  businessNumber: FIXED_SUPPLIER.bizNo,
+                  companyName: FIXED_SUPPLIER.companyName,
+                  ceoName: FIXED_SUPPLIER.ceoName,
+                  address: FIXED_SUPPLIER.address,
+                  tel: FIXED_SUPPLIER.tel,
+                  fax: FIXED_SUPPLIER.fax,
+                  bankAccount: FIXED_SUPPLIER.bankAccount,
+                  managerName: FIXED_SUPPLIER.managerName,
+                  managerPhone: FIXED_SUPPLIER.managerPhone,
+                  email: FIXED_SUPPLIER.email,
+                }}
+                vatIncluded={showVatIncluded}
+              />
+            )}
           </div>
         </dialog>
 
@@ -656,7 +844,7 @@ export default function TransactionStatementPage() {
             onClick={handleDownload}
             disabled={downloading || jpgSaving}
           >
-            {downloading ? "다운로드 중..." : "명세표 Excel다운"}
+            {downloading ? "다운로드 중..." : documentType === "statement" ? "명세표 Excel다운" : "견적서 Excel다운"}
           </button>
           <button
             type="button"
@@ -664,7 +852,7 @@ export default function TransactionStatementPage() {
             onClick={() => void handleJpgSave()}
             disabled={jpgSaving || downloading}
           >
-            {jpgSaving ? "JPG 저장 중…" : "명세표 이미지 저장"}
+            {jpgSaving ? "JPG 저장 중…" : documentType === "statement" ? "명세표 이미지 저장" : "견적서 이미지 저장"}
           </button>
         </div>
       </section>

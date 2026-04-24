@@ -5787,6 +5787,72 @@ label {
   margin-bottom: 4px;
 }
 
+.size-analysis-summary-scope-hint {
+  margin: 0 0 8px 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.size-analysis-dup-badge {
+  flex-shrink: 0;
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.1;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.size-analysis-table-name-cell {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.size-analysis-view-switch--3.size-analysis-view-switch--segmented .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 0.78rem;
+}
+
+.size-analysis-dup-club {
+  margin-bottom: 12px;
+}
+
+.size-analysis-dup-club__title {
+  margin: 0 0 6px 0;
+  font-size: 0.9rem;
+  color: #111827;
+}
+
+.size-analysis-dup-person {
+  margin: 0 0 8px 0.25rem;
+  padding: 0 0 0 2px;
+  border-left: 2px solid #e0e7ff;
+}
+
+.size-analysis-dup-person__name {
+  margin: 0 0 2px 0;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.size-analysis-dup-person__lines {
+  margin: 0 0 0 0;
+  padding: 0 0 0 0.5rem;
+  list-style: none;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: #374151;
+}
+
 .size-analysis-filter-row {
   display: flex;
   flex-wrap: wrap;
@@ -5994,10 +6060,20 @@ label {
 
 .size-analysis-norm-compact__line1 {
   margin: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 8px;
+  flex-wrap: wrap;
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.3;
   color: #111827;
+}
+
+.size-analysis-norm-compact__line1-text {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .size-analysis-norm-compact__row2 {

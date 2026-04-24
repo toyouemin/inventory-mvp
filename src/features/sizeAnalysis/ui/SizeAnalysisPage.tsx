@@ -64,6 +64,75 @@ function labelStructureType(v: string | null | undefined): string {
   return STRUCTURE_TYPE_LABEL[v as Mapping["structureType"]] ?? v;
 }
 
+function normClubFromNormRow(r: { clubNameNormalized?: string | null; clubNameRaw?: string | null }): string {
+  return String(r.clubNameNormalized ?? r.clubNameRaw ?? "미분류").trim() || "미분류";
+}
+
+function rowQtyParsed(r: any): number {
+  const q = r.qtyParsed;
+  return Number.isFinite(Number(q)) ? Number(q) : 0;
+}
+
+/** 정규화 행 → 중복 뱃지·Set 키 (id 우선, 없으면 원본행·인덱스) */
+function stableRowKeyForDup(r: any, rowIndex: number): string {
+  if (r != null && r.id != null && String(r.id) !== "") return String(r.id);
+  if (r?.sourceRowIndex != null && r.sourceRowIndex !== "") return `src:${r.sourceRowIndex}`;
+  return `ix:${rowIndex}`;
+}
+
+export type DuplicateAnalysis = {
+  duplicateRowIds: Set<string>;
+  dupByClub: Map<string, { persons: number; sheets: number }>;
+  duplicatePersonCount: number;
+  duplicateQtyTotal: number;
+  normalQty: number;
+  totalQty: number;
+};
+
+/** 같은 클럽 + 같은 이름(비어 있지 않음)이 2행 이상이면 중복자. 성별·사이즈가 달라도 동일 인물로 묶음 */
+function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
+  const duplicateRowIds = new Set<string>();
+  const byKey = new Map<string, { r: any; i: number }[]>();
+  let totalQty = 0;
+  for (let i = 0; i < rows.length; i += 1) {
+    const r = rows[i]!;
+    if (r.excluded) continue;
+    totalQty += rowQtyParsed(r);
+    const name = String(r.memberNameRaw ?? "").trim();
+    if (!name) continue;
+    const club = normClubFromNormRow(r);
+    const k = `${club}\0${name}`;
+    if (!byKey.has(k)) byKey.set(k, []);
+    byKey.get(k)!.push({ r, i });
+  }
+  const dupByClub = new Map<string, { persons: number; sheets: number }>();
+  let duplicatePersonCount = 0;
+  let duplicateQtyTotal = 0;
+  for (const list of byKey.values()) {
+    if (list.length < 2) continue;
+    duplicatePersonCount += 1;
+    const gQty = list.reduce((s, { r }) => s + rowQtyParsed(r), 0);
+    duplicateQtyTotal += gQty;
+    const club = normClubFromNormRow(list[0]!.r);
+    for (const { r, i } of list) {
+      duplicateRowIds.add(stableRowKeyForDup(r, i));
+    }
+    const d = dupByClub.get(club) ?? { persons: 0, sheets: 0 };
+    d.persons += 1;
+    d.sheets += gQty;
+    dupByClub.set(club, d);
+  }
+  const normalQty = totalQty - duplicateQtyTotal;
+  return {
+    duplicateRowIds,
+    dupByClub,
+    duplicatePersonCount,
+    duplicateQtyTotal,
+    normalQty,
+    totalQty,
+  };
+}
+
 export function SizeAnalysisPage() {
   const [jobId, setJobId] = useState<string>("");
   const [sheets, setSheets] = useState<Array<{ name: string; rowCount: number }>>([]);
@@ -76,27 +145,16 @@ export function SizeAnalysisPage() {
   const [loading, setLoading] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [mappingSaved, setMappingSaved] = useState(false);
-  const [detailViewMode, setDetailViewMode] = useState<"all" | "club">("all");
+  const [detailViewMode, setDetailViewMode] = useState<"all" | "club" | "duplicates">("all");
 
-  const clubSizeRows = useMemo(() => {
-    const detail = summary?.clubSizeStatusRows;
-    if (Array.isArray(detail) && detail.length > 0) {
-      return detail as Array<{ club: string; gender: string; size: string; qty: number }>;
-    }
-    const obj = summary?.clubSize ?? {};
-    const out: Array<{ club: string; gender: string; size: string; qty: number }> = [];
-    Object.entries(obj).forEach(([club, sizeMap]) => {
-      Object.entries(sizeMap as Record<string, number>).forEach(([size, qty]) => out.push({ club, gender: "", size, qty }));
-    });
-    return out.sort((a, b) => a.club.localeCompare(b.club, "ko") || compareGenderForClubSize(a.gender, b.gender) || compareSizeLabel(a.size, b.size));
-  }, [summary]);
+  const duplicateAnalysis = useMemo(() => analyzeDuplicateRows(rows), [rows]);
 
   const clubGroupedRows = useMemo(() => {
     const byClub = new Map<string, { club: string; totalQty: number; rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }> }>();
     const detailMap = new Map<string, { club: string; gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }>();
 
     for (const r of rows) {
-      const club = String(r.clubNameRaw ?? r.clubNameNormalized ?? "미분류").trim() || "미분류";
+      const club = normClubFromNormRow(r);
       const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
       const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
       const qtyRaw = r.qtyParsed ?? r.qtyRaw ?? 0;
@@ -132,6 +190,15 @@ export function SizeAnalysisPage() {
       }))
       .sort((a, b) => a.club.localeCompare(b.club, "ko"));
   }, [rows]);
+
+  /** 8) 집계: 현재 목록(필터) 기준, 성별/사이즈는 정규화 행에서 집계 */
+  const clubSizeFlatFromNorm = useMemo(
+    () =>
+      clubGroupedRows.flatMap((c) =>
+        c.rows.map((r) => ({ club: c.club, gender: r.gender, size: r.size, qty: r.qty }))
+      ),
+    [clubGroupedRows]
+  );
 
   const clubViewDataKey = useMemo(
     () => clubGroupedRows.map((c) => `${c.club}:${c.totalQty}:${c.rows.length}`).join("|"),
@@ -279,17 +346,19 @@ export function SizeAnalysisPage() {
         </button>
       </section>
 
-      <AnalysisSummaryCards summary={summary} />
+      <AnalysisSummaryCards summary={summary} duplicateAnalysis={duplicateAnalysis} statusFilter={statusFilter} />
       <AnalysisStatusFilter value={statusFilter} onChange={onStatusChange} />
       <div className="size-analysis-result-region">
         <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} />
         {detailViewMode === "all" ? (
-        <>
-          <AnalysisRowsTable rows={rows} />
-            <ClubSizeSummaryTable normRows={rows} rows={clubSizeRows} />
-        </>
+          <>
+            <AnalysisRowsTable rows={rows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
+            <ClubSizeSummaryTable dupByClub={duplicateAnalysis.dupByClub} normRows={rows} rows={clubSizeFlatFromNorm} />
+          </>
+        ) : detailViewMode === "club" ? (
+          <ClubGroupedView key={clubViewDataKey} dupByClub={duplicateAnalysis.dupByClub} rows={clubGroupedRows} />
         ) : (
-          <ClubGroupedView key={clubViewDataKey} rows={clubGroupedRows} />
+          <DuplicateMembersView rows={rows} />
         )}
       </div>
 
@@ -568,14 +637,14 @@ export function DetailViewSwitch({
   mode,
   onChange,
 }: {
-  mode: "all" | "club";
-  onChange: (mode: "all" | "club") => void;
+  mode: "all" | "club" | "duplicates";
+  onChange: (mode: "all" | "club" | "duplicates") => void;
 }) {
   return (
     <section className="size-analysis-card size-analysis-view-switch-card">
       <h3 className="size-analysis-view-switch__heading">보기 전환</h3>
       <div
-        className="size-analysis-view-switch size-analysis-view-switch--segmented"
+        className="size-analysis-view-switch size-analysis-view-switch--segmented size-analysis-view-switch--3"
         role="group"
         aria-label="결과 보기 전환"
       >
@@ -593,6 +662,111 @@ export function DetailViewSwitch({
         >
           클럽별 보기
         </button>
+        <button
+          type="button"
+          className={`btn ${mode === "duplicates" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => onChange("duplicates")}
+        >
+          중복자 보기
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function sortDupMemberRowsForDisplay(list: any[]): any[] {
+  return [...list].sort((a, b) => {
+    const oa = Number(a.sourceRowIndex);
+    const ob = Number(b.sourceRowIndex);
+    if (Number.isFinite(oa) && Number.isFinite(ob) && oa !== ob) return oa - ob;
+    if (Number.isFinite(oa) && !Number.isFinite(ob)) return -1;
+    if (!Number.isFinite(oa) && Number.isFinite(ob)) return 1;
+    return (
+      String(a.genderNormalized ?? a.genderRaw ?? "").localeCompare(String(b.genderNormalized ?? b.genderRaw ?? ""), "ko") ||
+      String(a.standardizedSize ?? a.sizeRaw ?? "").localeCompare(String(b.standardizedSize ?? b.sizeRaw ?? ""), "ko")
+    );
+  });
+}
+
+function lineGenderSizeQtyRow(r: any, lineIdx: number): string {
+  const g = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
+  const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+  const qty = rowQtyParsed(r);
+  const gPart = g === "공용" ? `공용 ${size}` : g ? `${g} ${size}` : size;
+  const hasSrc = r.sourceRowIndex != null && String(r.sourceRowIndex).trim() !== "";
+  const rowN = hasSrc ? String(r.sourceRowIndex).trim() : String(lineIdx + 1);
+  return `${gPart} · ${qty}개 · 행 ${rowN}`;
+}
+
+/** 클럽별로 (같은 클럽+이름) 중복 그룹만 표시 */
+export function DuplicateMembersView({ rows }: { rows: any[] }) {
+  const clubMap = new Map<string, Map<string, { r: any; i: number }[]>>();
+  for (let i = 0; i < rows.length; i += 1) {
+    const r = rows[i]!;
+    if (r.excluded) continue;
+    const name = String(r.memberNameRaw ?? "").trim();
+    if (!name) continue;
+    const club = normClubFromNormRow(r);
+    if (!clubMap.has(club)) clubMap.set(club, new Map());
+    const nameMap = clubMap.get(club)!;
+    if (!nameMap.has(name)) nameMap.set(name, []);
+    nameMap.get(name)!.push({ r, i });
+  }
+
+  const sections: { club: string; groups: { name: string; list: { r: any; i: number }[] }[] }[] = [];
+  for (const club of Array.from(clubMap.keys()).sort((a, b) => a.localeCompare(b, "ko"))) {
+    const nameMap = clubMap.get(club)!;
+    const groups: { name: string; list: { r: any; i: number }[] }[] = [];
+    for (const [name, list] of nameMap) {
+      if (list.length < 2) continue;
+      const sortedR = sortDupMemberRowsForDisplay(list.map((x) => x.r));
+      const byR = new Map(list.map((x) => [x.r, x] as const));
+      const listSorted = sortedR.map((r) => {
+        const hit = byR.get(r);
+        return hit ?? { r, i: 0 };
+      });
+      groups.push({ name, list: listSorted });
+    }
+    groups.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    if (groups.length) sections.push({ club, groups });
+  }
+
+  if (sections.length === 0) {
+    return (
+      <section className="size-analysis-card size-analysis-dup-only-section">
+        <h3>중복자 보기</h3>
+        <p className="size-analysis-muted">중복자가 없습니다.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="size-analysis-card size-analysis-dup-only-section">
+      <h3>중복자 보기</h3>
+      <p className="size-analysis-muted size-analysis-dup-only-hint">
+        같은 클럽·이름(비어 있지 않은 경우)이 2행 이상인 경우입니다. 성별·사이즈가 달라도 동일으로 묶습니다.
+      </p>
+      <div className="size-analysis-dup-only-list">
+        {sections.map((sec) => (
+          <div key={sec.club} className="size-analysis-dup-club">
+            <h4 className="size-analysis-dup-club__title">{sec.club}</h4>
+            {sec.groups.map((g) => {
+              const total = g.list.reduce((s, { r }) => s + rowQtyParsed(r), 0);
+              return (
+                <div key={g.name} className="size-analysis-dup-person">
+                  <p className="size-analysis-dup-person__name">
+                    {g.name} · 총 {total}개
+                  </p>
+                  <ul className="size-analysis-dup-person__lines">
+                    {g.list.map(({ r, i }, j) => (
+                      <li key={stableRowKeyForDup(r, i)}>– {lineGenderSizeQtyRow(r, j)}</li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -606,7 +780,9 @@ function defaultExpandedClubSet(items: Array<{ club: string }>) {
 
 export function ClubGroupedView({
   rows,
+  dupByClub,
 }: {
+  dupByClub?: Map<string, { persons: number; sheets: number }>;
   rows: Array<{
     club: string;
     totalQty: number;
@@ -633,6 +809,9 @@ export function ClubGroupedView({
         {rows.map((club, idx) => {
           const isOpen = expanded.has(club.club);
           const panelId = `size-analysis-club-panel-${idx}`;
+          const dup = dupByClub?.get(club.club);
+          const dupPart =
+            dup && dup.persons > 0 ? ` · 중복 ${dup.persons}명/${dup.sheets}개` : "";
           return (
             <article key={`${idx}-${club.club}`} className="size-analysis-club-group-card">
               <button
@@ -643,9 +822,10 @@ export function ClubGroupedView({
                 aria-controls={panelId}
                 aria-label={`${club.club} 상세 ${isOpen ? "접기" : "펼치기"}`}
               >
-                <span className="size-analysis-club-group-head__name">{club.club}</span>
+                <span className="size-analysis-club-group-head__name">
+                  {club.club} · 총 {club.totalQty}개{dupPart}
+                </span>
                 <span className="size-analysis-club-group-head__right">
-                  <span className="size-analysis-club-group-head__total">총 {club.totalQty}개</span>
                   <span className="size-analysis-club-group-chevron" aria-hidden>
                     <svg
                       className={isOpen ? "size-analysis-club-group-chevron__svg is-open" : "size-analysis-club-group-chevron__svg"}
@@ -704,9 +884,18 @@ export function ClubGroupedView({
   );
 }
 
-export function AnalysisSummaryCards({ summary }: { summary: any }) {
+export function AnalysisSummaryCards({
+  summary,
+  duplicateAnalysis,
+  statusFilter,
+}: {
+  summary: any;
+  duplicateAnalysis: DuplicateAnalysis;
+  statusFilter: string;
+}) {
   if (!summary) return null;
-  const cards = [
+  const filterLabel = STATUS_FILTER_LABEL[statusFilter as (typeof STATUS_FILTER_OPTIONS)[number]] ?? statusFilter;
+  const cards: Array<[string, string | number]> = [
     ["총 정규화 행 수", summary.totalRows],
     ["자동확정", summary.auto_confirmed],
     ["검토필요", summary.needs_review],
@@ -715,11 +904,17 @@ export function AnalysisSummaryCards({ summary }: { summary: any }) {
     ["제외", summary.excluded],
     ["원본 총수량", summary.originalTotalQty],
     ["최종 집계 수량", summary.aggregatedTotalQty],
+    ["중복자 수(인원)", duplicateAnalysis.duplicatePersonCount],
+    ["중복 수량", duplicateAnalysis.duplicateQtyTotal],
+    ["일반 수량", duplicateAnalysis.normalQty],
     ["검산", summary.verificationMatched ? "일치" : "불일치"],
   ];
   return (
     <section className="size-analysis-card">
       <h3>5) 결과 요약</h3>
+      <p className="size-analysis-muted size-analysis-summary-scope-hint">
+        {filterLabel} 필터·현재 화면에 로드된 목록을 기준으로 집계합니다(중복 지표 포함).
+      </p>
       <div className="size-analysis-summary-cards">
         {cards.map(([label, value]) => (
           <article key={label} className="size-analysis-summary-card">
@@ -806,16 +1001,20 @@ function normCompactClass(st: string | undefined) {
   return "size-analysis-norm-compact";
 }
 
-export function AnalysisRowsTable({ rows }: { rows: any[] }) {
+export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; duplicateRowIds: Set<string> }) {
   return (
     <section className="size-analysis-card size-analysis-norm-section">
       <h3>7) 정규화 행</h3>
       <div className="size-analysis-norm-compact-list size-analysis-norm-compact-list--mobile" aria-label="정규화 행(요약)">
-        {rows.map((r) => {
+        {rows.map((r, i) => {
           const { subline, pill } = normalizedRowLine2Parts(r);
+          const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
           return (
-            <article key={r.id} className={normCompactClass(r.parseStatus)}>
-              <p className="size-analysis-norm-compact__line1">{normalizedRowLine1(r)}</p>
+            <article key={stableRowKeyForDup(r, i)} className={normCompactClass(r.parseStatus)}>
+              <p className="size-analysis-norm-compact__line1">
+                <span className="size-analysis-norm-compact__line1-text">{normalizedRowLine1(r)}</span>
+                {isDup ? <span className="size-analysis-dup-badge">중복</span> : null}
+              </p>
               <div className="size-analysis-norm-compact__row2">
                 <p className="size-analysis-norm-compact__line2">{subline}</p>
                 {pill === "needs_review" ? (
@@ -845,18 +1044,26 @@ export function AnalysisRowsTable({ rows }: { rows: any[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td data-label="원본행">{r.sourceRowIndex}</td>
-                <td data-label="클럽">{r.clubNameRaw ?? ""}</td>
-                <td data-label="이름">{r.memberNameRaw ?? ""}</td>
-                <td data-label="성별">{r.genderNormalized ?? r.genderRaw ?? ""}</td>
-                <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
-                <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
-                <td data-label="상태">{labelParseStatus(r.parseStatus)}</td>
-                <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
+              return (
+                <tr key={stableRowKeyForDup(r, i)}>
+                  <td data-label="원본행">{r.sourceRowIndex}</td>
+                  <td data-label="클럽">{r.clubNameRaw ?? ""}</td>
+                  <td data-label="이름">
+                    <span className="size-analysis-table-name-cell">
+                      {r.memberNameRaw ?? ""}
+                      {isDup ? <span className="size-analysis-dup-badge">중복</span> : null}
+                    </span>
+                  </td>
+                  <td data-label="성별">{r.genderNormalized ?? r.genderRaw ?? ""}</td>
+                  <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
+                  <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
+                  <td data-label="상태">{labelParseStatus(r.parseStatus)}</td>
+                  <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -890,11 +1097,6 @@ function compareSizeLabel(a: string, b: string): number {
 
 const LETTER_SIZES_ORDER = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "FREE", "F"] as const;
 
-/** 집계 행(요약)과 정규화 행의 클럽 키를 맞춤 */
-function normClubFromNormRow(r: { clubNameNormalized?: string | null; clubNameRaw?: string | null }): string {
-  return String(r.clubNameNormalized ?? r.clubNameRaw ?? "미분류").trim() || "미분류";
-}
-
 /**
  * 매트릭스 행·집계 gender 키: 여 / 남 / 공용(빈 값·기타)
  */
@@ -921,39 +1123,6 @@ function compareSizeForMatrix(a: string, b: string): number {
   if (ia >= 0) return -1;
   if (ib >= 0) return 1;
   return na.localeCompare(nb, "ko");
-}
-
-type DupByClub = Map<string, { persons: number; sheets: number }>;
-
-/** 동일 클럽에서 같은 이름이 2행 이상이면 중복. 인원 수·총 장수(해당 행 수량 합) 집계 */
-function duplicateSummaryByClub(normRows: any[]): DupByClub {
-  const m = new Map<string, Map<string, { lineCount: number; sheetSum: number }>>();
-  for (const r of normRows) {
-    if (r.excluded) continue;
-    const name = String(r.memberNameRaw ?? "").trim();
-    if (!name) continue;
-    const club = normClubFromNormRow(r);
-    if (!m.has(club)) m.set(club, new Map());
-    const byName = m.get(club)!;
-    if (!byName.has(name)) byName.set(name, { lineCount: 0, sheetSum: 0 });
-    const o = byName.get(name)!;
-    o.lineCount += 1;
-    const q = r.qtyParsed;
-    o.sheetSum += Number.isFinite(Number(q)) ? Number(q) : 0;
-  }
-  const out: DupByClub = new Map();
-  for (const [club, byName] of m) {
-    let persons = 0;
-    let sheets = 0;
-    for (const o of byName.values()) {
-      if (o.lineCount > 1) {
-        persons += 1;
-        sheets += o.sheetSum;
-      }
-    }
-    out.set(club, { persons, sheets });
-  }
-  return out;
 }
 
 type CellMeta = { hasReview: boolean; hasUnres: boolean; hasCorrected: boolean };
@@ -997,12 +1166,12 @@ function clubAggMatrixHeadline(
     by[gk] += r.qty;
   }
   const gParts: string[] = [];
-  if (by.여 > 0) gParts.push(`여:${by.여}장`);
-  if (by.남 > 0) gParts.push(`남:${by.남}장`);
-  if (by.공용 > 0) gParts.push(`공용:${by.공용}장`);
+  if (by.여 > 0) gParts.push(`여:${by.여}개`);
+  if (by.남 > 0) gParts.push(`남:${by.남}개`);
+  if (by.공용 > 0) gParts.push(`공용:${by.공용}개`);
   const gStr = gParts.length ? `${gParts.join(" ")} ` : "";
-  const dupText = !dup || dup.persons === 0 ? "중복자 없음" : `중복 ${dup.persons}명/${dup.sheets}장`;
-  return `${club} (${gStr}합계:${totalQty}장 / ${dupText})`;
+  const dupText = !dup || dup.persons === 0 ? "중복자 없음" : `중복 ${dup.persons}명/${dup.sheets}개`;
+  return `${club} (${gStr}합계:${totalQty}개 / ${dupText})`;
 }
 
 function clubAggMobileLine(r: { club: string; gender: string; size: string; qty: number }): string {
@@ -1023,12 +1192,14 @@ const GENDER_ROW_ORDER: Array<"여" | "남" | "공용"> = ["여", "남", "공용
 export function ClubSizeSummaryTable({
   rows,
   normRows,
+  dupByClub,
 }: {
   rows: Array<{ club: string; gender: string; size: string; qty: number }>;
-  /** 필터·제외가 반영된 정규화 행(중복·셀 상태용) */
+  /** 필터·제외가 반영된 정규화 행(셀 상태용) */
   normRows: any[];
+  /** 상위 `analyzeDuplicateRows`와 동일(중복 요약) */
+  dupByClub: Map<string, { persons: number; sheets: number }>;
 }) {
-  const dupByClub = useMemo(() => duplicateSummaryByClub(normRows ?? []), [normRows]);
   const statusByCell = useMemo(() => buildCellStatusMap(normRows ?? []), [normRows]);
 
   const matrixBlocks = useMemo(() => {

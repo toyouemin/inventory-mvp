@@ -297,6 +297,105 @@ function assertHeaders(rawHeaders: string[]): ColMap {
   return map;
 }
 
+function aoaRowIsEmpty(row: string[]): boolean {
+  return row.every((c) => stripCellValue(String(c ?? "")) === "");
+}
+
+/**
+ * XLSX 등에서 읽은 2차원 배열(첫 시트)을 CSV 파이프라인과 동일 규칙으로 파싱합니다.
+ * 헤더·데이터는 `runProductCsvPipeline`과 동일한 검증( assertHeaders / normalizeCellCount )을 사용합니다.
+ */
+export function runProductPipelineFromAoa(maybeAoa: unknown[][]): { rows: ParsedCsvRow[]; skippedRows: number[] } {
+  const aoa: string[][] = (maybeAoa ?? []).map((row) =>
+    (row ?? []).map((c) => {
+      if (c == null) return "";
+      if (typeof c === "string") return c;
+      if (typeof c === "number" || typeof c === "boolean") return String(c);
+      return String(c);
+    })
+  );
+
+  const headerIndex = aoa.findIndex((row) => !aoaRowIsEmpty(row));
+  if (headerIndex < 0) {
+    throw new Error("엑셀 첫 번째 시트가 비어 있습니다.");
+  }
+
+  const headerForAssert = aoa[headerIndex].map((c) => String(c ?? ""));
+  const col = assertHeaders(headerForAssert);
+
+  const rows: ParsedCsvRow[] = [];
+  const skippedRows: number[] = [];
+  let dataRowIndex = 0;
+
+  for (let i = headerIndex + 1; i < aoa.length; i += 1) {
+    if (aoaRowIsEmpty(aoa[i] ?? [])) continue;
+    const fileLine1 = i + 1;
+    const parsed = normalizeCellCount(
+      (aoa[i] ?? []).map((c) => stripCellValue(String(c))),
+      fileLine1,
+      (aoa[i] ?? []).join("\t"),
+      col
+    );
+    const rawLine = (aoa[i] ?? []).join("\t");
+
+    const sku = normalizeSkuForMatch((parsed[col.SKU] ?? "") as string);
+    if (!sku) {
+      skippedRows.push(i + 1);
+      continue;
+    }
+
+    const name = (parsed[col.상품명] ?? "").trim();
+    if (!name) {
+      skippedRows.push(i + 1);
+      continue;
+    }
+
+    dataRowIndex += 1;
+
+    if (debugSkuMatches(sku)) {
+      logDebugSkuRow(fileLine1, rawLine, parsed, col, "after-normalize");
+    }
+
+    const category = normalizeCategoryLabel((parsed[col.카테고리] ?? "") as string);
+    const imageUrl = (parsed[col.이미지url] ?? "").trim();
+    const color = (parsed[col.color] ?? "").trim();
+    const gender = (parsed[col.gender] ?? "").trim();
+    const size = (parsed[col.size] ?? "").trim();
+    const stockRaw = parsed[col.stock];
+    const stock = parseNumberCell(stockRaw, 0);
+    const wholesale = parseNumberCell(parsed[col.wholesalePrice], 0);
+    const msrp = parseNumberCell(parsed[col.msrpPrice], 0);
+    const sale = parseNumberCell(parsed[col.salePrice], 0);
+    const extra = parseNumberCell(parsed[col.extraPrice], 0);
+    const memoRaw = (parsed[col.memo] ?? "").trim();
+    const memo2Raw = (parsed[col.memo2] ?? "").trim();
+
+    rows.push({
+      sku,
+      category,
+      name,
+      imageUrl,
+      color,
+      gender,
+      size,
+      stock,
+      wholesale,
+      msrp,
+      sale,
+      extra,
+      memo: memoRaw ? memoRaw : null,
+      memo2: memo2Raw ? memo2Raw : null,
+      dataRowIndex,
+    });
+  }
+
+  if (rows.length === 0) {
+    throw new Error("CSV 오류: 유효한 데이터 행이 없습니다. (SKU·상품명 필수)");
+  }
+
+  return { rows, skippedRows };
+}
+
 export function runProductCsvPipeline(text: string): { rows: ParsedCsvRow[]; skippedRows: number[] } {
   const rawLines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
   const headerLineIndex = rawLines.findIndex((l) => (l ?? "").trim().length > 0);

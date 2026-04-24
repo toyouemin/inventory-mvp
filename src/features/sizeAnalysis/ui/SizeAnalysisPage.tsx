@@ -75,22 +75,24 @@ export function SizeAnalysisPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [loading, setLoading] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [mappingSaved, setMappingSaved] = useState(false);
 
   const clubSizeRows = useMemo(() => {
     const detail = summary?.clubSizeStatusRows;
     if (Array.isArray(detail) && detail.length > 0) {
-      return detail as Array<{ club: string; size: string; qty: number; parseStatus: string }>;
+      return detail as Array<{ club: string; gender: string; size: string; qty: number }>;
     }
     const obj = summary?.clubSize ?? {};
-    const out: Array<{ club: string; size: string; qty: number; parseStatus?: string }> = [];
+    const out: Array<{ club: string; gender: string; size: string; qty: number }> = [];
     Object.entries(obj).forEach(([club, sizeMap]) => {
-      Object.entries(sizeMap as Record<string, number>).forEach(([size, qty]) => out.push({ club, size, qty }));
+      Object.entries(sizeMap as Record<string, number>).forEach(([size, qty]) => out.push({ club, gender: "", size, qty }));
     });
-    return out.sort((a, b) => a.club.localeCompare(b.club) || a.size.localeCompare(b.size));
+    return out.sort((a, b) => a.club.localeCompare(b.club, "ko") || compareGenderForClubSize(a.gender, b.gender) || compareSizeLabel(a.size, b.size));
   }, [summary]);
 
   async function uploadFile(file: File) {
     setError("");
+    setMappingSaved(false);
     setLoading("upload");
     try {
       const fd = new FormData();
@@ -113,6 +115,7 @@ export function SizeAnalysisPage() {
     if (!jobId || !selectedSheet) return;
     setLoading("detect");
     setError("");
+    setMappingSaved(false);
     try {
       const res = await fetch("/api/size-analysis/detect-structure", {
         method: "POST",
@@ -145,7 +148,9 @@ export function SizeAnalysisPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "매핑 저장 실패");
+      setMappingSaved(true);
     } catch (e) {
+      setMappingSaved(false);
       setError(e instanceof Error ? e.message : "매핑 저장 실패");
     } finally {
       setLoading("");
@@ -198,20 +203,25 @@ export function SizeAnalysisPage() {
       <h2>사이즈 분석</h2>
       <p className="size-analysis-muted">다양한 주문 파일을 사람별 주문행으로 정규화하고 사이즈 추출/표준화를 수행합니다.</p>
 
-      <SizeAnalysisUploadCard onUpload={uploadFile} loading={loading === "upload"} />
-      <WorkbookSheetSelector sheets={sheets} selectedSheet={selectedSheet} onSelect={setSelectedSheet} />
-
-      <StructureDetectionPanel
-        detectResult={detectResult}
-        loading={loading === "detect"}
-        onDetect={detectStructureAction}
-      />
+      <div className="size-analysis-stage-grid">
+        <SizeAnalysisUploadCard onUpload={uploadFile} loading={loading === "upload"} />
+        <WorkbookSheetSelector sheets={sheets} selectedSheet={selectedSheet} onSelect={setSelectedSheet} />
+        <StructureDetectionPanel
+          detectResult={detectResult}
+          loading={loading === "detect"}
+          onDetect={detectStructureAction}
+        />
+      </div>
 
       <FieldMappingEditor
         mapping={mapping}
-        onChange={setMapping}
+        onChange={(next) => {
+          setMapping(next);
+          setMappingSaved(false);
+        }}
         onSave={saveMappingAction}
         loading={loading === "mapping"}
+        saved={mappingSaved}
         previewRows={detectResult?.previewRows as string[][] | undefined}
       />
 
@@ -233,7 +243,7 @@ export function SizeAnalysisPage() {
 
 export function SizeAnalysisUploadCard({ onUpload, loading }: { onUpload: (file: File) => void; loading: boolean }) {
   return (
-    <section className="size-analysis-card">
+    <section className="size-analysis-card size-analysis-card--upload">
       <h3>1) 업로드</h3>
       <input
         type="file"
@@ -258,7 +268,7 @@ export function WorkbookSheetSelector({
   onSelect: (name: string) => void;
 }) {
   return (
-    <section className="size-analysis-card">
+    <section className="size-analysis-card size-analysis-card--sheet-select">
       <h3>2) 시트 선택</h3>
       <select value={selectedSheet} onChange={(e) => onSelect(e.target.value)}>
         <option value="">시트 선택</option>
@@ -282,7 +292,7 @@ export function StructureDetectionPanel({
   onDetect: () => void;
 }) {
   return (
-    <section className="size-analysis-card">
+    <section className="size-analysis-card size-analysis-card--detect">
       <h3>3) 구조 분석</h3>
       <button className="btn btn-secondary" onClick={onDetect} disabled={loading}>
         {loading ? "분석 중..." : "헤더/구조 자동 추천"}
@@ -306,12 +316,14 @@ export function FieldMappingEditor({
   onChange,
   onSave,
   loading,
+  saved,
   previewRows,
 }: {
   mapping: Mapping | null;
   onChange: (mapping: Mapping) => void;
   onSave: () => void;
   loading: boolean;
+  saved: boolean;
   previewRows?: string[][];
 }) {
   const maxCols = useMemo(
@@ -481,8 +493,13 @@ export function FieldMappingEditor({
         </p>
       )}
       <div className="size-analysis-map-actions">
-        <button className="btn btn-secondary" onClick={onSave} disabled={loading} type="button">
-          {loading ? "저장 중..." : "매핑 확정"}
+        <button
+          className={`btn ${saved ? "size-analysis-map-save-btn--done" : "btn-secondary"}`}
+          onClick={onSave}
+          disabled={loading || saved}
+          type="button"
+        >
+          {loading ? "저장중..." : saved ? "매핑 완료" : "매핑확정"}
         </button>
       </div>
     </section>
@@ -522,10 +539,10 @@ export function AnalysisStatusFilter({ value, onChange }: { value: string; onCha
     <section className="size-analysis-card">
       <h3>6) 상태 필터</h3>
       <div className="size-analysis-filter-row">
-        {STATUS_FILTER_OPTIONS.map((opt) => (
+        {STATUS_FILTER_OPTIONS.map((opt, idx) => (
           <button
             key={opt}
-            className={`btn ${value === opt ? "btn-primary" : "btn-secondary"}`}
+            className={`btn ${value === opt ? "btn-primary" : "btn-secondary"} ${idx === 0 ? "size-analysis-filter-btn--all" : ""}`}
             onClick={() => void onChange(opt)}
             type="button"
           >
@@ -542,7 +559,7 @@ export function AnalysisRowsTable({ rows }: { rows: any[] }) {
     <section className="size-analysis-card">
       <h3>7) 정규화 행</h3>
       <div className="size-analysis-table-wrap">
-        <table className="size-analysis-table">
+        <table className="size-analysis-table size-analysis-table--normalized">
           <thead>
             <tr>
               <th>원본행</th>
@@ -575,55 +592,59 @@ export function AnalysisRowsTable({ rows }: { rows: any[] }) {
   );
 }
 
-function clubSizeSizeLabel(size: string, parseStatus: string | undefined): string {
-  if (parseStatus === "needs_review") return `${size} (검토필요)`;
-  if (parseStatus === "unresolved") return `${size} (미분류)`;
-  return size;
+function compareGenderForClubSize(a: string, b: string): number {
+  const order = (g: string) => {
+    const t = String(g ?? "").trim();
+    if (t === "남") return 0;
+    if (t === "여") return 1;
+    if (t === "공용" || t === "") return 2;
+    return 3;
+  };
+  return order(a) - order(b) || String(a ?? "").localeCompare(String(b ?? ""), "ko");
+}
+
+function compareSizeLabel(a: string, b: string): number {
+  const aa = String(a ?? "").trim();
+  const bb = String(b ?? "").trim();
+  const an = /^\d+$/.test(aa) ? Number(aa) : Number.NaN;
+  const bn = /^\d+$/.test(bb) ? Number(bb) : Number.NaN;
+  const aIsNum = Number.isFinite(an);
+  const bIsNum = Number.isFinite(bn);
+  if (aIsNum && bIsNum) return an - bn;
+  if (aIsNum) return -1;
+  if (bIsNum) return 1;
+  return aa.localeCompare(bb, "ko");
 }
 
 export function ClubSizeSummaryTable({
   rows,
 }: {
-  rows: Array<{ club: string; size: string; qty: number; parseStatus?: string }>;
+  rows: Array<{ club: string; gender: string; size: string; qty: number }>;
 }) {
   if (rows.length === 0) return null;
-  const hasStatus = rows.some((r) => r.parseStatus != null && r.parseStatus !== "");
   return (
     <section className="size-analysis-card size-analysis-club-size-card">
       <h3>8) 클럽/사이즈 집계</h3>
       <p className="size-analysis-muted size-analysis-club-size-hint">
-        수량은 자동·검토·수정·미분류를 모두 합산합니다. 아래 <strong>상태</strong>·사이즈 표기로 확정/검토를 구분하세요.
+        수량은 자동·검토·수정·미분류를 모두 합산하며, 클럽/성별/사이즈 기준으로 집계합니다.
       </p>
       <div className="size-analysis-table-wrap">
         <table className="size-analysis-table size-analysis-table--club-size">
           <thead>
             <tr>
               <th>클럽</th>
+              <th>성별</th>
               <th>사이즈</th>
-              {hasStatus ? <th>상태</th> : null}
               <th>수량</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r, idx) => {
-              const st = r.parseStatus;
-              const statusLabel = st ? labelParseStatus(st) : "—";
-              const rowClass =
-                st === "needs_review"
-                  ? "size-analysis-club-size-tr--review"
-                  : st === "unresolved"
-                    ? "size-analysis-club-size-tr--unresolved"
-                    : st === "corrected"
-                      ? "size-analysis-club-size-tr--corrected"
-                      : "";
               return (
-                <tr
-                  key={`${r.club}-${r.size}-${st ?? "na"}-${idx}`}
-                  className={rowClass}
-                >
+                <tr key={`${r.club}-${r.gender ?? ""}-${r.size}-${idx}`}>
                   <td data-label="클럽">{r.club}</td>
-                  <td data-label="사이즈">{hasStatus ? clubSizeSizeLabel(r.size, st) : r.size}</td>
-                  {hasStatus ? <td data-label="상태">{statusLabel}</td> : null}
+                  <td data-label="성별">{r.gender ?? ""}</td>
+                  <td data-label="사이즈">{r.size}</td>
                   <td data-label="수량">{r.qty}</td>
                 </tr>
               );

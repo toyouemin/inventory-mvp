@@ -5,7 +5,14 @@ export const dynamic = "force-dynamic";
 export async function GET(_: Request, ctx: { params: { jobId: string } }) {
   const rows = await prisma.sizeAnalysisRow.findMany({
     where: { jobId: ctx.params.jobId },
-    select: { parseStatus: true, qtyParsed: true, excluded: true, standardizedSize: true, clubNameNormalized: true },
+    select: {
+      parseStatus: true,
+      qtyParsed: true,
+      excluded: true,
+      standardizedSize: true,
+      clubNameNormalized: true,
+      genderNormalized: true,
+    },
   });
 
   const statusCounts = {
@@ -18,8 +25,8 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
   let originalTotalQty = 0;
   let aggregatedTotalQty = 0;
   const clubSize: Record<string, Record<string, number>> = {};
-  /** 클럽·사이즈·파싱상태별 수량(집계 총합은 기존 clubSize와 동일하게 유지) */
-  const clubSizeByStatus = new Map<string, { club: string; size: string; parseStatus: string; qty: number }>();
+  /** 클럽·성별·사이즈별 수량 */
+  const clubGenderSize = new Map<string, { club: string; gender: string; size: string; qty: number }>();
 
   for (const row of rows) {
     statusCounts[row.parseStatus] += 1;
@@ -28,33 +35,46 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
       originalTotalQty += qty;
       aggregatedTotalQty += qty;
       const club = row.clubNameNormalized || "미분류";
+        const gender = String(row.genderNormalized ?? "").trim();
       const size = row.standardizedSize || "미분류";
-      const st = row.parseStatus;
       clubSize[club] = clubSize[club] ?? {};
       clubSize[club][size] = (clubSize[club][size] ?? 0) + qty;
 
-      const key = `${club}\0${size}\0${st}`;
-      const cur = clubSizeByStatus.get(key) ?? { club, size, parseStatus: st, qty: 0 };
-      cur.qty += qty;
-      clubSizeByStatus.set(key, cur);
+        const key = `${club}\0${gender}\0${size}`;
+        const cur = clubGenderSize.get(key) ?? { club, gender, size, qty: 0 };
+        cur.qty += qty;
+        clubGenderSize.set(key, cur);
     }
   }
 
-  const statusOrder = (s: string) => {
-    const o: Record<string, number> = {
-      auto_confirmed: 0,
-      corrected: 1,
-      needs_review: 2,
-      unresolved: 3,
-    };
-    return o[s] ?? 9;
+  const genderOrder = (g: string) => {
+    const t = String(g ?? "").trim();
+    if (t === "남") return 0;
+    if (t === "여") return 1;
+    if (t === "공용" || t === "") return 2;
+    return 3;
   };
 
-  const clubSizeStatusRows = Array.from(clubSizeByStatus.values()).sort(
+  const sizeOrder = (size: string): { kind: 0 | 1; num: number; text: string } => {
+    const t = String(size ?? "").trim();
+    if (/^\d+$/.test(t)) return { kind: 0, num: Number(t), text: t };
+    return { kind: 1, num: Number.POSITIVE_INFINITY, text: t };
+  };
+
+  const compareSize = (a: string, b: string) => {
+    const aa = sizeOrder(a);
+    const bb = sizeOrder(b);
+    if (aa.kind !== bb.kind) return aa.kind - bb.kind;
+    if (aa.kind === 0) return aa.num - bb.num;
+    return aa.text.localeCompare(bb.text, "ko");
+  };
+
+  const clubSizeStatusRows = Array.from(clubGenderSize.values()).sort(
     (a, b) =>
       a.club.localeCompare(b.club, "ko") ||
-      a.size.localeCompare(b.size, "ko") ||
-      statusOrder(a.parseStatus) - statusOrder(b.parseStatus)
+      genderOrder(a.gender) - genderOrder(b.gender) ||
+      a.gender.localeCompare(b.gender, "ko") ||
+      compareSize(a.size, b.size)
   );
 
   return Response.json({

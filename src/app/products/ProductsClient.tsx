@@ -2221,7 +2221,7 @@ export function ProductsClient({
                 ? "완료"
                 : csvUploadHighlight === "error"
                   ? "실패"
-                  : "CSV 업로드"}
+                  : "CSV / 엑셀 업로드"}
           </button>
         </div>
         <button type="button" className="btn btn-primary btn-compact" onClick={() => setAddOpen(true)}>
@@ -2477,7 +2477,7 @@ export function ProductsClient({
                   requestAnimationFrame(() => csvFileInputRef.current?.click());
                 }}
               >
-                CSV 덮어쓰기
+                덮어쓰기 (CSV·xlsx)
               </button>
               <button
                 type="button"
@@ -2486,7 +2486,7 @@ export function ProductsClient({
                 onClick={() => {
                   if (
                     !confirm(
-                      "초기화: products·product_variants를 모두 삭제한 뒤 CSV만 남깁니다. 계속할까요?"
+                      "초기화: products·product_variants를 모두 삭제한 뒤 업로드한 CSV 또는 엑셀(.xlsx) 데이터만 남깁니다. 계속할까요?"
                     )
                   ) {
                     return;
@@ -2496,8 +2496,11 @@ export function ProductsClient({
                   requestAnimationFrame(() => csvFileInputRef.current?.click());
                 }}
               >
-                CSV 초기화
+                전체 초기화 (CSV·xlsx)
               </button>
+              <p className="download-dropdown__upload-hint" role="note">
+                CSV 또는 엑셀(.xlsx) 파일을 업로드할 수 있습니다. 엑셀은 첫 번째 시트만 사용됩니다.
+              </p>
             </div>,
             document.body
           )
@@ -2702,7 +2705,7 @@ export function ProductsClient({
       <input
         ref={csvFileInputRef}
         type="file"
-        accept=".csv"
+        accept=".csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         onChange={(e) => handleProductsCsv(e)}
         disabled={uploading}
         className="products-csv-file-input"
@@ -2753,7 +2756,7 @@ export function ProductsClient({
         >
           <div className="modal csv-upload-error-modal" onClick={(e) => e.stopPropagation()}>
             <h2 id="csv-upload-error-title" className="csv-upload-error-modal__title">
-              CSV 업로드 실패
+              상품 파일 업로드 실패
             </h2>
             <div id="csv-upload-error-desc" className="csv-upload-error-modal__body">
               {csvUploadErrorMessage}

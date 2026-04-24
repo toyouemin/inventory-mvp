@@ -2,7 +2,8 @@
 
 import { supabaseServer } from "@/lib/supabaseClient";
 import { revalidatePath } from "next/cache";
-import { runProductCsvPipeline, type ParsedCsvRow } from "./csvProductPipeline";
+import { runProductCsvPipeline, runProductPipelineFromAoa, type ParsedCsvRow } from "./csvProductPipeline";
+import { readXlsxFirstSheetToAoa } from "./xlsxProductUpload";
 import { dominantNormSkuFromVariantSkus, normalizeSkuForMatch } from "./skuNormalize";
 import {
   aggregateDuplicateVariantsByCompositeKey,
@@ -848,6 +849,16 @@ export async function uploadProductsCsv(formData: FormData): Promise<UploadProdu
       .toLowerCase();
     const mode: "merge" | "reset" = modeRaw === "reset" ? "reset" : "merge";
 
+    const fileName = (file as File).name ?? "";
+    const lowerName = fileName.toLowerCase();
+    if (lowerName.endsWith(".xls") && !lowerName.endsWith(".xlsx")) {
+      return {
+        ok: false,
+        error:
+          "구형 엑셀(.xls)은 지원하지 않습니다. .xlsx 또는 .csv로 저장 후 업로드해주세요.",
+      };
+    }
+
     const raw = await file.arrayBuffer();
 
     function decodeWithFallback(buf: ArrayBuffer) {
@@ -870,9 +881,13 @@ export async function uploadProductsCsv(formData: FormData): Promise<UploadProdu
       return t.replace(/^\uFEFF/, "");
     }
 
-    const text = decodeWithFallback(raw);
+    const isXlsx =
+      lowerName.endsWith(".xlsx") ||
+      (file as File).type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-    const { rows, skippedRows } = runProductCsvPipeline(text);
+    const { rows, skippedRows } = isXlsx
+      ? runProductPipelineFromAoa(readXlsxFirstSheetToAoa(raw))
+      : runProductCsvPipeline(decodeWithFallback(raw));
     if (mode === "reset") {
       await replaceAllProductsAndVariantsFromCsv(rows);
     } else {
@@ -890,7 +905,7 @@ export async function uploadProductsCsv(formData: FormData): Promise<UploadProdu
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg || "CSV 업로드 처리 중 오류가 발생했습니다." };
+    return { ok: false, error: msg || "상품 파일 업로드 처리 중 오류가 발생했습니다." };
   }
 }
 

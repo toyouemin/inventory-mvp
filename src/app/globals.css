@@ -471,6 +471,17 @@ button.download-dropdown__item:disabled {
   cursor: not-allowed;
 }
 
+.download-dropdown__upload-hint {
+  margin: 4px 8px 6px;
+  max-width: 16rem;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--muted, #6b6b6b);
+  text-align: center;
+  white-space: normal;
+}
+
 @media (max-width: 768px) {
   .download-dropdown__menu {
     min-width: 0;
@@ -5750,6 +5761,12 @@ label {
   min-width: 0;
 }
 
+.size-analysis-stage-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
 .size-analysis-summary-cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5924,6 +5941,13 @@ label {
   margin-top: 12px;
 }
 
+.size-analysis-map-save-btn--done {
+  background: #e5e7eb;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
 @media (max-width: 600px) {
   .size-analysis-field-row {
     grid-template-columns: 1fr;
@@ -5948,27 +5972,52 @@ label {
 
 @media (max-width: 768px) {
   .size-analysis-page {
-    padding: 10px 8px;
-    gap: 10px;
+    padding: 8px 6px;
+    gap: 7px;
   }
 
   .size-analysis-card {
-    padding: 10px;
+    padding: 7px;
     border-radius: 8px;
+  }
+
+  .size-analysis-card h3 {
+    font-size: 0.98rem;
+    margin: 0 0 6px 0;
+  }
+
+  .size-analysis-stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .size-analysis-card--upload {
+    grid-column: 1 / -1;
   }
 
   .size-analysis-summary-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
+    gap: 4px;
   }
 
   .size-analysis-summary-card {
-    padding: 7px;
+    padding: 5px 6px;
+  }
+
+  .size-analysis-summary-card strong {
+    line-height: 1.15;
+    font-size: 0.96rem;
+  }
+
+  .size-analysis-summary-card__label {
+    margin-bottom: 2px;
+    font-size: 0.77rem;
   }
 
   .size-analysis-grid {
     grid-template-columns: 1fr;
-    gap: 6px;
+    gap: 4px;
+    margin-top: 4px;
   }
 
   .size-analysis-card input,
@@ -5981,8 +6030,20 @@ label {
   }
 
   .size-analysis-filter-row {
-    flex-direction: column;
-    gap: 6px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .size-analysis-filter-btn--all {
+    grid-column: 1 / -1;
+  }
+
+  .size-analysis-filter-row .btn {
+    min-height: 36px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    font-size: 0.83rem;
   }
 
   .size-analysis-table {
@@ -6005,15 +6066,15 @@ label {
   .size-analysis-table tr {
     border: 1px solid #e5e7eb;
     border-radius: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
     background: #fff;
     overflow: hidden;
   }
 
   .size-analysis-table td {
     border: 0;
-    border-bottom: 1px solid #f1f3f5;
-    padding: 6px 8px;
+    border-bottom: 1px solid #f4f5f7;
+    padding: 4px 6px;
     font-size: 0.82rem;
   }
 
@@ -6024,10 +6085,56 @@ label {
   .size-analysis-table td::before {
     content: attr(data-label) " ";
     display: inline-block;
-    min-width: 72px;
-    margin-right: 6px;
+    min-width: 58px;
+    margin-right: 4px;
     color: #6b7280;
     font-weight: 600;
+  }
+
+  .size-analysis-table--normalized tr,
+  .size-analysis-table--club-size tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    padding: 3px;
+    overflow: hidden;
+  }
+
+  .size-analysis-table--normalized td,
+  .size-analysis-table--club-size td {
+    border: 0;
+    border-radius: 6px;
+    padding: 5px 6px;
+    min-height: 38px;
+    background: transparent;
+  }
+
+  .size-analysis-table--normalized td::before,
+  .size-analysis-table--club-size td::before {
+    display: block;
+    min-width: 0;
+    margin: 0 0 2px 0;
+    font-size: 0.75rem;
+    line-height: 1.2;
+  }
+
+  .size-analysis-table--normalized td:empty::after,
+  .size-analysis-table--club-size td:empty::after {
+    content: " ";
+    display: block;
+    height: 0.9em;
+  }
+
+  .size-analysis-table--club-size .size-analysis-club-size-tr--review td {
+    background: #fffbeb;
+  }
+
+  .size-analysis-table--club-size .size-analysis-club-size-tr--unresolved td {
+    background: #f3f4f6;
+  }
+
+  .size-analysis-table--club-size .size-analysis-club-size-tr--corrected td {
+    background: #ecfdf5;
   }
 }
 

@@ -39,6 +39,8 @@ export type NormalizedRow = {
   sourceGroupIndex?: number;
   clubNameRaw?: string;
   memberNameRaw?: string;
+  /** 이름(people 등 `name` 전용) — `memberNameRaw`가 비었을 때 그룹 키·표시용 fallback */
+  memberName?: string;
   genderRaw?: string;
   itemRaw?: string;
   sizeRaw?: string;

@@ -46,6 +46,52 @@ export function rowKeyGenderForAgg(g: string | null | undefined): "여" | "남" 
   return "공용";
 }
 
+/**
+ * 클럽 집계·매트릭스 **표시**용: 내부 `standardizedSize`는 M100/W90을 유지해도 됨.
+ * - `M123` / `W123` → 표시 성별은 접두(M=남, W=여)가 행 `gender`보다 우선, 사이즈 열은 숫자만
+ * - 숫자만(예: 100) → 표시 성별·사이즈는 기존 gender / 해당 숫자
+ * - `standardizedSize`가 비어 있을 때만 `sizeRaw`에서 M/W 패턴을 본다(비정상 셀 섞임 방지)
+ */
+export function matrixAggGenderAndSizeFromRow(r: {
+  standardizedSize?: string | null;
+  sizeRaw?: string | null;
+  genderNormalized?: string | null;
+  genderRaw?: string | null;
+}): { gender: string; size: string } {
+  const st = String(r.standardizedSize ?? "").trim();
+  const raw = String(r.sizeRaw ?? "").trim();
+  const genderFromRow = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
+
+  const fromMw = (s: string) => {
+    const m = /^M(\d+)$/i.exec(s);
+    if (m) return { gender: "남" as const, size: m[1]! };
+    const w = /^W(\d+)$/i.exec(s);
+    if (w) return { gender: "여" as const, size: w[1]! };
+    return null;
+  };
+
+  const u0 = fromMw(st);
+  if (u0) return u0;
+  if (st.length === 0) {
+    const u1 = fromMw(raw);
+    if (u1) return u1;
+  }
+
+  if (st.length > 0) {
+    if (/^\d+$/.test(st)) {
+      return { gender: genderFromRow, size: st };
+    }
+    return { gender: genderFromRow, size: st };
+  }
+  if (raw.length > 0) {
+    if (/^\d+$/.test(raw)) {
+      return { gender: genderFromRow, size: raw };
+    }
+    return { gender: genderFromRow, size: raw };
+  }
+  return { gender: genderFromRow, size: "미분류" };
+}
+
 /** 여·남은 항상 행으로 두고, 공용은 데이터가 있을 때만 추가 */
 export function matrixGenderRowKeys(clubRows: Array<{ gender: string }>): Array<"여" | "남" | "공용"> {
   const keys: Array<"여" | "남" | "공용"> = ["여", "남"];
@@ -108,8 +154,7 @@ export function buildAggRowsTotal(rows: any[]): AggRow[] {
   const detailMap = new Map<string, AggRow>();
   for (const r of rows) {
     const club = normClubFromNormRow(r);
-    const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
-    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+    const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
     pushRowIntoDetailMap(detailMap, club, gender, size, qty);
   }
@@ -123,8 +168,7 @@ export function buildAggRowsDuplicate(rows: any[], duplicateRowIds: Set<string>)
     const r = rows[i]!;
     if (!duplicateRowIds.has(stableRowKeyForDup(r, i))) continue;
     const club = normClubFromNormRow(r);
-    const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
-    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+    const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
     pushRowIntoDetailMap(detailMap, club, gender, size, qty);
   }
@@ -179,8 +223,7 @@ export function buildAggRowsDedupedFirst(rows: any[]): AggRow[] {
     if (!included.has(i)) continue;
     const r = rows[i]!;
     const club = normClubFromNormRow(r);
-    const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
-    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+    const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
     pushRowIntoDetailMap(detailMap, club, gender, size, qty);
   }

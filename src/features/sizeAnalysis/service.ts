@@ -41,6 +41,7 @@ function normalizedRowsFromPeople(jobId: string, sheetName: string, people: Pers
       sourceRowIndex: idx,
       clubNameRaw: person.club,
       memberNameRaw: person.name,
+      memberName: person.name,
       genderRaw: person.gender,
       sizeRaw: person.size,
       qtyRaw: "1",

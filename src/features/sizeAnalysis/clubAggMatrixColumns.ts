@@ -30,9 +30,18 @@ const DEFAULT_NUM_SET = new Set<string>(DEFAULT_NUM_SIZE_COLS);
 /** 기본 숫자 열 뒤에 붙는 문자 사이즈 순 (데이터에 있을 때만 열) */
 const LETTER_SIZE_ORDER: readonly string[] = [...LETTER_SIZES_ORDER];
 
+/** 집계 행에 M100/W90이 섞여 들어온 경우에도 열 머리는 숫자만 쓰도록 보정 */
+function normalizeMatrixColumnLabel(s: string): string {
+  const t = String(s ?? "").trim();
+  const m = /^(M|W)(\d+)$/i.exec(t);
+  return m ? m[2]! : t;
+}
+
 export function buildColumnSizesForClub(clubRows: Array<{ size: string }>): string[] {
   const sizeSet = new Set(
-    clubRows.map((r) => String(r.size ?? "").trim()).filter((s) => s.length > 0)
+    clubRows
+      .map((r) => normalizeMatrixColumnLabel(String(r.size ?? "").trim()))
+      .filter((s) => s.length > 0)
   );
   const cols: string[] = [...DEFAULT_NUM_SIZE_COLS];
   const extraNums = [...sizeSet]

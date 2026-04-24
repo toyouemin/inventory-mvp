@@ -11,6 +11,7 @@ import {
   CLUB_AGG_MODE_LABEL,
   compareRowsBySourceThenIndex,
   matrixGenderRowKeys,
+  matrixAggGenderAndSizeFromRow,
   normClubFromNormRow,
   rowKeyGenderForAgg,
   stableRowKeyForDup,
@@ -141,8 +142,7 @@ export function SizeAnalysisPage() {
 
     for (const r of rows) {
       const club = normClubFromNormRow(r);
-      const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
-      const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+      const { gender, size } = matrixAggGenderAndSizeFromRow(r);
       const qtyRaw = r.qtyParsed ?? r.qtyRaw ?? 0;
       const qty = Number.isFinite(Number(qtyRaw)) ? Number(qtyRaw) : 0;
       const parseStatus = String(r.parseStatus ?? "");

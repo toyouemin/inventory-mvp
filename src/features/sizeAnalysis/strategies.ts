@@ -68,6 +68,7 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
         sourceRowIndex: i,
         clubNameRaw: clubRaw,
         memberNameRaw: nameRaw,
+        memberName: nameRaw,
         genderRaw,
         itemRaw: cell(row, mapping.fields.item),
         sizeRaw,
@@ -103,6 +104,7 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
         sourceRowIndex: i,
         clubNameRaw: clubRaw,
         memberNameRaw: nameRaw,
+        memberName: nameRaw,
         genderRaw,
         itemRaw: cell(row, mapping.fields.item),
         sizeRaw,
@@ -156,6 +158,7 @@ export function parseRepeatedSlots(jobId: string, sheet: SheetSnapshot, mapping:
         sourceGroupIndex: groupIndex,
         clubNameRaw: clubRaw,
         memberNameRaw: nameRaw,
+        memberName: nameRaw,
         genderRaw,
         itemRaw: cell(row, g.item),
         sizeRaw,
@@ -216,6 +219,7 @@ export function parseUnknownManualItem(jobId: string, sheet: SheetSnapshot, mapp
         sourceRowIndex: i,
         sourceGroupIndex: 0,
         memberNameRaw: nameRaw,
+        memberName: nameRaw,
         clubNameRaw: clubRaw,
         itemRaw: itemText,
         clubNameNormalized: preprocessCell(clubRaw),
@@ -236,6 +240,7 @@ export function parseUnknownManualItem(jobId: string, sheet: SheetSnapshot, mapp
         sourceRowIndex: i,
         sourceGroupIndex: 0,
         memberNameRaw: nameRaw,
+        memberName: nameRaw,
         clubNameRaw: clubRaw,
         itemRaw: itemText,
         clubNameNormalized: preprocessCell(clubRaw),
@@ -258,6 +263,7 @@ export function parseUnknownManualItem(jobId: string, sheet: SheetSnapshot, mapp
         sourceGroupIndex: groupIndex,
         clubNameRaw: clubRaw,
         memberNameRaw: nameRaw,
+        memberName: nameRaw,
         genderRaw: gRaw,
         itemRaw: seg,
         sizeRaw: seg,
@@ -305,12 +311,14 @@ export function parseSizeMatrix(jobId: string, sheet: SheetSnapshot, mapping: Fi
       const qtyRaw = cell(row, s.idx);
       const qtyParsed = parseQty(qtyRaw) ?? (Number(preprocessCell(qtyRaw)) || undefined);
       const empty = qtyParsed === undefined || qtyParsed === 0;
+      const nameForRow = cell(row, mapping.fields.name);
       out.push({
         jobId,
         sourceSheet: sheet.name,
         sourceRowIndex: i,
         clubNameRaw: cell(row, mapping.fields.club),
-        memberNameRaw: cell(row, mapping.fields.name),
+        memberNameRaw: nameForRow,
+        memberName: nameForRow,
         genderRaw: cell(row, mapping.fields.gender),
         itemRaw: cell(row, mapping.fields.item),
         sizeRaw: s.h,

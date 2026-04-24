@@ -139,18 +139,17 @@ function mwLine(standardizedSize: string | undefined): "M" | "W" | null {
 export const DUPLICATE_KEY_NO_PERSON = "__NO_CLUB__::__NO_NAME__" as const;
 
 /**
- * 동일 사이즈·성별 M/W 중복 기준: **같은 사람** = `clubNameNormalized` + `memberName`(이름 열)만.
- * - 클럽: 정규화 값 우선, 없으면 `clubNameRaw`를 preprocess(대문자/공백 정리) — 서로 다른 클럽이 한 그룹에 섞이지 않게 함
- * - 이름: **전체대문자 등 토큰 합병을 하지 않고** `memberNameRaw`를 공백만 정리한 값으로 구분(이선화 ≠ 전영금)
+ * 동일 사이즈·성별 M/W 중복 기준: **같은 사람** = 클럽 키 + 이름(`memberNameRaw` | `memberName` fallback).
+ * - `__NO_NAME__`는 두 이름이 모두 비어 있을 때만. 이선화/전영금 등은 placeholder로 절대 합치지 않음
  */
 export function personGroupKeyForDuplicate(r: NormalizedRow): string {
   const normClub =
     (r.clubNameNormalized != null && String(r.clubNameNormalized).replace(/\s+/g, " ").trim()) || "";
   const fromRawClub = preprocessCell(r.clubNameRaw);
   const clubKey = normClub || (fromRawClub && fromRawClub.length > 0 ? fromRawClub : "") || "__NO_CLUB__";
-  const nameKey = String(r.memberNameRaw ?? "")
-    .replace(/\s+/g, " ")
-    .trim() || "__NO_NAME__";
+  const rawName = r.memberNameRaw || r.memberName || "";
+  const name = String(rawName).trim().replace(/\s+/g, " ");
+  const nameKey = name.length === 0 ? "__NO_NAME__" : name;
   return `${clubKey}::${nameKey}`;
 }
 
@@ -197,6 +196,28 @@ export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[]
       continue;
     }
     const sortedIdx = [...indices].sort((a, b) => orderKey(result[a]!) - orderKey(result[b]!));
+    const is88MinteonHint = /88/.test(key) && /민턴/i.test(key);
+    const preDupTable = sortedIdx.map((i) => {
+      const row = result[i]!;
+      return {
+        key,
+        originalRowNumber: (row.sourceRowIndex ?? 0) + 1,
+        clubNameRaw: row.clubNameRaw ?? "",
+        clubNameNormalized: row.clubNameNormalized ?? "",
+        memberNameRaw: row.memberNameRaw ?? "",
+        memberName: row.memberName ?? "",
+        gender: row.genderNormalized ?? row.genderRaw ?? "",
+        standardizedSize: row.standardizedSize ?? "",
+        parseStatus: row.parseStatus,
+      };
+    });
+    console.log("applyDuplicateSizePolicy: group before M/W + same-size dedupe, key =", key);
+    console.table(preDupTable);
+    if (is88MinteonHint) {
+      console.log(
+        "applyDuplicateSizePolicy: 88민턴 관련 key — 이선화/전영금/황경숙/김정미는 **인물마다 key가 달라야** 하며, 위 테이블은 **동일 key 한 덩어리**만 표시합니다. 4인이 **각각 별도 로그·별도 key**이면 올바른 분리입니다. 한 테이블에 서로 다른 이름이 섞이면(동일 key인데) 버그로 의심하세요."
+      );
+    }
     const g = result[sortedIdx[0]!]!.genderNormalized ?? normalizeGender(result[sortedIdx[0]!]!.genderRaw);
 
     const withLine = sortedIdx.map((i) => ({

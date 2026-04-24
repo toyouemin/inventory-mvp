@@ -16,6 +16,7 @@ import {
   reconnectProductsImageUrlsFromStorageBySku,
   removeReplacedProductImageFromStorage,
 } from "@/lib/productImagesStorage";
+import { decodeWithFallback } from "@/lib/csvDecodeWithFallback";
 
 const LOG_MOVES = process.env.LOG_MOVES === "1";
 /** CSV 업로드 행별 재고 디버그: .env에 LOG_CSV_STOCK=1 */
@@ -860,26 +861,6 @@ export async function uploadProductsCsv(formData: FormData): Promise<UploadProdu
     }
 
     const raw = await file.arrayBuffer();
-
-    function decodeWithFallback(buf: ArrayBuffer) {
-      // 1) utf-8 시도
-      let t = new TextDecoder("utf-8", { fatal: false }).decode(buf);
-
-      // utf-8이 실패하면 보통 '�' (replacement char) 가 많이 생김
-      const bad = (t.match(/\uFFFD/g) ?? []).length;
-
-      // 2) 깨진 느낌이면 euc-kr 재시도 (엑셀/윈도우에서 흔함)
-      if (bad > 0) {
-        try {
-          t = new TextDecoder("euc-kr", { fatal: false }).decode(buf);
-        } catch {
-          // 일부 환경에서 euc-kr 미지원이면 그대로 둠
-        }
-      }
-
-      // BOM 제거
-      return t.replace(/^\uFEFF/, "");
-    }
 
     const isXlsx =
       lowerName.endsWith(".xlsx") ||

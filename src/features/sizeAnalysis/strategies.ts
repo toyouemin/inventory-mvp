@@ -66,36 +66,45 @@ function pickQtyForSingleRowPerson(
   };
 }
 
+/** club/name/gender/size/qty가 모두 비어 있으면 완전 빈 행으로 간주 */
+function isCoreFieldsAllEmpty(args: {
+  clubRaw?: string;
+  nameRaw?: string;
+  genderRaw?: string;
+  sizeRaw?: string;
+  qtyRaw?: string;
+}): boolean {
+  return (
+    !preprocessCell(args.clubRaw) &&
+    !preprocessCell(args.nameRaw) &&
+    !preprocessCell(args.genderRaw) &&
+    !preprocessCell(args.sizeRaw) &&
+    !preprocessCell(args.qtyRaw)
+  );
+}
+
 export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mapping: FieldMapping): NormalizedRow[] {
   const out: NormalizedRow[] = [];
   const start = mapping.headerRowIndex + 1;
   const hasQtyColumn = mapping.fields.qty !== undefined;
   for (let i = start; i < sheet.rows.length; i += 1) {
     const row = sheet.rows[i] ?? [];
+    const clubRaw = cell(row, mapping.fields.club);
     const nameRaw = cell(row, mapping.fields.name);
     const sizeRaw = cell(row, mapping.fields.size);
     const qtyRaw = cell(row, mapping.fields.qty);
     const genderRaw = cell(row, mapping.fields.gender);
     const itemRaw = cell(row, mapping.fields.item);
-    const empty = !preprocessCell(nameRaw) && !preprocessCell(sizeRaw) && !preprocessCell(qtyRaw);
-    if (empty) {
-      out.push({
-        jobId,
-        sourceSheet: sheet.name,
-        sourceRowIndex: i,
-        clubNameRaw: cell(row, mapping.fields.club),
-        memberNameRaw: nameRaw,
+    if (
+      isCoreFieldsAllEmpty({
+        clubRaw,
+        nameRaw,
         genderRaw,
-        itemRaw: cell(row, mapping.fields.item),
         sizeRaw,
         qtyRaw,
-        clubNameNormalized: preprocessCell(cell(row, mapping.fields.club)),
-        userCorrected: false,
-        excluded: true,
-        parseStatus: "excluded",
-        parseConfidence: 1,
-        parseReason: "빈 행 제외",
-      });
+      })
+    ) {
+      // 완전 빈 행은 excluded로 저장하지 않고 아예 drop
       continue;
     }
 
@@ -109,13 +118,13 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
         jobId,
         sourceSheet: sheet.name,
         sourceRowIndex: i,
-        clubNameRaw: cell(row, mapping.fields.club),
+        clubNameRaw: clubRaw,
         memberNameRaw: nameRaw,
         genderRaw,
         itemRaw: cell(row, mapping.fields.item),
         sizeRaw,
         qtyRaw,
-        clubNameNormalized: preprocessCell(cell(row, mapping.fields.club)),
+        clubNameNormalized: preprocessCell(clubRaw),
         genderNormalized: parsed.gender ?? normalizeGender(genderRaw),
         standardizedSize,
         qtyParsed: qty,
@@ -135,13 +144,13 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
         jobId,
         sourceSheet: sheet.name,
         sourceRowIndex: i,
-        clubNameRaw: cell(row, mapping.fields.club),
+        clubNameRaw: clubRaw,
         memberNameRaw: nameRaw,
         genderRaw,
         itemRaw: cell(row, mapping.fields.item),
         sizeRaw,
         qtyRaw,
-        clubNameNormalized: preprocessCell(cell(row, mapping.fields.club)),
+        clubNameNormalized: preprocessCell(clubRaw),
         genderNormalized: parsedFull.gender ?? normalizeGender(genderRaw),
         standardizedSize,
         qtyParsed: qty,
@@ -163,29 +172,38 @@ export function parseRepeatedSlots(jobId: string, sheet: SheetSnapshot, mapping:
   for (let i = start; i < sheet.rows.length; i += 1) {
     const row = sheet.rows[i] ?? [];
     groups.forEach((g, groupIndex) => {
+      const clubRaw = cell(row, g.club);
       const nameRaw = cell(row, g.name);
       const sizeRaw = cell(row, g.size);
       const qtyRaw = cell(row, g.qty);
       const genderRaw = cell(row, g.gender);
       const parsed = extractSizeGenderQty([genderRaw, sizeRaw, qtyRaw].filter(Boolean).join(" "));
-      const empty = !preprocessCell(nameRaw) && !preprocessCell(sizeRaw) && !preprocessCell(qtyRaw);
+      const empty = isCoreFieldsAllEmpty({
+        clubRaw,
+        nameRaw,
+        genderRaw,
+        sizeRaw,
+        qtyRaw,
+      });
+      if (empty) {
+        // 완전 빈 슬롯은 생성하지 않음
+        return;
+      }
       out.push({
         jobId,
         sourceSheet: sheet.name,
         sourceRowIndex: i,
         sourceGroupIndex: groupIndex,
-        clubNameRaw: cell(row, g.club),
+        clubNameRaw: clubRaw,
         memberNameRaw: nameRaw,
         genderRaw,
         itemRaw: cell(row, g.item),
         sizeRaw,
         qtyRaw,
-        clubNameNormalized: preprocessCell(cell(row, g.club)),
+        clubNameNormalized: preprocessCell(clubRaw),
         userCorrected: false,
-        excluded: empty,
-        ...(empty
-          ? { parseStatus: "excluded", parseConfidence: 1, parseReason: "빈 슬롯 제외" as const }
-          : baseStatus(parsed, sizeRaw, genderRaw, qtyRaw)),
+        excluded: false,
+        ...baseStatus(parsed, sizeRaw, genderRaw, qtyRaw),
       });
     });
   }
@@ -210,22 +228,20 @@ export function parseUnknownManualItem(jobId: string, sheet: SheetSnapshot, mapp
     const row = sheet.rows[i] ?? [];
     const nameRaw = cell(row, nameCol);
     const clubRaw = cell(row, clubCol);
+    const genderRaw = cell(row, mapping.fields.gender);
+    const sizeRaw = cell(row, mapping.fields.size);
+    const qtyRaw = cell(row, mapping.fields.qty);
     const itemText = cell(row, itemCol) ?? "";
-    const allEmpty = !preprocessCell(nameRaw) && !preprocessCell(clubRaw) && !preprocessCell(itemText);
-    if (allEmpty) {
-      out.push({
-        jobId,
-        sourceSheet: sheet.name,
-        sourceRowIndex: i,
-        memberNameRaw: nameRaw,
-        clubNameRaw: clubRaw,
-        itemRaw: itemText,
-        userCorrected: false,
-        excluded: true,
-        parseStatus: "excluded",
-        parseConfidence: 1,
-        parseReason: "빈 행 제외",
-      });
+    if (
+      isCoreFieldsAllEmpty({
+        clubRaw,
+        nameRaw,
+        genderRaw,
+        sizeRaw,
+        qtyRaw,
+      })
+    ) {
+      // 완전 빈 행은 drop
       continue;
     }
     if (!preprocessCell(itemText)) {

@@ -68,7 +68,7 @@ main {
   padding: 0 16px;
 }
 
-nav {
+.app-main-nav {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-start;
@@ -83,14 +83,14 @@ nav {
   position: static;
 }
 
-nav a {
+.app-main-nav a {
   color: var(--text);
   text-decoration: none;
   font-weight: 600;
   font-size: clamp(16px, 1.2vw, 20px);
 }
 
-nav a:hover {
+.app-main-nav a:hover {
   color: var(--accent);
 }
 
@@ -2646,8 +2646,63 @@ label {
   }
 
   .app-site-header {
-    padding: 12px 10px 6px;
+    padding: 12px 10px 4px;
     max-width: 100%;
+  }
+
+  .app-main-nav {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    padding: 0;
+    margin: 0 0 4px;
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    border-top: 1px solid var(--border);
+    border-left: 1px solid var(--border);
+  }
+
+  .app-main-nav > a,
+  .app-main-nav > .nav-dropdown {
+    width: 100%;
+    min-height: 34px;
+    height: 34px;
+    padding: 0 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-sizing: border-box;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-main-nav > a {
+    font-size: clamp(16px, 1.2vw, 20px);
+  }
+
+  .app-main-nav > .nav-dropdown {
+    position: relative;
+  }
+
+  .app-main-nav > .nav-dropdown .nav-dropdown__summary {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+    font-size: clamp(16px, 1.2vw, 20px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   body > nav {
@@ -5768,6 +5823,53 @@ label {
   gap: 12px;
 }
 
+.size-analysis-setup-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.size-analysis-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.size-analysis-layout__left,
+.size-analysis-layout__right {
+  min-width: 0;
+}
+
+.size-analysis-layout__right {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.size-analysis-work-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.size-analysis-work-grid__main,
+.size-analysis-work-grid__side {
+  min-width: 0;
+}
+
+.size-analysis-work-grid__main,
+.size-analysis-work-grid__side {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.size-analysis-pc-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
 .size-analysis-summary-cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -5851,6 +5953,91 @@ label {
   font-size: 0.84rem;
   line-height: 1.4;
   color: #374151;
+}
+
+.size-analysis-club-group-hint {
+  margin: 0 0 8px 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+/* 클럽별 보기: 접기 카드는 모바일만 */
+.size-analysis-club-group-accordion--mobile {
+  display: block;
+}
+
+/* 중복자 보기: 리스트는 모바일만(표는 PC 전용 래퍼) */
+.size-analysis-dup-only-list--mobile {
+  display: block;
+}
+
+.size-analysis-dup-pc-wrap {
+  display: none;
+}
+
+.size-analysis-dup-pc-club {
+  margin-bottom: 16px;
+}
+
+.size-analysis-dup-pc-club:last-child {
+  margin-bottom: 0;
+}
+
+.size-analysis-dup-pc-club__title {
+  margin: 0 0 6px 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #111827;
+  word-break: keep-all;
+}
+
+.size-analysis-dup-pc-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.size-analysis-dup-pc-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.size-analysis-dup-pc-table th,
+.size-analysis-dup-pc-table td {
+  border: 1px solid #e5e7eb;
+  padding: 5px 8px;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+
+.size-analysis-dup-pc-table thead th {
+  background: #f9fafb;
+  font-weight: 700;
+  color: #374151;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.size-analysis-dup-pc-table td:nth-child(1),
+.size-analysis-dup-pc-table td:nth-child(2) {
+  word-break: break-word;
+}
+
+.size-analysis-dup-pc-table td:nth-child(3),
+.size-analysis-dup-pc-table td:nth-child(6) {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.size-analysis-dup-pc-tbody-group {
+  background: #fafafa;
+}
+
+.size-analysis-dup-pc-table .size-analysis-dup-pc-tbody-group + .size-analysis-dup-pc-tbody-group {
+  border-top: 2px solid #cbd5e1;
 }
 
 .size-analysis-filter-row {
@@ -6687,6 +6874,27 @@ label {
 }
 
 @media (min-width: 769px) {
+  .size-analysis-page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 24px;
+    gap: 16px;
+  }
+
+  .size-analysis-page > p.size-analysis-muted,
+  .size-analysis-card .size-analysis-muted {
+    max-width: 78ch;
+  }
+
+  .size-analysis-stage-grid {
+    gap: 16px;
+  }
+
+  .size-analysis-page > .size-analysis-card,
+  .size-analysis-page > .size-analysis-result-region {
+    margin-bottom: 0;
+  }
+
   .size-analysis-view-switch__heading {
     position: static;
     width: auto;
@@ -6733,6 +6941,18 @@ label {
   }
 
   .size-analysis-club-agg-mtx--desktop {
+    display: block !important;
+  }
+
+  .size-analysis-club-group-accordion--mobile {
+    display: none !important;
+  }
+
+  .size-analysis-dup-only-list--mobile {
+    display: none !important;
+  }
+
+  .size-analysis-dup-pc-wrap {
     display: block !important;
   }
 
@@ -6819,5 +7039,108 @@ label {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
     gap: 6px;
     padding: 4px 6px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .size-analysis-page {
+    max-width: 1100px;
+  }
+
+  .size-analysis-pc-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .size-analysis-pc-grid > .size-analysis-card--upload,
+  .size-analysis-pc-grid > .size-analysis-card--sheet-select,
+  .size-analysis-pc-grid > .size-analysis-card--detect {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .size-analysis-pc-grid > .size-analysis-field-mapping,
+  .size-analysis-pc-grid > .size-analysis-run-card,
+  .size-analysis-pc-grid > .size-analysis-grid-item--summary,
+  .size-analysis-pc-grid > .size-analysis-grid-item--filter,
+  .size-analysis-pc-grid > .size-analysis-xlsx-export,
+  .size-analysis-pc-grid > .size-analysis-result-region {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .size-analysis-run-card {
+    position: static;
+    z-index: auto;
+  }
+
+  .size-analysis-run-card .btn {
+    width: 100%;
+    min-height: 44px;
+    font-weight: 700;
+  }
+
+  .size-analysis-grid-item--filter .size-analysis-filter-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .size-analysis-grid-item--filter .size-analysis-filter-row .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .size-analysis-result-region {
+    gap: 14px;
+  }
+
+  /* 4) 필드 매핑: PC에서 2열 정렬형 배치 */
+  .size-analysis-field-mapping .size-analysis-map-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 14px;
+    row-gap: 9px;
+    margin-top: 6px;
+  }
+
+  .size-analysis-field-mapping .size-analysis-field-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 6px;
+    min-height: 88px;
+    padding: 8px 10px;
+  }
+
+  .size-analysis-field-mapping .size-analysis-field-select,
+  .size-analysis-field-mapping .size-analysis-field-input {
+    width: 100%;
+    min-height: 38px;
+    box-sizing: border-box;
+  }
+
+  .size-analysis-field-mapping .size-analysis-field-row--role-club,
+  .size-analysis-field-mapping .size-analysis-field-row--role-gender,
+  .size-analysis-field-mapping .size-analysis-field-row--role-qty,
+  .size-analysis-field-mapping .size-analysis-field-row--role-note {
+    grid-column: 1;
+  }
+
+  .size-analysis-field-mapping .size-analysis-field-row--role-name,
+  .size-analysis-field-mapping .size-analysis-field-row--role-size,
+  .size-analysis-field-mapping .size-analysis-field-row--role-item {
+    grid-column: 2;
+  }
+
+  .size-analysis-field-mapping .size-analysis-map-row,
+  .size-analysis-field-mapping .size-analysis-map-actions {
+    grid-column: 1 / -1;
+  }
+
+  .size-analysis-field-mapping .size-analysis-btn-auto,
+  .size-analysis-field-mapping .size-analysis-map-actions .btn {
+    width: 100%;
   }
 }

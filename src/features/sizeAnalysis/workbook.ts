@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { decodeWithFallback } from "@/lib/csvDecodeWithFallback";
 import type { WorkbookSnapshot } from "./types";
 
 export async function readWorkbookFromFile(file: File): Promise<WorkbookSnapshot> {
@@ -6,9 +7,8 @@ export async function readWorkbookFromFile(file: File): Promise<WorkbookSnapshot
   const ext = file.name.toLowerCase();
 
   if (ext.endsWith(".csv")) {
-    const text = new TextDecoder("utf-8").decode(bytes);
+    const text = decodeWithFallback(bytes);
     const rows = text
-      .replace(/^\uFEFF/, "")
       .split(/\r?\n/)
       .map((line) => line.split(",").map((v) => v.trim()));
     return { sheets: [{ name: "Sheet1", rows }] };

@@ -34,13 +34,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <header className="app-site-header">
             <h1 className="app-site-title">재고관리 프로그램</h1>
           </header>
-          <nav>
+          <nav className="app-main-nav" aria-label="주요 메뉴">
             <a href="/products">상품</a>
             <a href="/status">재고현황</a>
             <AdaptiveHomepageLink />
-            <a href="/transaction-statement">명세서</a>
-            <a href="/order-quantity-match">수량매칭</a>
-            <a href="/size-analysis">분석</a>
+            <a href="/transaction-statement">거래명세서</a>
+            <a href="/order-quantity-match">수량매치</a>
+            <a href="/size-analysis">사이즈분석</a>
             {/*href="/moves">재고 변동</a>*/}
           </nav>
         </div>

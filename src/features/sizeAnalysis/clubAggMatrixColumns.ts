@@ -3,6 +3,8 @@
  * 기본 숫자 열(85~115)은 항상 포함하고, 120·기타 숫자·문자 사이즈는 데이터가 있을 때만 뒤에 붙입니다.
  */
 
+import { matrixColumnLabelFromSizeString } from "./matrixSizeDisplay";
+
 const LETTER_SIZES_ORDER = ["S", "M", "L", "XL", "2XL", "3XL", "4XL", "FREE", "F"] as const;
 
 function compareSizeForMatrix(a: string, b: string): number {
@@ -30,11 +32,9 @@ const DEFAULT_NUM_SET = new Set<string>(DEFAULT_NUM_SIZE_COLS);
 /** 기본 숫자 열 뒤에 붙는 문자 사이즈 순 (데이터에 있을 때만 열) */
 const LETTER_SIZE_ORDER: readonly string[] = [...LETTER_SIZES_ORDER];
 
-/** 집계 행에 M100/W90이 섞여 들어온 경우에도 열 머리는 숫자만 쓰도록 보정 */
+/** `남자 100`·`M100`·`105여` 등 임의 size 문자열 → 열(숫자·알파)만 */
 function normalizeMatrixColumnLabel(s: string): string {
-  const t = String(s ?? "").trim();
-  const m = /^(M|W)(\d+)$/i.exec(t);
-  return m ? m[2]! : t;
+  return matrixColumnLabelFromSizeString(s);
 }
 
 export function buildColumnSizesForClub(clubRows: Array<{ size: string }>): string[] {

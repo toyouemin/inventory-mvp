@@ -361,7 +361,7 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
 
   const modes = [
     { kind: "total" as const, label: "총 수량", flat: buildAggRowsTotal(rows) },
-    { kind: "deduped" as const, label: "중복 제외 수량", flat: buildAggRowsDedupedFirst(rows) },
+    { kind: "deduped" as const, label: "중복 제외 수량", flat: buildAggRowsDedupedFirst(rows, duplicateRowIds) },
     { kind: "duplicate" as const, label: "중복자 수량", flat: buildAggRowsDuplicate(rows, duplicateRowIds) },
   ] as const;
 

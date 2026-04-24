@@ -843,7 +843,7 @@ export function ClubGroupedView({
   const mobileClubTripleMatrices = useMemo(() => {
     const statusByCell = buildCellStatusMap(normRows);
     const flatTotal = buildAggRowsTotal(normRows);
-    const flatDeduped = buildAggRowsDedupedFirst(normRows);
+    const flatDeduped = buildAggRowsDedupedFirst(normRows, duplicateRowIds);
     const flatDup = buildAggRowsDuplicate(normRows, duplicateRowIds);
 
     const pickClub = (clubName: string, flat: typeof flatTotal) => flat.filter((r) => r.club === clubName);
@@ -1025,7 +1025,7 @@ export function AnalysisSummaryCards({
     ["제외", summary.excluded],
     ["원본 총수량", summary.originalTotalQty],
     ["최종 집계 수량", summary.aggregatedTotalQty],
-    ["중복자 수(인원)", duplicateAnalysis.duplicatePersonCount],
+    ["중복 주문(건)", duplicateAnalysis.duplicatePersonCount],
     ["중복 수량", duplicateAnalysis.duplicateQtyTotal],
     ["일반 수량", duplicateAnalysis.normalQty],
     ["검산", summary.verificationMatched ? "일치" : "불일치"],
@@ -1233,8 +1233,9 @@ function buildCellStatusMap(normRows: any[]): Map<string, CellMeta> {
   for (const r of normRows) {
     if (r.excluded) continue;
     const club = normClubFromNormRow(r);
-    const gk = rowKeyGenderForAgg(String(r.genderNormalized ?? r.genderRaw ?? ""));
-    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+    const { gender: gDisp, size: sDisp } = matrixAggGenderAndSizeFromRow(r);
+    const gk = rowKeyGenderForAgg(gDisp);
+    const size = sDisp || "미분류";
     const key = `${club}\0${gk}\0${size}`;
     const st = String(r.parseStatus ?? "");
     const cur = map.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false };
@@ -1273,7 +1274,7 @@ function clubAggMatrixHeadline(
   if (by.공용 > 0) gParts.push(`공용:${by.공용}개`);
   const gStr = gParts.length ? `${gParts.join(" ")} ` : "";
   const dupText =
-    !dup || dup.persons === 0 ? "중복자 없음" : `중복 ${dup.persons}명 · 중복분 ${dup.sheets}개`;
+    !dup || dup.persons === 0 ? "중복자 없음" : `중복 ${dup.persons}건 · 중복분 ${dup.sheets}개`;
   return `${club} (${gStr}합계:${totalQty}개 / ${dupText})`;
 }
 
@@ -1384,7 +1385,7 @@ export function ClubSizeSummaryTable({
   const aggFlat = useMemo(() => {
     if (aggMode === "total") return buildAggRowsTotal(normRows);
     if (aggMode === "duplicate") return buildAggRowsDuplicate(normRows, duplicateRowIds);
-    return buildAggRowsDedupedFirst(normRows);
+    return buildAggRowsDedupedFirst(normRows, duplicateRowIds);
   }, [normRows, aggMode, duplicateRowIds]);
 
   const baseClubs = useMemo(

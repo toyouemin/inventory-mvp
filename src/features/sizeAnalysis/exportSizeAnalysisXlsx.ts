@@ -2,7 +2,16 @@ import * as XLSX from "xlsx-js-style";
 
 import { applyExcelDownloadFontToWorksheet } from "@/lib/excelDownloadFont";
 import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
-import { buildColumnSizesForClub } from "./clubAggMatrixColumns";
+import {
+  buildAggRowsDedupedFirst,
+  buildAggRowsDuplicate,
+  buildAggRowsTotal,
+  buildClubAggBlock,
+  normClubFromNormRow,
+  rowQtyParsed,
+  stableRowKeyForDup,
+  unionClubsOrdered,
+} from "./clubSizeAggModes";
 
 const PARSE_STATUS_LABEL: Record<string, string> = {
   auto_confirmed: "자동확정",
@@ -15,126 +24,6 @@ const PARSE_STATUS_LABEL: Record<string, string> = {
 function labelParseStatus(v: string | null | undefined): string {
   if (v == null || v === "") return "";
   return PARSE_STATUS_LABEL[v] ?? v;
-}
-
-function normClubFromNormRow(r: { clubNameNormalized?: string | null; clubNameRaw?: string | null }): string {
-  return String(r.clubNameNormalized ?? r.clubNameRaw ?? "미분류").trim() || "미분류";
-}
-
-function rowQtyParsed(r: any): number {
-  const q = r.qtyParsed;
-  return Number.isFinite(Number(q)) ? Number(q) : 0;
-}
-
-function stableRowKeyForDup(r: any, rowIndex: number): string {
-  if (r != null && r.id != null && String(r.id) !== "") return String(r.id);
-  if (r?.sourceRowIndex != null && r.sourceRowIndex !== "") return `src:${r.sourceRowIndex}`;
-  return `ix:${rowIndex}`;
-}
-
-function rowKeyGenderForAgg(g: string | null | undefined): "여" | "남" | "공용" {
-  const t = String(g ?? "").trim();
-  if (t === "남") return "남";
-  if (t === "여") return "여";
-  return "공용";
-}
-
-function compareGenderForClubSize(a: string, b: string): number {
-  const order = (g: string) => {
-    const t = String(g ?? "").trim();
-    if (t === "남") return 0;
-    if (t === "여") return 1;
-    if (t === "공용" || t === "") return 2;
-    return 3;
-  };
-  return order(a) - order(b) || String(a ?? "").localeCompare(String(b ?? ""), "ko");
-}
-
-function compareSizeLabel(a: string, b: string): number {
-  const aa = String(a ?? "").trim();
-  const bb = String(b ?? "").trim();
-  const an = /^\d+$/.test(aa) ? Number(aa) : Number.NaN;
-  const bn = /^\d+$/.test(bb) ? Number(bb) : Number.NaN;
-  const aIsNum = Number.isFinite(an);
-  const bIsNum = Number.isFinite(bn);
-  if (aIsNum && bIsNum) return an - bn;
-  if (aIsNum) return -1;
-  if (bIsNum) return 1;
-  return aa.localeCompare(bb, "ko");
-}
-
-type AggRow = { club: string; gender: string; size: string; qty: number };
-
-function buildAggregatedDetailRowsFromNormRows(rows: any[]): AggRow[] {
-  const byClub = new Map<string, { club: string; totalQty: number; rows: AggRow[] }>();
-  const detailMap = new Map<string, { club: string; gender: string; size: string; qty: number }>();
-
-  for (const r of rows) {
-    const club = normClubFromNormRow(r);
-    const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
-    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
-    const qtyRaw = r.qtyParsed ?? r.qtyRaw ?? 0;
-    const qty = Number.isFinite(Number(qtyRaw)) ? Number(qtyRaw) : 0;
-
-    const clubEntry = byClub.get(club) ?? { club, totalQty: 0, rows: [] };
-    clubEntry.totalQty += qty;
-    byClub.set(club, clubEntry);
-
-    const key = `${club}\0${gender}\0${size}`;
-    const cur = detailMap.get(key) ?? { club, gender, size, qty: 0 };
-    cur.qty += qty;
-    detailMap.set(key, cur);
-  }
-
-  for (const d of detailMap.values()) {
-    const clubEntry = byClub.get(d.club);
-    if (!clubEntry) continue;
-    clubEntry.rows.push(d);
-  }
-
-  return Array.from(byClub.values())
-    .map((club) => ({
-      ...club,
-      rows: club.rows.sort(
-        (a, b) => compareGenderForClubSize(a.gender, b.gender) || compareSizeLabel(a.size, b.size)
-      ),
-    }))
-    .sort((a, b) => a.club.localeCompare(b.club, "ko"))
-    .flatMap((c) => c.rows.map((r) => ({ club: c.club, gender: r.gender, size: r.size, qty: r.qty })));
-}
-
-type ClubBlock = {
-  club: string;
-  clubRows: AggRow[];
-  totalQty: number;
-  columnSizes: string[];
-  hasGongYong: boolean;
-  qtyMap: Map<string, number>;
-  dup: { persons: number; sheets: number } | undefined;
-};
-
-function buildClubBlocks(clubFlat: AggRow[], dupByClub: Map<string, { persons: number; sheets: number }>): ClubBlock[] {
-  const by = new Map<string, AggRow[]>();
-  for (const r of clubFlat) {
-    if (!by.has(r.club)) by.set(r.club, []);
-    by.get(r.club)!.push(r);
-  }
-  const clubs = Array.from(by.keys()).sort((a, b) => a.localeCompare(b, "ko"));
-  return clubs.map((club) => {
-    const clubRows = by.get(club) ?? [];
-    const totalQty = clubRows.reduce((s, r) => s + r.qty, 0);
-    const columnSizes = buildColumnSizesForClub(clubRows);
-    const gSeen = new Set<"여" | "남" | "공용">();
-    for (const r of clubRows) gSeen.add(rowKeyGenderForAgg(r.gender));
-    const hasGongYong = gSeen.has("공용");
-    const qtyMap = new Map<string, number>();
-    for (const r of clubRows) {
-      const gk = rowKeyGenderForAgg(r.gender);
-      const k = `${gk}\0${r.size}`;
-      qtyMap.set(k, (qtyMap.get(k) ?? 0) + r.qty);
-    }
-    return { club, clubRows, totalQty, columnSizes, hasGongYong, qtyMap, dup: dupByClub.get(club) };
-  });
 }
 
 type DupInput = { duplicateRowIds: Set<string>; dupByClub: Map<string, { persons: number; sheets: number }> };
@@ -318,7 +207,7 @@ export function downloadSizeAnalysisResultXlsx(rows: any[], duplicateAnalysis: D
   XLSX.utils.book_append_sheet(wb, buildSheetAllStyled(aoa1), "전체목록");
   XLSX.utils.book_append_sheet(
     wb,
-    buildClubAggregateStyledSheet(rows, duplicateAnalysis.dupByClub),
+    buildClubAggregateStyledSheet(rows, duplicateAnalysis.duplicateRowIds),
     "클럽별집계"
   );
   XLSX.utils.book_append_sheet(wb, buildSheetDupStyled(aoa3), "중복자");
@@ -366,96 +255,116 @@ function buildSheetAllStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet
   });
 }
 
-function buildClubAggregateStyledSheet(
-  rows: any[],
-  dupByClub: Map<string, { persons: number; sheets: number }>
-): XLSX.WorkSheet {
-  const flat = buildAggregatedDetailRowsFromNormRows(rows);
+function appendClubMatrixSection(
+  ws: XLSX.WorkSheet,
+  enc: typeof XLSX.utils.encode_cell,
+  merges: import("xlsx").Range[],
+  rIn: number,
+  b: ReturnType<typeof buildClubAggBlock>,
+  titleText: string
+): { r: number; cMax: number } {
+  let r = rIn;
+  const colSizes = b.columnSizes;
+  const L = colSizes.length;
+  const colCount = 1 + L + 1 + 1;
+  const lastCol = colCount - 1;
+  const lastSumCol = 1 + L;
+  let cMax = colCount - 1;
+
+  const titleR = r;
+  ws[enc({ r: titleR, c: 0 })] = { v: titleText, t: "s", s: styleTitle() };
+  merges.push({ s: { r: titleR, c: 0 }, e: { r: titleR, c: lastCol } });
+  for (let c = 1; c <= lastCol; c += 1) {
+    ws[enc({ r: titleR, c })] = { v: "", t: "s", s: styleTitle() };
+  }
+
+  r += 1;
+  const headerR = r;
+  const headerRow: (string | number)[] = ["성별", ...colSizes, "합계", "종합계"];
+  for (let c = 0; c < colCount; c += 1) {
+    const v = headerRow[c]!;
+    ws[enc({ r: headerR, c })] = { v, t: typeof v === "number" ? "n" : "s", s: styleHeader() };
+  }
+
+  r += 1;
+  const genders = b.rowKeys;
+  const dataStartR = r;
+  const total = b.totalQty;
+  const zongV = total === 0 ? "" : total;
+  for (let gi = 0; gi < genders.length; gi += 1) {
+    const gk = genders[gi]!;
+    const rowIdx = r;
+    ws[enc({ r: rowIdx, c: 0 })] = { v: gk, t: "s", s: styleDataCenter() };
+    let rowSum = 0;
+    for (let i = 0; i < L; i += 1) {
+      const sz = colSizes[i]!;
+      const q = b.qtyMap.get(`${gk}\0${sz}`) ?? 0;
+      rowSum += q;
+      if (q === 0) {
+        ws[enc({ r: rowIdx, c: 1 + i })] = { t: "s", v: "", s: styleDataCenter() };
+      } else {
+        ws[enc({ r: rowIdx, c: 1 + i })] = { t: "n", v: q, s: styleDataCenter() };
+      }
+    }
+    if (rowSum === 0) {
+      ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "s", v: "", s: styleDataCenter() };
+    } else {
+      ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "n", v: rowSum, s: styleDataCenter() };
+    }
+    if (gi === 0) {
+      ws[enc({ r: rowIdx, c: lastCol })] = {
+        v: zongV,
+        t: zongV === "" ? "s" : "n",
+        s: { ...styleDataCenter(), font: { bold: true } },
+      };
+    } else {
+      ws[enc({ r: rowIdx, c: lastCol })] = { t: "s", v: "", s: styleDataCenter() };
+    }
+    r += 1;
+  }
+  if (genders.length > 1) {
+    merges.push({
+      s: { r: dataStartR, c: lastCol },
+      e: { r: dataStartR + genders.length - 1, c: lastCol },
+    });
+  }
+
+  return { r, cMax };
+}
+
+function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>): XLSX.WorkSheet {
   const ws: XLSX.WorkSheet = {};
   const enc = XLSX.utils.encode_cell;
 
-  if (flat.length === 0) {
+  const modes = [
+    { label: "총 수량", flat: buildAggRowsTotal(rows) },
+    { label: "중복자 수량", flat: buildAggRowsDuplicate(rows, duplicateRowIds) },
+    { label: "중복 제외 수량", flat: buildAggRowsDedupedFirst(rows) },
+  ] as const;
+
+  const clubsOrdered = unionClubsOrdered(modes.map((m) => m.flat));
+  if (clubsOrdered.length === 0) {
     ws[enc({ r: 0, c: 0 })] = { v: "(집계할 데이터가 없습니다)", t: "s" };
     ws["!ref"] = "A1";
     return ws;
   }
 
-  const blocks = buildClubBlocks(flat, dupByClub);
   const merges: import("xlsx").Range[] = [];
   let cMax = 0;
   let r = 0;
 
-  for (let bi = 0; bi < blocks.length; bi += 1) {
+  for (let bi = 0; bi < clubsOrdered.length; bi += 1) {
+    const club = clubsOrdered[bi]!;
     if (bi > 0) r += 1;
-    const b = blocks[bi]!;
-    const colSizes = b.columnSizes;
-    const L = colSizes.length;
-    const colCount = 1 + L + 1 + 1;
-    const lastCol = colCount - 1;
-    const lastSumCol = 1 + L;
-    cMax = Math.max(cMax, colCount - 1);
-
-    const dup = b.dup;
-    const dupText =
-      dup && dup.persons > 0 ? ` · 중복 ${dup.persons}명/${dup.sheets}장` : " · 중복자 없음";
-    const titleText = `${b.club} · 총 ${b.totalQty}장${dupText}`;
-
-    const titleR = r;
-    ws[enc({ r: titleR, c: 0 })] = { v: titleText, t: "s", s: styleTitle() };
-    merges.push({ s: { r: titleR, c: 0 }, e: { r: titleR, c: lastCol } });
-    for (let c = 1; c <= lastCol; c += 1) {
-      ws[enc({ r: titleR, c })] = { v: "", t: "s", s: styleTitle() };
-    }
-
-    r += 1;
-    const headerR = r;
-    const headerRow: (string | number)[] = ["성별", ...colSizes, "합계", "종합계"];
-    for (let c = 0; c < colCount; c += 1) {
-      const v = headerRow[c]!;
-      ws[enc({ r: headerR, c })] = { v, t: typeof v === "number" ? "n" : "s", s: styleHeader() };
-    }
-
-    r += 1;
-    const genders: ("여" | "남" | "공용")[] = b.hasGongYong ? ["여", "남", "공용"] : ["여", "남"];
-    const dataStartR = r;
-    const total = b.totalQty;
-    const zongV = total === 0 ? "" : total;
-    for (let gi = 0; gi < genders.length; gi += 1) {
-      const gk = genders[gi]!;
-      const rowIdx = r;
-      ws[enc({ r: rowIdx, c: 0 })] = { v: gk, t: "s", s: styleDataCenter() };
-      let rowSum = 0;
-      for (let i = 0; i < L; i += 1) {
-        const sz = colSizes[i]!;
-        const q = b.qtyMap.get(`${gk}\0${sz}`) ?? 0;
-        rowSum += q;
-        if (q === 0) {
-          ws[enc({ r: rowIdx, c: 1 + i })] = { t: "s", v: "", s: styleDataCenter() };
-        } else {
-          ws[enc({ r: rowIdx, c: 1 + i })] = { t: "n", v: q, s: styleDataCenter() };
-        }
-      }
-      if (rowSum === 0) {
-        ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "s", v: "", s: styleDataCenter() };
-      } else {
-        ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "n", v: rowSum, s: styleDataCenter() };
-      }
-      if (gi === 0) {
-        ws[enc({ r: rowIdx, c: lastCol })] = {
-          v: zongV,
-          t: zongV === "" ? "s" : "n",
-          s: { ...styleDataCenter(), font: { bold: true } },
-        };
-      } else {
-        ws[enc({ r: rowIdx, c: lastCol })] = { t: "s", v: "", s: styleDataCenter() };
-      }
-      r += 1;
-    }
-    if (genders.length > 1) {
-      merges.push({
-        s: { r: dataStartR, c: lastCol },
-        e: { r: dataStartR + genders.length - 1, c: lastCol },
-      });
+    for (let mi = 0; mi < modes.length; mi += 1) {
+      const mode = modes[mi]!;
+      if (mi > 0) r += 1;
+      const clubRows = mode.flat.filter((x) => x.club === club);
+      const b = buildClubAggBlock(club, clubRows);
+      const titleText = `${b.club} · ${mode.label} ${b.totalQty}개`;
+      const out = appendClubMatrixSection(ws, enc, merges, r, b, titleText);
+      r = out.r;
+      cMax = Math.max(cMax, out.cMax);
     }
   }
 

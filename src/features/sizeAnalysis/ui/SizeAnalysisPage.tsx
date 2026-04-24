@@ -3,6 +3,18 @@
 import { useMemo, useState } from "react";
 
 import { buildColumnSizesForClub } from "@/features/sizeAnalysis/clubAggMatrixColumns";
+import {
+  buildAggRowsDedupedFirst,
+  buildAggRowsDuplicate,
+  buildAggRowsTotal,
+  CLUB_AGG_MODE_LABEL,
+  matrixGenderRowKeys,
+  normClubFromNormRow,
+  rowKeyGenderForAgg,
+  stableRowKeyForDup,
+  unionClubsOrdered,
+  type ClubSizeAggMode,
+} from "@/features/sizeAnalysis/clubSizeAggModes";
 import { downloadSizeAnalysisResultXlsx } from "@/features/sizeAnalysis/exportSizeAnalysisXlsx";
 import {
   excelColumnLetterFromOneBased,
@@ -93,20 +105,9 @@ function logExcludedRows(rows: any[], statusFilter: string): void {
   console.groupEnd();
 }
 
-function normClubFromNormRow(r: { clubNameNormalized?: string | null; clubNameRaw?: string | null }): string {
-  return String(r.clubNameNormalized ?? r.clubNameRaw ?? "미분류").trim() || "미분류";
-}
-
 function rowQtyParsed(r: any): number {
   const q = r.qtyParsed;
   return Number.isFinite(Number(q)) ? Number(q) : 0;
-}
-
-/** 정규화 행 → 중복 뱃지·Set 키 (id 우선, 없으면 원본행·인덱스) */
-function stableRowKeyForDup(r: any, rowIndex: number): string {
-  if (r != null && r.id != null && String(r.id) !== "") return String(r.id);
-  if (r?.sourceRowIndex != null && r.sourceRowIndex !== "") return `src:${r.sourceRowIndex}`;
-  return `ix:${rowIndex}`;
 }
 
 export type DuplicateAnalysis = {
@@ -219,15 +220,6 @@ export function SizeAnalysisPage() {
       }))
       .sort((a, b) => a.club.localeCompare(b.club, "ko"));
   }, [rows]);
-
-  /** 8) 집계: 현재 목록(필터) 기준, 성별/사이즈는 정규화 행에서 집계 */
-  const clubSizeFlatFromNorm = useMemo(
-    () =>
-      clubGroupedRows.flatMap((c) =>
-        c.rows.map((r) => ({ club: c.club, gender: r.gender, size: r.size, qty: r.qty }))
-      ),
-    [clubGroupedRows]
-  );
 
   const clubViewDataKey = useMemo(
     () => clubGroupedRows.map((c) => `${c.club}:${c.totalQty}:${c.rows.length}`).join("|"),
@@ -404,11 +396,7 @@ export function SizeAnalysisPage() {
           {detailViewMode === "all" ? (
             <>
               <AnalysisRowsTable rows={rows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
-              <ClubSizeSummaryTable
-                dupByClub={duplicateAnalysis.dupByClub}
-                normRows={rows}
-                rows={clubSizeFlatFromNorm}
-              />
+              <ClubSizeSummaryTable duplicateRowIds={duplicateAnalysis.duplicateRowIds} normRows={rows} />
             </>
           ) : detailViewMode === "club" ? (
             <ClubGroupedView key={clubViewDataKey} dupByClub={duplicateAnalysis.dupByClub} rows={clubGroupedRows} />
@@ -1250,16 +1238,6 @@ function compareSizeLabel(a: string, b: string): number {
   return aa.localeCompare(bb, "ko");
 }
 
-/**
- * 매트릭스 행·집계 gender 키: 여 / 남 / 공용(빈 값·기타)
- */
-function rowKeyGenderForAgg(g: string | null | undefined): "여" | "남" | "공용" {
-  const t = String(g ?? "").trim();
-  if (t === "남") return "남";
-  if (t === "여") return "여";
-  return "공용";
-}
-
 type CellMeta = { hasReview: boolean; hasUnres: boolean; hasCorrected: boolean };
 function buildCellStatusMap(normRows: any[]): Map<string, CellMeta> {
   const map = new Map<string, CellMeta>();
@@ -1401,59 +1379,80 @@ function ClubAggMatrixTableDesktop({
 }
 
 export function ClubSizeSummaryTable({
-  rows,
   normRows,
-  dupByClub,
+  duplicateRowIds,
 }: {
-  rows: Array<{ club: string; gender: string; size: string; qty: number }>;
-  /** 필터·제외가 반영된 정규화 행(셀 상태용) */
+  /** 필터·제외가 반영된 정규화 행(셀 상태·집계 입력) */
   normRows: any[];
-  /** 상위 `analyzeDuplicateRows`와 동일(중복 요약) */
-  dupByClub: Map<string, { persons: number; sheets: number }>;
+  duplicateRowIds: Set<string>;
 }) {
+  const [aggMode, setAggMode] = useState<ClubSizeAggMode>("total");
+
+  const aggFlat = useMemo(() => {
+    if (aggMode === "total") return buildAggRowsTotal(normRows);
+    if (aggMode === "duplicate") return buildAggRowsDuplicate(normRows, duplicateRowIds);
+    return buildAggRowsDedupedFirst(normRows);
+  }, [normRows, aggMode, duplicateRowIds]);
+
+  const baseClubs = useMemo(
+    () => unionClubsOrdered([buildAggRowsTotal(normRows)]),
+    [normRows]
+  );
+
   const statusByCell = useMemo(() => buildCellStatusMap(normRows ?? []), [normRows]);
 
   const matrixBlocks = useMemo(() => {
-    if (rows.length === 0) return [];
-    const by = groupClubAggRows(rows);
-    const clubs = Array.from(by.keys()).sort((a, b) => a.localeCompare(b, "ko"));
-    return clubs.map((club) => {
+    if (baseClubs.length === 0) return [];
+    const by = groupClubAggRows(aggFlat);
+    return baseClubs.map((club) => {
       const clubRows = by.get(club) ?? [];
       const totalQty = clubRows.reduce((s, r) => s + r.qty, 0);
       const sizes = buildColumnSizesForClub(clubRows);
-      const gSeen = new Set<"여" | "남" | "공용">();
-      for (const r of clubRows) gSeen.add(rowKeyGenderForAgg(r.gender));
-      const rowKeys = GENDER_ROW_ORDER.filter((g) => gSeen.has(g));
+      const rowKeys = matrixGenderRowKeys(clubRows);
       const qtyMap = new Map<string, number>();
       for (const r of clubRows) {
         const gk = rowKeyGenderForAgg(r.gender);
         const k = `${gk}\0${r.size}`;
         qtyMap.set(k, (qtyMap.get(k) ?? 0) + r.qty);
       }
-      return {
-        club,
-        clubRows,
-        totalQty,
-        sizes,
-        rowKeys,
-        qtyMap,
-        headline: clubAggMatrixHeadline(club, clubRows, totalQty, dupByClub.get(club)),
-      };
+      const modeLabel = CLUB_AGG_MODE_LABEL[aggMode];
+      const headline = `${club} · ${modeLabel} ${totalQty}개`;
+      return { club, clubRows, totalQty, sizes, rowKeys, qtyMap, headline };
     });
-  }, [rows, dupByClub]);
+  }, [aggFlat, aggMode, baseClubs]);
 
-  if (rows.length === 0) return null;
+  if (baseClubs.length === 0) return null;
 
   return (
     <section className="size-analysis-card size-analysis-club-size-card size-analysis-club-agg-section">
       <h3>8) 클럽/성별/사이즈 집계</h3>
+      <div
+        className="size-analysis-agg-mode-tabs"
+        role="tablist"
+        aria-label="집계 기준"
+      >
+        {(["total", "duplicate", "deduped"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            role="tab"
+            aria-selected={aggMode === m}
+            className={`size-analysis-agg-mode-tab${aggMode === m ? " size-analysis-agg-mode-tab--active" : ""}`}
+            onClick={() => setAggMode(m)}
+          >
+            {CLUB_AGG_MODE_LABEL[m]}
+          </button>
+        ))}
+      </div>
       <p className="size-analysis-muted size-analysis-club-size-hint size-analysis-club-agg-hint">
-        수량은 자동·검토·수정·미분류를 모두 합산하며, 클럽/성별/사이즈 기준으로 집계합니다.
+        탭에 따라 동일한 클럽·성별·사이즈 매트릭스로 수량을 확인합니다. (중복 제외 = 클럽+이름 그룹의 원본행 순 첫 행만)
       </p>
       <div className="size-analysis-club-agg-compact--mobile" aria-label="집계(요약)">
         {matrixBlocks.map((b) => (
           <div key={b.club} className="size-analysis-club-agg-mgroup">
-            <p className="size-analysis-club-agg-mgroup__head">{b.club}</p>
+            <p className="size-analysis-club-agg-mgroup__head">
+              {b.club} · {CLUB_AGG_MODE_LABEL[aggMode]} {b.totalQty}개
+            </p>
             {b.clubRows.map((r, idx) => (
               <div key={`${b.club}-${r.gender ?? ""}-${r.size}-${idx}`} className="size-analysis-club-agg-line">
                 {clubAggMobileLineInner(r)}

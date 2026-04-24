@@ -76,6 +76,7 @@ export function SizeAnalysisPage() {
   const [loading, setLoading] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [mappingSaved, setMappingSaved] = useState(false);
+  const [detailViewMode, setDetailViewMode] = useState<"all" | "club">("all");
 
   const clubSizeRows = useMemo(() => {
     const detail = summary?.clubSizeStatusRows;
@@ -89,6 +90,48 @@ export function SizeAnalysisPage() {
     });
     return out.sort((a, b) => a.club.localeCompare(b.club, "ko") || compareGenderForClubSize(a.gender, b.gender) || compareSizeLabel(a.size, b.size));
   }, [summary]);
+
+  const clubGroupedRows = useMemo(() => {
+    const byClub = new Map<string, { club: string; totalQty: number; rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }> }>();
+    const detailMap = new Map<string, { club: string; gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }>();
+
+    for (const r of rows) {
+      const club = String(r.clubNameRaw ?? r.clubNameNormalized ?? "미분류").trim() || "미분류";
+      const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
+      const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+      const qtyRaw = r.qtyParsed ?? r.qtyRaw ?? 0;
+      const qty = Number.isFinite(Number(qtyRaw)) ? Number(qtyRaw) : 0;
+      const parseStatus = String(r.parseStatus ?? "");
+
+      const clubEntry = byClub.get(club) ?? { club, totalQty: 0, rows: [] };
+      clubEntry.totalQty += qty;
+      byClub.set(club, clubEntry);
+
+      const key = `${club}\0${gender}\0${size}`;
+      const cur =
+        detailMap.get(key) ??
+        { club, gender, size, qty: 0, hasReview: false, hasUnresolved: false };
+      cur.qty += qty;
+      if (parseStatus === "needs_review") cur.hasReview = true;
+      if (parseStatus === "unresolved") cur.hasUnresolved = true;
+      detailMap.set(key, cur);
+    }
+
+    for (const d of detailMap.values()) {
+      const clubEntry = byClub.get(d.club);
+      if (!clubEntry) continue;
+      clubEntry.rows.push(d);
+    }
+
+    return Array.from(byClub.values())
+      .map((club) => ({
+        ...club,
+        rows: club.rows.sort(
+          (a, b) => compareGenderForClubSize(a.gender, b.gender) || compareSizeLabel(a.size, b.size)
+        ),
+      }))
+      .sort((a, b) => a.club.localeCompare(b.club, "ko"));
+  }, [rows]);
 
   async function uploadFile(file: File) {
     setError("");
@@ -233,8 +276,15 @@ export function SizeAnalysisPage() {
 
       <AnalysisSummaryCards summary={summary} />
       <AnalysisStatusFilter value={statusFilter} onChange={onStatusChange} />
-      <AnalysisRowsTable rows={rows} />
-      <ClubSizeSummaryTable rows={clubSizeRows} />
+      <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} />
+      {detailViewMode === "all" ? (
+        <>
+          <AnalysisRowsTable rows={rows} />
+          <ClubSizeSummaryTable rows={clubSizeRows} />
+        </>
+      ) : (
+        <ClubGroupedView rows={clubGroupedRows} />
+      )}
 
       {error ? <p className="size-analysis-error">{error}</p> : null}
     </main>
@@ -430,6 +480,7 @@ export function FieldMappingEditor({
               key={role}
               className={[
                 "size-analysis-field-row",
+                `size-analysis-field-row--role-${role}`,
                 unmapped && "size-analysis-field-row--unmapped",
                 reqUnknown && "size-analysis-field-row--required",
                 dup && "size-analysis-field-row--dup",
@@ -486,10 +537,10 @@ export function FieldMappingEditor({
         })}
       </div>
       {hasPreview ? (
-        <p className="size-analysis-muted size-analysis-map-hint-2">CSV의 열 순서를 위 드롭다운에서 선택해 맞추면 됩니다.</p>
+        <p className="size-analysis-muted size-analysis-map-hint-2">열 순서만 선택해 맞추면 됩니다.</p>
       ) : (
         <p className="size-analysis-muted size-analysis-map-hint-2">
-          먼저 &quot;3) 구조 분석&quot;을 실행해 헤더를 불러온 뒤 열을 선택하거나, 위 숫자로 1=첫 열을 입력하세요.
+          먼저 &quot;3) 구조 분석&quot; 후 열을 선택하세요.
         </p>
       )}
       <div className="size-analysis-map-actions">
@@ -501,6 +552,83 @@ export function FieldMappingEditor({
         >
           {loading ? "저장중..." : saved ? "매핑 완료" : "매핑확정"}
         </button>
+      </div>
+    </section>
+  );
+}
+
+export function DetailViewSwitch({
+  mode,
+  onChange,
+}: {
+  mode: "all" | "club";
+  onChange: (mode: "all" | "club") => void;
+}) {
+  return (
+    <section className="size-analysis-card">
+      <h3>보기 전환</h3>
+      <div className="size-analysis-view-switch">
+        <button
+          type="button"
+          className={`btn ${mode === "all" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => onChange("all")}
+        >
+          전체 보기
+        </button>
+        <button
+          type="button"
+          className={`btn ${mode === "club" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => onChange("club")}
+        >
+          클럽별 보기
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export function ClubGroupedView({
+  rows,
+}: {
+  rows: Array<{
+    club: string;
+    totalQty: number;
+    rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }>;
+  }>;
+}) {
+  return (
+    <section className="size-analysis-card">
+      <h3>클럽별 보기</h3>
+      <div className="size-analysis-club-group-list">
+        {rows.map((club) => (
+          <article key={club.club} className="size-analysis-club-group-card">
+            <div className="size-analysis-club-group-head">
+              <strong>{club.club}</strong>
+              <span>총 {club.totalQty}</span>
+            </div>
+            <div className="size-analysis-club-group-rows">
+              {club.rows.map((r, idx) => (
+                <div
+                  key={`${club.club}-${r.gender}-${r.size}-${idx}`}
+                  className={[
+                    "size-analysis-club-group-row",
+                    r.hasReview && "size-analysis-club-size-tr--review",
+                    r.hasUnresolved && "size-analysis-club-size-tr--unresolved",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <span className="size-analysis-club-group-gender">{r.gender || "공용"}</span>
+                  <span>{r.size}</span>
+                  <span>{r.qty}개</span>
+                  <span>
+                    {r.hasReview ? "(검토필요)" : r.hasUnresolved ? "(미분류)" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );

@@ -143,7 +143,7 @@ export function splitOrderItemSegments(itemText: string | null | undefined): str
     .filter((s) => s.length > 0);
 }
 
-const ALPHA_SIZE_TOKEN = String.raw`4XL|3XL|2XL|XXL|XXXL|XXXXL|XL|XS|FREE|L|M|S`;
+const ALPHA_SIZE_TOKEN = String.raw`4XL|3XL|2XL|XXL|XXXL|XXXXL|XL|XS|L|M|S`;
 const RE_ALPHA_SIZE_QTY = new RegExp(
   `^\\s*(${ALPHA_SIZE_TOKEN})\\s+(\\d{1,4})\\s*(?:장|개|EA|PCS)?\\s*$`,
   "i"
@@ -155,6 +155,99 @@ const RE_GENDER_ALPHA_QTY = new RegExp(
   "i"
 );
 
+const QTY_MAX_NORMAL = 50;
+
+function applyUnknownManualQtySizeRules(
+  sizeNorm: string | undefined,
+  qty: number
+): { qty: number; status: ParseStatus; reason: string; confidence: number } {
+  if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && qty === Number(sizeNorm)) {
+    return {
+      qty: 1,
+      status: "auto_confirmed",
+      reason: "수량이 사이즈와 동일(오인) → 1",
+      confidence: 0.88,
+    };
+  }
+  if (qty > QTY_MAX_NORMAL) {
+    return { qty, status: "needs_review" as const, reason: "수량 범위 초과(1~50만 자동, 검토)", confidence: 0.42 };
+  }
+  if (qty < 1) {
+    return { qty: 1, status: "unresolved" as const, reason: "수량 없음", confidence: 0.2 };
+  }
+  return { qty, status: "auto_confirmed" as const, reason: "수동: 사이즈+수량", confidence: 0.9 };
+}
+
+function isFreeSizeText(s: string): boolean {
+  if (/프리미엄|프리오더|프리뷰|프리페|프리텍/i.test(s)) {
+    return false;
+  }
+  if (/\bFREE\b|FREE\s*SIZE/i.test(s)) {
+    return true;
+  }
+  return /(^|[\s,/])(프리(?:사이즈)?)(?=[\s\d장개]|$)/.test(s);
+}
+
+function tryParseFreeKorean(s: string): ParsePiece | null {
+  if (!isFreeSizeText(s)) {
+    return null;
+  }
+  const trail = s.match(/(\d{1,2})\s*(?:장|개)?\s*$/);
+  const qRaw = trail ? Number(trail[1]) : 1;
+  const q = qRaw < 1 ? 1 : qRaw;
+  return {
+    size: "FREE",
+    qty: q,
+    confidence: 0.55,
+    reason: "FREE(검토)",
+    status: "needs_review",
+  };
+}
+
+function tryParseKoreanVagueSize(s: string): ParsePiece | null {
+  if (!/특대/.test(s)) return null;
+  const m = s.match(/특대\s*(\d{1,2})/) ?? s.match(/(\d{1,2})\s*(?:장|개)?\s*$/);
+  const q = m ? Math.max(1, Number(m[1])) : 1;
+  return {
+    size: "특대",
+    qty: q,
+    confidence: 0.5,
+    reason: "한글 사이즈(검토)",
+    status: "needs_review",
+  };
+}
+
+function refineExtractedForUnknownManual(t: string, p: ReturnType<typeof extractSizeGenderQty>): ParsePiece {
+  if (p.size === "FREE" || isFreeSizeText(t)) {
+    const n = t.match(/(\d{1,2})\s*(?:장|개)?\s*$/);
+    return {
+      size: "FREE",
+      gender: p.gender,
+      qty: n && Number(n[1]) > 0 ? Number(n[1]) : 1,
+      status: "needs_review",
+      reason: "FREE(검토)",
+      confidence: 0.55,
+    };
+  }
+  let q = p.qty;
+  if (isLikelySizeQtyConflation(p.size, q)) {
+    q = 1;
+  }
+  if (p.size != null && q != null) {
+    const r = applyUnknownManualQtySizeRules(p.size, q);
+    return {
+      ...p,
+      size: p.size,
+      gender: p.gender,
+      qty: r.qty,
+      status: r.status,
+      reason: `${p.reason} / ${r.reason}`,
+      confidence: r.confidence,
+    };
+  }
+  return p;
+}
+
 /**
  * unknown 구조 · 수동 item 텍스트 파싱용: 토막 한 덩이에서 사이즈/성별/수량을 판정합니다.
  */
@@ -164,20 +257,31 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
     return { confidence: 0, reason: "빈 토막", status: "unresolved" as ParseStatus };
   }
 
+  if (/^\d{1,3}\s*$/.test(t)) {
+    return { confidence: 0.12, reason: "숫자만(사이즈·수량 구분 불가)", status: "unresolved" as ParseStatus };
+  }
+
+  const freeP = tryParseFreeKorean(t);
+  if (freeP) return freeP;
+
+  const koreanP = tryParseKoreanVagueSize(t);
+  if (koreanP) return koreanP;
+
   let m = t.match(RE_GENDER_NUMSIZE_QTY);
   if (m) {
     const g = m[1] as string;
     const sizeNorm = normalizeSize(m[2]);
-    const q = Number(m[3]);
+    let q = Number(m[3]);
     const gNorm: "남" | "여" | "공용" = g === "남" ? "남" : g === "여" ? "여" : "공용";
     if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
+      const r = applyUnknownManualQtySizeRules(sizeNorm, q);
       return {
         gender: gNorm,
         size: sizeNorm,
-        qty: q,
-        confidence: 0.94,
-        reason: "수동: 성별+숫자사이즈+수량",
-        status: "auto_confirmed",
+        qty: r.qty,
+        confidence: r.confidence,
+        reason: "수동: 성별+숫자사이즈+수량 — " + r.reason,
+        status: r.status,
       };
     }
   }
@@ -186,17 +290,21 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
   if (m) {
     const g = m[1] as string;
     const rawSize = m[2];
-    const q = Number(m[3]);
+    let q = Number(m[3]);
     const sizeNorm = normalizeSize(rawSize);
     const gNorm: "남" | "여" | "공용" = g === "남" ? "남" : g === "여" ? "여" : "공용";
     if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || (ALPHA_SIZES as readonly string[]).includes(sizeNorm)) && Number.isFinite(q) && q > 0) {
+      if (sizeNorm === "FREE") {
+        return { gender: gNorm, size: "FREE", qty: q, confidence: 0.55, reason: "FREE(검토)", status: "needs_review" };
+      }
+      const r = applyUnknownManualQtySizeRules(sizeNorm, q);
       return {
         gender: gNorm,
         size: sizeNorm,
-        qty: q,
-        confidence: 0.9,
-        reason: "수동: 성별+알파사이즈+수량",
-        status: "auto_confirmed",
+        qty: r.qty,
+        confidence: r.confidence,
+        reason: "수동: 성별+알파사이즈+수량 — " + r.reason,
+        status: r.status,
       };
     }
   }
@@ -204,10 +312,20 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
   m = t.match(RE_ALPHA_SIZE_QTY);
   if (m) {
     const rawSize = m[1];
-    const q = Number(m[2]);
+    let q = Number(m[2]);
     const sizeNorm = normalizeSize(rawSize);
     if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || (ALPHA_SIZES as readonly string[]).includes(sizeNorm)) && Number.isFinite(q) && q > 0) {
-      return { size: sizeNorm, qty: q, confidence: 0.9, reason: "수동: 알파사이즈+수량", status: "auto_confirmed" };
+      if (sizeNorm === "FREE") {
+        return { size: "FREE", qty: q, confidence: 0.55, reason: "FREE(검토)", status: "needs_review" };
+      }
+      const r = applyUnknownManualQtySizeRules(sizeNorm, q);
+      return {
+        size: sizeNorm,
+        qty: r.qty,
+        confidence: r.confidence,
+        reason: "수동: 알파사이즈+수량 — " + r.reason,
+        status: r.status,
+      };
     }
   }
 
@@ -216,21 +334,19 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
     const a = m[1];
     const b = m[2];
     const sizeNorm = normalizeSize(a);
-    const q = Number(b);
+    let q = Number(b);
     if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
-      if (q > 200) {
-        return {
-          size: sizeNorm,
-          qty: q,
-          confidence: 0.4,
-          reason: "수량이 비정상적으로 큼(검토)",
-          status: "needs_review",
-        };
-      }
-      return { size: sizeNorm, qty: q, confidence: 0.9, reason: "수동: 숫자사이즈+수량", status: "auto_confirmed" };
+      const r = applyUnknownManualQtySizeRules(sizeNorm, q);
+      return {
+        size: sizeNorm,
+        qty: r.qty,
+        confidence: r.confidence,
+        reason: "수동: 숫자사이즈+수량 — " + r.reason,
+        status: r.status,
+      };
     }
   }
 
-  return extractSizeGenderQty(t);
+  return refineExtractedForUnknownManual(t, extractSizeGenderQty(t));
 }
 

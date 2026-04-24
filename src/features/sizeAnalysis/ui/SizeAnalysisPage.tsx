@@ -2,6 +2,14 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  excelColumnLetterFromOneBased,
+  findDuplicateColumnIndices,
+  maxColumnCountInPreview,
+  mergeAutoFieldMap,
+  suggestFieldIndicesFromHeaderRow,
+} from "@/features/sizeAnalysis/fieldMappingUi";
+
 type Mapping = {
   structureType: "single_row_person" | "repeated_slots" | "size_matrix" | "unknown";
   headerRowIndex: number;
@@ -69,8 +77,12 @@ export function SizeAnalysisPage() {
   const [error, setError] = useState<string>("");
 
   const clubSizeRows = useMemo(() => {
+    const detail = summary?.clubSizeStatusRows;
+    if (Array.isArray(detail) && detail.length > 0) {
+      return detail as Array<{ club: string; size: string; qty: number; parseStatus: string }>;
+    }
     const obj = summary?.clubSize ?? {};
-    const out: Array<{ club: string; size: string; qty: number }> = [];
+    const out: Array<{ club: string; size: string; qty: number; parseStatus?: string }> = [];
     Object.entries(obj).forEach(([club, sizeMap]) => {
       Object.entries(sizeMap as Record<string, number>).forEach(([size, qty]) => out.push({ club, size, qty }));
     });
@@ -110,7 +122,10 @@ export function SizeAnalysisPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "구조 분석 실패");
       setDetectResult(json);
-      setMapping(json.mapping);
+      const base = json.mapping as Mapping;
+      const headerRow: string[] | undefined = json.previewRows?.[base.headerRowIndex];
+      const auto = suggestFieldIndicesFromHeaderRow(headerRow);
+      setMapping({ ...base, fields: mergeAutoFieldMap(base.fields ?? {}, auto) });
     } catch (e) {
       setError(e instanceof Error ? e.message : "구조 분석 실패");
     } finally {
@@ -164,7 +179,9 @@ export function SizeAnalysisPage() {
     setSummary(summaryJson);
 
     const rowsUrl =
-      status === "all" ? `/api/size-analysis/${id}/rows` : `/api/size-analysis/${id}/rows?status=${encodeURIComponent(status)}`;
+      status === "all"
+        ? `/api/size-analysis/${id}/rows?excludeExcluded=1`
+        : `/api/size-analysis/${id}/rows?status=${encodeURIComponent(status)}`;
     const rowsRes = await fetch(rowsUrl, { cache: "no-store" });
     const rowsJson = await rowsRes.json();
     if (!rowsRes.ok) throw new Error(rowsJson.error ?? "행 조회 실패");
@@ -195,6 +212,7 @@ export function SizeAnalysisPage() {
         onChange={setMapping}
         onSave={saveMappingAction}
         loading={loading === "mapping"}
+        previewRows={detectResult?.previewRows as string[][] | undefined}
       />
 
       <section className="size-analysis-card">
@@ -271,7 +289,9 @@ export function StructureDetectionPanel({
       </button>
       {detectResult ? (
         <div className="size-analysis-grid">
-          <div>추천 헤더 행: {detectResult.headerRowIndex}</div>
+          <div>
+            추천 헤더 행(1번째=첫 행): <strong>{Number(detectResult.headerRowIndex) + 1}</strong>번째
+          </div>
           <div>추천 구조 유형: {labelStructureType(detectResult.structureType)}</div>
         </div>
       ) : null}
@@ -279,28 +299,69 @@ export function StructureDetectionPanel({
   );
 }
 
+const UNKNOWN_REQUIRED = ["name", "club", "item"] as const;
+
 export function FieldMappingEditor({
   mapping,
   onChange,
   onSave,
   loading,
+  previewRows,
 }: {
   mapping: Mapping | null;
   onChange: (mapping: Mapping) => void;
   onSave: () => void;
   loading: boolean;
+  previewRows?: string[][];
 }) {
+  const maxCols = useMemo(
+    () => (previewRows?.length ? maxColumnCountInPreview(previewRows, mapping?.headerRowIndex ?? 0) : 0),
+    [previewRows, mapping?.headerRowIndex]
+  );
+  const headerCells = useMemo(
+    () => (previewRows?.[mapping?.headerRowIndex ?? 0] as string[] | undefined) ?? [],
+    [previewRows, mapping?.headerRowIndex]
+  );
+  const duplicateCols = useMemo(
+    () => (mapping ? findDuplicateColumnIndices(mapping.fields ?? {}) : []),
+    [mapping]
+  );
   if (!mapping) return null;
-  const roles = ["club", "name", "gender", "size", "qty", "item", "note"];
+  const m = mapping;
+  const roles = ["club", "name", "gender", "size", "qty", "item", "note"] as const;
+  const hasPreview = maxCols > 0;
+  const previewLen = previewRows?.length ?? 0;
+  const headerOutOfPreview = m.headerRowIndex >= previewLen;
+  const requiredUnknownSet = new Set<string>(UNKNOWN_REQUIRED);
+
+  function columnLabelForIndex(zeroIdx: number): string {
+    const h = String(headerCells[zeroIdx] ?? "").trim() || "제목 없음";
+    const u = zeroIdx + 1;
+    const L = excelColumnLetterFromOneBased(u);
+    return `${h} (${L}열 = ${u})`;
+  }
+
+  function applyHeaderAuto() {
+    const next = mergeAutoFieldMap(m.fields, suggestFieldIndicesFromHeaderRow(headerCells));
+    onChange({ ...m, fields: next });
+  }
+
+  const unknownUnmapped = UNKNOWN_REQUIRED.filter((k) => m.fields[k] === undefined);
+  const unknownNeedsFix = m.structureType === "unknown" && unknownUnmapped.length > 0;
+
   return (
-    <section className="size-analysis-card">
+    <section className="size-analysis-card size-analysis-field-mapping">
       <h3>4) 필드 매핑</h3>
-      <div className="size-analysis-grid">
+      <p className="size-analysis-map-hint size-analysis-muted">
+        열 번호는 <strong>1</strong>부터입니다 (A열=1, B열=2, C열=3). · 헤더 행을 맞춘 뒤 열을 선택하세요.
+      </p>
+      <div className="size-analysis-grid size-analysis-grid--map-tools">
         <label>
           구조 유형
           <select
-            value={mapping.structureType}
-            onChange={(e) => onChange({ ...mapping, structureType: e.target.value as Mapping["structureType"] })}
+            className="size-analysis-field-select"
+            value={m.structureType}
+            onChange={(e) => onChange({ ...m, structureType: e.target.value as Mapping["structureType"] })}
           >
             <option value="single_row_person">{STRUCTURE_TYPE_LABEL.single_row_person}</option>
             <option value="repeated_slots">{STRUCTURE_TYPE_LABEL.repeated_slots}</option>
@@ -309,32 +370,121 @@ export function FieldMappingEditor({
           </select>
         </label>
         <label>
-          헤더 행
+          헤더 행 (1=첫 행)
           <input
             type="number"
-            value={mapping.headerRowIndex}
-            onChange={(e) => onChange({ ...mapping, headerRowIndex: Number(e.target.value || 0) })}
+            className="size-analysis-field-input"
+            min={1}
+            max={49_999}
+            value={m.headerRowIndex + 1}
+            onChange={(e) => {
+              const n = Math.max(1, parseInt(e.target.value, 10) || 1);
+              onChange({ ...m, headerRowIndex: n - 1 });
+            }}
           />
         </label>
-        {roles.map((role) => (
-          <label key={role}>
-            {FIELD_ROLE_LABEL[role] ?? role}
-            <input
-              type="number"
-              value={mapping.fields[role] ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...mapping,
-                  fields: { ...mapping.fields, [role]: e.target.value === "" ? undefined : Number(e.target.value) },
-                })
-              }
-            />
-          </label>
-        ))}
       </div>
-      <button className="btn btn-secondary" onClick={onSave} disabled={loading}>
-        {loading ? "저장 중..." : "매핑 확정"}
-      </button>
+      {headerOutOfPreview && previewLen > 0 ? (
+        <p className="size-analysis-field-note size-analysis-muted" role="note">
+          헤더 행이 미리보기({previewLen}행) 밖이면, 열 제목은 비어 보일 수 있으나 1=첫 열 매핑은 그대로 적용됩니다.
+        </p>
+      ) : null}
+      {hasPreview ? (
+        <div className="size-analysis-map-row">
+          <button type="button" className="btn btn-secondary size-analysis-btn-auto" onClick={applyHeaderAuto} disabled={loading}>
+            헤더 이름으로 자동 채우기
+          </button>
+        </div>
+      ) : null}
+      {unknownNeedsFix ? (
+        <p className="size-analysis-field-warning" role="alert">
+          <strong>직접 매핑</strong>에서는 <strong>이름·클럽·주문내용</strong>을 모두 지정해 주세요. · 미지정:{" "}
+          {unknownUnmapped.map((k) => FIELD_ROLE_LABEL[k] ?? k).join(", ")}
+        </p>
+      ) : null}
+      {duplicateCols.length > 0 ? (
+        <p className="size-analysis-field-warning" role="alert">
+          같은 열이 여러 필드에 지정됨(검토): 열 {duplicateCols.map((c) => c + 1).join(", ")}
+        </p>
+      ) : null}
+      <div className="size-analysis-map-fields">
+        {roles.map((role) => {
+          const idx0 = m.fields[role];
+          const dup = idx0 !== undefined && duplicateCols.includes(idx0);
+          const reqUnknown = m.structureType === "unknown" && requiredUnknownSet.has(role) && idx0 === undefined;
+          const unmapped = idx0 === undefined;
+          return (
+            <div
+              key={role}
+              className={[
+                "size-analysis-field-row",
+                unmapped && "size-analysis-field-row--unmapped",
+                reqUnknown && "size-analysis-field-row--required",
+                dup && "size-analysis-field-row--dup",
+                idx0 !== undefined && "size-analysis-field-row--filled",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <span className="size-analysis-field-row__label">{FIELD_ROLE_LABEL[role] ?? role}</span>
+              {hasPreview ? (
+                <select
+                  className={["size-analysis-field-select", idx0 !== undefined && "size-analysis-field-select--has-value"]
+                    .filter(Boolean)
+                    .join(" ")}
+                  value={idx0 === undefined ? "" : String(idx0)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onChange({
+                      ...m,
+                      fields: { ...m.fields, [role]: v === "" ? undefined : parseInt(v, 10) },
+                    });
+                  }}
+                >
+                  <option value="">— 열 선택 —</option>
+                  {Array.from({ length: maxCols }, (_, i) => (
+                    <option key={i} value={i}>
+                      {columnLabelForIndex(i)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="size-analysis-fallback-cols">
+                  <input
+                    type="number"
+                    className="size-analysis-field-input"
+                    min={1}
+                    placeholder="열 번호 (1=첫 열)"
+                    value={idx0 === undefined ? "" : idx0 + 1}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      onChange({
+                        ...m,
+                        fields: {
+                          ...m.fields,
+                          [role]: raw === "" ? undefined : Math.max(0, (parseInt(raw, 10) || 1) - 1),
+                        },
+                      });
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {hasPreview ? (
+        <p className="size-analysis-muted size-analysis-map-hint-2">CSV의 열 순서를 위 드롭다운에서 선택해 맞추면 됩니다.</p>
+      ) : (
+        <p className="size-analysis-muted size-analysis-map-hint-2">
+          먼저 &quot;3) 구조 분석&quot;을 실행해 헤더를 불러온 뒤 열을 선택하거나, 위 숫자로 1=첫 열을 입력하세요.
+        </p>
+      )}
+      <div className="size-analysis-map-actions">
+        <button className="btn btn-secondary" onClick={onSave} disabled={loading} type="button">
+          {loading ? "저장 중..." : "매핑 확정"}
+        </button>
+      </div>
     </section>
   );
 }
@@ -425,28 +575,59 @@ export function AnalysisRowsTable({ rows }: { rows: any[] }) {
   );
 }
 
-export function ClubSizeSummaryTable({ rows }: { rows: Array<{ club: string; size: string; qty: number }> }) {
+function clubSizeSizeLabel(size: string, parseStatus: string | undefined): string {
+  if (parseStatus === "needs_review") return `${size} (검토필요)`;
+  if (parseStatus === "unresolved") return `${size} (미분류)`;
+  return size;
+}
+
+export function ClubSizeSummaryTable({
+  rows,
+}: {
+  rows: Array<{ club: string; size: string; qty: number; parseStatus?: string }>;
+}) {
   if (rows.length === 0) return null;
+  const hasStatus = rows.some((r) => r.parseStatus != null && r.parseStatus !== "");
   return (
-    <section className="size-analysis-card">
+    <section className="size-analysis-card size-analysis-club-size-card">
       <h3>8) 클럽/사이즈 집계</h3>
+      <p className="size-analysis-muted size-analysis-club-size-hint">
+        수량은 자동·검토·수정·미분류를 모두 합산합니다. 아래 <strong>상태</strong>·사이즈 표기로 확정/검토를 구분하세요.
+      </p>
       <div className="size-analysis-table-wrap">
-        <table className="size-analysis-table">
+        <table className="size-analysis-table size-analysis-table--club-size">
           <thead>
             <tr>
               <th>클럽</th>
               <th>사이즈</th>
+              {hasStatus ? <th>상태</th> : null}
               <th>수량</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, idx) => (
-              <tr key={`${r.club}-${r.size}-${idx}`}>
-                <td data-label="클럽">{r.club}</td>
-                <td data-label="사이즈">{r.size}</td>
-                <td data-label="수량">{r.qty}</td>
-              </tr>
-            ))}
+            {rows.map((r, idx) => {
+              const st = r.parseStatus;
+              const statusLabel = st ? labelParseStatus(st) : "—";
+              const rowClass =
+                st === "needs_review"
+                  ? "size-analysis-club-size-tr--review"
+                  : st === "unresolved"
+                    ? "size-analysis-club-size-tr--unresolved"
+                    : st === "corrected"
+                      ? "size-analysis-club-size-tr--corrected"
+                      : "";
+              return (
+                <tr
+                  key={`${r.club}-${r.size}-${st ?? "na"}-${idx}`}
+                  className={rowClass}
+                >
+                  <td data-label="클럽">{r.club}</td>
+                  <td data-label="사이즈">{hasStatus ? clubSizeSizeLabel(r.size, st) : r.size}</td>
+                  {hasStatus ? <td data-label="상태">{statusLabel}</td> : null}
+                  <td data-label="수량">{r.qty}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

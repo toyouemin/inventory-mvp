@@ -314,8 +314,12 @@ export function parseSizeMatrix(jobId: string, sheet: SheetSnapshot, mapping: Fi
     .map((h, idx) => ({ h: preprocessCell(h), idx }))
     .filter((x) => /^(80|85|90|95|100|105|110|115|120|XS|S|M|L|XL|2XL|3XL|4XL|FREE)$/.test(x.h));
 
+  const clubCol = mapping.fields.club;
   for (let i = start; i < sheet.rows.length; i += 1) {
     const row = sheet.rows[i] ?? [];
+    if (clubCol !== undefined && !preprocessCell(cell(row, clubCol))) {
+      continue;
+    }
     for (const s of sizeCols) {
       const qtyRaw = cell(row, s.idx);
       const qtyParsed = parseQty(qtyRaw) ?? (Number(preprocessCell(qtyRaw)) || undefined);

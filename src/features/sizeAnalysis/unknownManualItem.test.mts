@@ -74,4 +74,34 @@ const ok = rows.filter((r) => r.parseStatus === "auto_confirmed");
 assert.equal(ok.length, 7);
 assert.ok(rows.every((r) => (r.metaJson as { strategy?: string })?.strategy === "unknown_manual_item"));
 
+// 테스트4: unknown item 토막 규칙
+const t4split = splitOrderItemSegments("95 1 / 105 1");
+assert.equal(t4split.length, 2);
+const t4a = parseManualItemOrderSegment(t4split[0]!);
+const t4b = parseManualItemOrderSegment(t4split[1]!);
+assert.equal(t4a.size, "95");
+assert.equal(t4a.qty, 1);
+assert.equal(t4a.status, "auto_confirmed");
+assert.equal(t4b.size, "105");
+assert.equal(t4b.qty, 1);
+
+const t4free = parseManualItemOrderSegment("FREE 1");
+assert.equal(t4free.size, "FREE");
+assert.equal(t4free.status, "needs_review");
+
+const t4td = parseManualItemOrderSegment("특대 2");
+assert.equal(t4td.size, "특대");
+assert.equal(t4td.qty, 2);
+assert.equal(t4td.status, "needs_review");
+
+const t4td2 = parseManualItemOrderSegment("특대2");
+assert.equal(t4td2.qty, 2);
+assert.equal(t4td2.status, "needs_review");
+
+assert.equal(parseManualItemOrderSegment("95").status, "unresolved");
+
+const t4dup = parseManualItemOrderSegment("95 95");
+assert.equal(t4dup.size, "95");
+assert.equal(t4dup.qty, 1);
+
 console.log("unknownManualItem test passed:", { totalRows: rows.length, allAuto: ok.length });

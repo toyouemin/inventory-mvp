@@ -30,6 +30,9 @@ type TransactionStatementFormData = {
   customerBusinessItem: string;
   issueDate: string;
   tradeDate: string;
+  estimateEventName: string;
+  estimateManagerName: string;
+  estimateManagerPhone: string;
   items: StatementItemFormRow[];
 };
 
@@ -160,6 +163,13 @@ function normalizeBizNoInput(value: string): string {
   return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 10)}`;
 }
 
+function normalizePhoneInput(value: string): string {
+  const digits = normalizeDigitsOnly(value).slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 export default function TransactionStatementPage() {
   const printCaptureRef = useRef<HTMLDivElement>(null);
   const previewDialogRef = useRef<HTMLDialogElement>(null);
@@ -173,6 +183,9 @@ export default function TransactionStatementPage() {
     customerBusinessItem: "",
     issueDate: formatYmd(new Date()),
     tradeDate: formatYmd(new Date()),
+    estimateEventName: "",
+    estimateManagerName: "",
+    estimateManagerPhone: "",
     items: [makeRow(1)],
   });
   const [downloading, setDownloading] = useState(false);
@@ -236,6 +249,41 @@ export default function TransactionStatementPage() {
       })),
     [printLines]
   );
+
+  const estimateSummary = useMemo(() => {
+    const estimateItems = computedRows.filter((row) => row.name.trim() !== "");
+    const itemCount = estimateItems.length;
+    const totalQty = estimateItems.reduce((sum, row) => sum + row.qtyNumber, 0);
+    const memo = estimateItems
+      .map((row) => row.note.trim())
+      .filter((note) => note !== "")
+      .join(" / ");
+    return {
+      quoteDate: formData.issueDate,
+      receiver: formData.customerName.trim() || formData.customerRepresentative.trim() || "—",
+      eventName: formData.estimateEventName.trim() || "—",
+      itemCount,
+      totalQty,
+      totalAmount: totals.totalAmount,
+      vatLabel: showVatIncluded ? "VAT 포함" : "VAT 별도",
+      managerName: formData.estimateManagerName.trim() || "—",
+      managerPhone: formData.estimateManagerPhone.trim() || "—",
+      memo: memo || "—",
+    };
+  }, [
+    computedRows,
+    formData.issueDate,
+    formData.customerName,
+    formData.customerRepresentative,
+    formData.estimateEventName,
+    formData.estimateManagerName,
+    formData.estimateManagerPhone,
+    totals.totalAmount,
+    showVatIncluded,
+  ]);
+
+  const shouldShowErrorMessage =
+    !!errorMessage && !(documentType === "estimate" && errorMessage === "공급받는자 상호를 입력해 주세요.");
 
   const printSheetProps = useMemo(
     () => ({
@@ -349,8 +397,8 @@ export default function TransactionStatementPage() {
 
         const bytes = exportEstimateExcel({
           issueDate: formData.issueDate,
-          receiverName: formData.customerName.trim(),
-          eventName: "",
+          receiverName: formData.customerRepresentative.trim(),
+          eventName: formData.estimateEventName.trim(),
           memo: "",
           vatIncluded: showVatIncluded,
           supplier: {
@@ -361,8 +409,8 @@ export default function TransactionStatementPage() {
             tel: FIXED_SUPPLIER.tel,
             fax: FIXED_SUPPLIER.fax,
             bankAccount: FIXED_SUPPLIER.bankAccount,
-            managerName: FIXED_SUPPLIER.managerName,
-            managerPhone: FIXED_SUPPLIER.managerPhone,
+            managerName: formData.estimateManagerName.trim() || FIXED_SUPPLIER.managerName,
+            managerPhone: formData.estimateManagerPhone.trim() || FIXED_SUPPLIER.managerPhone,
             email: FIXED_SUPPLIER.email,
           },
           items: payloadItems,
@@ -474,7 +522,12 @@ export default function TransactionStatementPage() {
     setErrorMessage("");
 
     const itemCount = computedRows.filter((row) => row.name.trim() !== "").length;
-    if (!formData.customerName.trim()) {
+    if (documentType === "estimate") {
+      if (!formData.customerRepresentative.trim()) {
+        setErrorMessage("수신자를 입력해 주세요.");
+        return;
+      }
+    } else if (!formData.customerName.trim()) {
       setErrorMessage("공급받는자 상호를 입력해 주세요.");
       return;
     }
@@ -557,67 +610,115 @@ export default function TransactionStatementPage() {
           </button>
         </div>
 
-        <div className="transaction-form-grid">
-          <label className="transaction-form-grid__customer">
-            상호/클럽
-            <input value={formData.customerName} onChange={(event) => updateFormField("customerName", event.target.value)} />
-          </label>
-          <label className="transaction-form-grid__customer">
-            사업자번호/핸드폰
-            <input
-              inputMode="numeric"
-              value={formData.customerBizNo}
-              onChange={(event) => updateFormField("customerBizNo", normalizeBizNoInput(event.target.value))}
-            />
-          </label>
-          <label className="transaction-form-grid__customer">
-            성명
-            <input
-              value={formData.customerRepresentative}
-              onChange={(event) => updateFormField("customerRepresentative", event.target.value)}
-            />
-          </label>
-          <label className="transaction-form-grid__customer">
-            업태
-            <input
-              value={formData.customerBusinessType}
-              onChange={(event) => updateFormField("customerBusinessType", event.target.value)}
-            />
-          </label>
-          <label className="transaction-form-grid__customer">
-            종목
-            <input
-              value={formData.customerBusinessItem}
-              onChange={(event) => updateFormField("customerBusinessItem", event.target.value)}
-            />
-          </label>
-          <label className="transaction-form-grid__customer">
-            사업장주소
-            <input
-              value={formData.customerAddress}
-              onChange={(event) => updateFormField("customerAddress", event.target.value)}
-            />
-          </label>
-          <label className="transaction-form-grid__date transaction-form-grid__date--mobile">
-            발행일자
-            <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
-          </label>
-          <label className="transaction-form-grid__date transaction-form-grid__date--mobile">
-            거래일자
-            <input type="date" value={formData.tradeDate} onChange={(event) => updateFormField("tradeDate", event.target.value)} />
-          </label>
-        </div>
+        {documentType === "statement" ? (
+          <>
+            <div className="transaction-form-grid">
+              <label className="transaction-form-grid__customer">
+                상호/클럽
+                <input value={formData.customerName} onChange={(event) => updateFormField("customerName", event.target.value)} />
+              </label>
+              <label className="transaction-form-grid__customer">
+                사업자번호/핸드폰
+                <input
+                  inputMode="numeric"
+                  value={formData.customerBizNo}
+                  onChange={(event) => updateFormField("customerBizNo", normalizeBizNoInput(event.target.value))}
+                />
+              </label>
+              <label className="transaction-form-grid__customer">
+                성명
+                <input
+                  value={formData.customerRepresentative}
+                  onChange={(event) => updateFormField("customerRepresentative", event.target.value)}
+                />
+              </label>
+              <label className="transaction-form-grid__customer">
+                업태
+                <input
+                  value={formData.customerBusinessType}
+                  onChange={(event) => updateFormField("customerBusinessType", event.target.value)}
+                />
+              </label>
+              <label className="transaction-form-grid__customer">
+                종목
+                <input
+                  value={formData.customerBusinessItem}
+                  onChange={(event) => updateFormField("customerBusinessItem", event.target.value)}
+                />
+              </label>
+              <label className="transaction-form-grid__customer">
+                사업장주소
+                <input
+                  value={formData.customerAddress}
+                  onChange={(event) => updateFormField("customerAddress", event.target.value)}
+                />
+              </label>
+              <label className="transaction-form-grid__date transaction-form-grid__date--mobile">
+                발행일자
+                <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
+              </label>
+              <label className="transaction-form-grid__date transaction-form-grid__date--mobile">
+                거래일자
+                <input type="date" value={formData.tradeDate} onChange={(event) => updateFormField("tradeDate", event.target.value)} />
+              </label>
+            </div>
 
-        <div className="transaction-date-row" aria-label="거래명세 날짜 입력">
-          <label className="transaction-form-grid__date transaction-form-grid__date--desktop">
-            발행일자
-            <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
-          </label>
-          <label className="transaction-form-grid__date transaction-form-grid__date--desktop">
-            거래일자
-            <input type="date" value={formData.tradeDate} onChange={(event) => updateFormField("tradeDate", event.target.value)} />
-          </label>
-        </div>
+            <div className="transaction-date-row" aria-label="거래명세 날짜 입력">
+              <label className="transaction-form-grid__date transaction-form-grid__date--desktop">
+                발행일자
+                <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
+              </label>
+              <label className="transaction-form-grid__date transaction-form-grid__date--desktop">
+                거래일자
+                <input type="date" value={formData.tradeDate} onChange={(event) => updateFormField("tradeDate", event.target.value)} />
+              </label>
+            </div>
+          </>
+        ) : (
+          <div className="estimate-form">
+            <div className="estimate-form__row">
+              <label className="transaction-form-grid__date">
+                견적일
+                <input type="date" value={formData.issueDate} onChange={(event) => updateFormField("issueDate", event.target.value)} />
+              </label>
+            </div>
+
+            <div className="estimate-form__row estimate-form__row--2col">
+              <label className="transaction-form-grid__customer">
+                수신자
+                <input
+                  value={formData.customerRepresentative}
+                  onChange={(event) => updateFormField("customerRepresentative", event.target.value)}
+                />
+              </label>
+              <label className="transaction-form-grid__customer">
+                행사명(대회명)
+                <input
+                  value={formData.estimateEventName}
+                  onChange={(event) => updateFormField("estimateEventName", event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="estimate-form__row estimate-form__row--2col">
+              <label className="transaction-form-grid__customer">
+                담당자
+                <input
+                  value={formData.estimateManagerName}
+                  onChange={(event) => updateFormField("estimateManagerName", event.target.value)}
+                />
+              </label>
+              <label className="transaction-form-grid__customer">
+                담당자 연락처
+                <input
+                  value={formData.estimateManagerPhone}
+                  inputMode="numeric"
+                  onChange={(event) => updateFormField("estimateManagerPhone", normalizePhoneInput(event.target.value))}
+                />
+              </label>
+            </div>
+          </div>
+        )}
 
         <div className="transaction-items">
           <div className="transaction-items__header">
@@ -715,6 +816,46 @@ export default function TransactionStatementPage() {
                 <span className={panelStyles.vatToggleTrack} aria-hidden />
               </label>
             </div>
+            <div className={panelStyles.summaryStack} role="group" aria-label="견적서 요약 정보">
+              <div className={panelStyles.summaryInline}>
+                <span className={panelStyles.summaryItem}>
+                  <strong>견적일</strong> {estimateSummary.quoteDate || "—"}
+                </span>
+                <span className={panelStyles.summaryItem}>
+                  <strong>수신</strong> {estimateSummary.receiver}
+                </span>
+                <span className={panelStyles.summaryItem}>
+                  <strong>행사명</strong> {estimateSummary.eventName}
+                </span>
+              </div>
+              <div className={panelStyles.summaryInline}>
+                <span className={panelStyles.summaryItem}>
+                  <strong>품목 수</strong> {estimateSummary.itemCount.toLocaleString("ko-KR")}
+                </span>
+                <span className={panelStyles.summaryItem}>
+                  <strong>총 수량</strong> {estimateSummary.totalQty.toLocaleString("ko-KR")}
+                </span>
+                <span className={panelStyles.summaryItem}>
+                  <strong>견적금액</strong> {estimateSummary.totalAmount.toLocaleString("ko-KR")}원
+                </span>
+                <span className={panelStyles.summaryItem}>
+                  <strong>{estimateSummary.vatLabel}</strong>
+                </span>
+              </div>
+              <div className={panelStyles.summaryInline}>
+                <span className={panelStyles.summaryItem}>
+                  <strong>담당자</strong> {estimateSummary.managerName}
+                </span>
+                <span className={panelStyles.summaryItem}>
+                  <strong>담당자 연락처</strong> {estimateSummary.managerPhone}
+                </span>
+              </div>
+              <div className={panelStyles.summaryInline}>
+                <span className={panelStyles.summaryItem}>
+                  <strong>비고</strong> {estimateSummary.memo}
+                </span>
+              </div>
+            </div>
             <div className={panelStyles.previewRow}>
               <button
                 type="button"
@@ -734,8 +875,8 @@ export default function TransactionStatementPage() {
             <EstimateSheet
               data={{
                 date: formData.issueDate,
-                receiverName: formData.customerName,
-                eventName: "",
+                receiverName: formData.customerRepresentative,
+                eventName: formData.estimateEventName,
                 memo: "",
               }}
               items={computedRows.map((row) => ({
@@ -755,8 +896,8 @@ export default function TransactionStatementPage() {
                 tel: FIXED_SUPPLIER.tel,
                 fax: FIXED_SUPPLIER.fax,
                 bankAccount: FIXED_SUPPLIER.bankAccount,
-                managerName: FIXED_SUPPLIER.managerName,
-                managerPhone: FIXED_SUPPLIER.managerPhone,
+                managerName: formData.estimateManagerName || FIXED_SUPPLIER.managerName,
+                managerPhone: formData.estimateManagerPhone || FIXED_SUPPLIER.managerPhone,
                 email: FIXED_SUPPLIER.email,
               }}
               vatIncluded={showVatIncluded}
@@ -804,8 +945,8 @@ export default function TransactionStatementPage() {
               <EstimateSheet
                 data={{
                   date: formData.issueDate,
-                  receiverName: formData.customerName,
-                  eventName: "",
+                  receiverName: formData.customerRepresentative,
+                  eventName: formData.estimateEventName,
                   memo: "",
                 }}
                 items={computedRows.map((row) => ({
@@ -825,8 +966,8 @@ export default function TransactionStatementPage() {
                   tel: FIXED_SUPPLIER.tel,
                   fax: FIXED_SUPPLIER.fax,
                   bankAccount: FIXED_SUPPLIER.bankAccount,
-                  managerName: FIXED_SUPPLIER.managerName,
-                  managerPhone: FIXED_SUPPLIER.managerPhone,
+                  managerName: formData.estimateManagerName || FIXED_SUPPLIER.managerName,
+                  managerPhone: formData.estimateManagerPhone || FIXED_SUPPLIER.managerPhone,
                   email: FIXED_SUPPLIER.email,
                 }}
                 vatIncluded={showVatIncluded}
@@ -835,7 +976,7 @@ export default function TransactionStatementPage() {
           </div>
         </dialog>
 
-        {errorMessage ? <p className="transaction-error">{errorMessage}</p> : null}
+        {shouldShowErrorMessage ? <p className="transaction-error">{errorMessage}</p> : null}
 
         <div className="transaction-actions">
           <button

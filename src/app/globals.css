@@ -26,10 +26,11 @@
   gap: 12px;
   justify-content: space-between;
   align-items: flex-start;
+  margin-bottom: 10px;
 }
 
 .estimate-sheet__receiver {
-  flex: 1;
+  flex: 0 0 360px;
   border: 1px solid #000;
   padding: 8px 10px;
   display: flex;
@@ -37,8 +38,31 @@
   gap: 6px;
 }
 
+.estimate-sheet__receiver > div:last-child {
+  font-weight: 700;
+  font-size: 1.4em;
+  line-height: 1.2;
+}
+
 .estimate-sheet__supplier {
-  width: 380px;
+  width: 398px;
+}
+
+.estimate-sheet__supplier-col-role {
+  width: 38px;
+}
+
+.estimate-sheet__supplier-col-label {
+  width: 52px;
+}
+
+.estimate-sheet__supplier-col-label-narrow {
+  width: 42px;
+}
+
+.estimate-sheet__supplier-col-value,
+.estimate-sheet__supplier-col-value-narrow {
+  width: auto;
 }
 
 .estimate-sheet__supplier table,
@@ -57,21 +81,28 @@
 .estimate-sheet__items th,
 .estimate-sheet__items td {
   border: 1px solid #000;
-  padding: 6px 8px;
+  padding: 8px;
   font-size: 15px;
   vertical-align: middle;
   word-break: break-word;
   overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 .estimate-sheet__supplier th {
-  width: 66px;
   background: #fafafa;
   white-space: nowrap;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.estimate-sheet__supplier td {
+  white-space: nowrap;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 .estimate-sheet__supplier-role {
-  width: 46px;
   text-align: center;
   line-height: 1.4;
   font-weight: 700;
@@ -80,39 +111,69 @@
 
 .estimate-sheet__supplier-business-number {
   white-space: nowrap;
+  padding-left: 8px;
+}
+
+.estimate-sheet__supplier td[colspan="3"] {
+  white-space: normal;
+}
+
+.estimate-sheet__supplier tr:last-child td {
+  min-width: 112px;
+}
+
+.estimate-sheet__ceo {
+  position: relative;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.estimate-sheet__stamp-inline {
+  width: 42px;
+  height: auto;
+  margin-left: 6px;
+  vertical-align: middle;
+  opacity: 0.9;
 }
 
 .estimate-sheet__notice {
-  margin: 8px 0;
+  margin: 5px 0 8px;
   font-size: 15px;
 }
 
 .estimate-sheet__amount {
   border: 1px solid #000;
   display: grid;
-  grid-template-columns: 120px 1fr auto 100px;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
-  text-align: center;
   padding: 12px;
-  margin: 16px 0;
-  gap: 8px;
+  margin: 12px 0;
+  column-gap: 10px;
 }
 
 .estimate-sheet__amount-label,
 .estimate-sheet__amount-text,
 .estimate-sheet__amount-number,
 .estimate-sheet__vat {
-  border-right: 1px solid #000;
-  padding: 0 8px;
+  border: 0;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 24px;
   font-size: 15px;
+  position: relative;
+  white-space: nowrap;
+}
+
+.estimate-sheet__amount > div {
+  border: none;
 }
 
 .estimate-sheet__amount-label {
   font-weight: 700;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .estimate-sheet__amount-number {
@@ -123,14 +184,29 @@
 }
 
 .estimate-sheet__vat {
-  border-right: 0;
   font-size: 14px;
-  margin-top: 4px;
+  margin-top: 0;
   white-space: nowrap;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.estimate-sheet__amount-text {
+  justify-content: center;
+  text-align: center;
+}
+
+.estimate-sheet__amount-label::after,
+.estimate-sheet__amount-text::after,
+.estimate-sheet__amount-number::after {
+  content: "|";
+  margin: 0 6px;
+  font-weight: 400;
 }
 
 .estimate-sheet__items {
   margin-top: 8px;
+  margin-bottom: 8px;
   border: 1px solid #000;
 }
 
@@ -171,13 +247,15 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px;
+  padding: 10px;
   font-weight: 700;
   font-size: 16px;
+  margin-bottom: 8px;
 }
 
 .estimate-sheet__items--extra {
   margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 .estimate-sheet__memo-title {
@@ -191,13 +269,15 @@
 
 .estimate-sheet__memo {
   border: 1px solid #000;
-  min-height: 92px;
+  min-height: 100px;
   white-space: pre-line;
   padding: 8px;
   line-height: 1.5;
   font-size: 15px;
   word-break: break-word;
   overflow-wrap: anywhere;
+  margin-top: 6px;
+  margin-bottom: 8px;
 }
 
 .estimate-sheet__footer {
@@ -207,13 +287,14 @@
   justify-content: space-between;
   gap: 12px;
   padding: 8px;
-  margin-top: 16px;
+  margin-top: 20px;
+  margin-bottom: 8px;
 }
 
 .estimate-sheet__footer-notice {
   flex: 1;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .estimate-sheet__logo {
@@ -252,6 +333,46 @@
 
 .estimate-sheet__manager span:last-child {
   border-right: 0;
+}
+
+/* 견적서 내부 선 두께 1px 통일 */
+.estimate-sheet__root,
+.estimate-sheet__receiver,
+.estimate-sheet__supplier table,
+.estimate-sheet__supplier th,
+.estimate-sheet__supplier td,
+.estimate-sheet__amount,
+.estimate-sheet__amount-label,
+.estimate-sheet__amount-text,
+.estimate-sheet__amount-number,
+.estimate-sheet__vat,
+.estimate-sheet__items,
+.estimate-sheet__items th,
+.estimate-sheet__items td,
+.estimate-sheet__total,
+.estimate-sheet__memo-title,
+.estimate-sheet__memo,
+.estimate-sheet__footer {
+  border-width: 1px;
+  border-style: solid;
+  border-color: #000;
+}
+
+.estimate-form {
+  margin-bottom: 10px;
+}
+
+.estimate-form__row {
+  margin-bottom: 8px;
+}
+
+.estimate-form__row--2col {
+  display: flex;
+  gap: 10px;
+}
+
+.estimate-form__row--2col > * {
+  flex: 1;
 }
 
 @media print {

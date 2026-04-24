@@ -45,7 +45,6 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
   const extraItems = items.filter((item) => item.isExtra);
   const supplierTel = supplier.tel || "032-468-0351";
   const supplierFax = supplier.fax || "032-468-0332";
-  const supplierCeoWithSeal = `${supplier.ceoName || ""} (인)`;
 
   const totalAmount = normalItems.reduce((sum, item) => {
     const qty = Number(item.quantity || 0);
@@ -68,6 +67,13 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
 
         <div className="estimate-sheet__supplier">
           <table>
+            <colgroup>
+              <col className="estimate-sheet__supplier-col-role" />
+              <col className="estimate-sheet__supplier-col-label" />
+              <col className="estimate-sheet__supplier-col-value" />
+              <col className="estimate-sheet__supplier-col-label-narrow" />
+              <col className="estimate-sheet__supplier-col-value-narrow" />
+            </colgroup>
             <tbody>
               <tr>
                 <th rowSpan={4} className="estimate-sheet__supplier-role">
@@ -82,7 +88,10 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
                 <th>상호</th>
                 <td>{supplier.companyName || ""}</td>
                 <th>대표</th>
-                <td>{supplierCeoWithSeal}</td>
+                <td className="estimate-sheet__ceo">
+                  <span>{supplier.ceoName || ""}</span>
+                  <img src="/stamp.png" alt="" className="estimate-sheet__stamp-inline" />
+                </td>
               </tr>
               <tr>
                 <th>주소</th>

@@ -123,6 +123,16 @@ export function parseQty(raw: string | null | undefined): number | undefined {
 }
 
 /**
+ * extract가 사이즈 숫자(예: 95)를 수량으로도 잡은 경우(분리 열이 없는 한 줄 텍스트 등).
+ * single_row_person에서 수량 열이 없을 때만 보정에 사용.
+ */
+export function isLikelySizeQtyConflation(standardizedSize: string | undefined, qty: number | undefined): boolean {
+  if (standardizedSize == null || qty === undefined) return false;
+  if (!NUMERIC_SIZES.has(standardizedSize)) return false;
+  return Number(standardizedSize) === qty;
+}
+
+/**
  * item 열 "주문내용" 텍스트를 개별 주문 토막으로 나눕니다(슬래시, 쉼표, 줄바꿈).
  */
 export function splitOrderItemSegments(itemText: string | null | undefined): string[] {

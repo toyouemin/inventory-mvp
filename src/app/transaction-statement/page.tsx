@@ -33,6 +33,7 @@ type TransactionStatementFormData = {
   estimateEventName: string;
   estimateManagerName: string;
   estimateManagerPhone: string;
+  estimateMemo: string;
   items: StatementItemFormRow[];
 };
 
@@ -199,6 +200,7 @@ export default function TransactionStatementPage() {
     estimateEventName: "",
     estimateManagerName: DEFAULT_ESTIMATE_MANAGER_NAME,
     estimateManagerPhone: DEFAULT_ESTIMATE_MANAGER_PHONE,
+    estimateMemo: "",
     items: [makeRow(1)],
   });
   const [downloading, setDownloading] = useState(false);
@@ -267,10 +269,7 @@ export default function TransactionStatementPage() {
     const estimateItems = computedRows.filter((row) => row.name.trim() !== "");
     const itemCount = estimateItems.length;
     const totalQty = estimateItems.reduce((sum, row) => sum + row.qtyNumber, 0);
-    const memo = estimateItems
-      .map((row) => row.note.trim())
-      .filter((note) => note !== "")
-      .join(" / ");
+    const memo = formData.estimateMemo.trim();
     return {
       quoteDate: formData.issueDate,
       receiver: formData.customerName.trim() || formData.customerRepresentative.trim() || "—",
@@ -291,6 +290,7 @@ export default function TransactionStatementPage() {
     formData.estimateEventName,
     formData.estimateManagerName,
     formData.estimateManagerPhone,
+    formData.estimateMemo,
     totals.totalAmount,
     showVatIncluded,
   ]);
@@ -412,7 +412,7 @@ export default function TransactionStatementPage() {
           issueDate: formData.issueDate,
           receiverName: formData.customerRepresentative.trim(),
           eventName: formData.estimateEventName.trim(),
-          memo: "",
+          memo: formData.estimateMemo.trim(),
           vatIncluded: showVatIncluded,
           supplier: {
             businessNumber: FIXED_SUPPLIER.bizNo,
@@ -774,10 +774,12 @@ export default function TransactionStatementPage() {
                     금액(자동)
                     <input value={row.amount.toLocaleString("ko-KR")} readOnly />
                   </label>
-                  <label>
-                    비고
-                    <input value={row.note} onChange={(event) => updateItem(row.id, "note", event.target.value)} />
-                  </label>
+                  {documentType === "statement" ? (
+                    <label>
+                      비고
+                      <input value={row.note} onChange={(event) => updateItem(row.id, "note", event.target.value)} />
+                    </label>
+                  ) : null}
                 </div>
                 <div className="transaction-item-row__actions">
                   <button type="button" className="btn btn-primary btn-compact" onClick={addRow}>
@@ -795,6 +797,19 @@ export default function TransactionStatementPage() {
               </div>
             ))}
           </div>
+          {documentType === "estimate" ? (
+            <div className="transaction-items__estimate-memo">
+              <label>
+                공통 비고
+                <textarea
+                  value={formData.estimateMemo}
+                  onChange={(event) => updateFormField("estimateMemo", event.target.value)}
+                  placeholder="견적서 하단 비고에 표시됩니다."
+                  rows={4}
+                />
+              </label>
+            </div>
+          ) : null}
         </div>
 
         {documentType === "statement" ? (
@@ -893,7 +908,7 @@ export default function TransactionStatementPage() {
                 date: formData.issueDate,
                 receiverName: formData.customerRepresentative,
                 eventName: formData.estimateEventName,
-                memo: "",
+                memo: formData.estimateMemo,
               }}
               items={computedRows.map((row) => ({
                 id: row.id,
@@ -963,7 +978,7 @@ export default function TransactionStatementPage() {
                   date: formData.issueDate,
                   receiverName: formData.customerRepresentative,
                   eventName: formData.estimateEventName,
-                  memo: "",
+                  memo: formData.estimateMemo,
                 }}
                 items={computedRows.map((row) => ({
                   id: row.id,

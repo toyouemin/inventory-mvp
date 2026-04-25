@@ -58,6 +58,8 @@
   width: 70px;
   display: inline-block;
   box-sizing: border-box;
+  font-size: 30px;
+  line-height: 1.25;
 }
 
 .estimate-sheet__receiver-label::after {
@@ -68,12 +70,14 @@
 .estimate-sheet__receiver-value {
   flex: 1;
   min-width: 0;
+  font-size: 30px;
+  line-height: 1.25;
 }
 
 .estimate-sheet__receiver-value--name {
   font-weight: 700;
-  font-size: 16px;
-  line-height: 1.35;
+  font-size: 32px;
+  line-height: 1.25;
 }
 
 .estimate-sheet__supplier {
@@ -3704,6 +3708,23 @@ label {
   flex-wrap: wrap;
   justify-content: flex-end;
   margin-top: 4px;
+}
+
+.transaction-items__estimate-memo {
+  margin-top: 8px;
+}
+
+.transaction-items__estimate-memo label {
+  display: block;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.transaction-items__estimate-memo textarea {
+  width: 100%;
+  margin-top: 2px;
+  min-height: 92px;
+  resize: vertical;
 }
 
 .transaction-summary {

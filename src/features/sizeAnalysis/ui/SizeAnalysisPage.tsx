@@ -10,12 +10,14 @@ import {
   buildAggRowsTotal,
   CLUB_AGG_MODE_LABEL,
   compareRowsBySourceThenIndex,
+  computeClubDisplaySummaryStats,
   matrixGenderRowKeys,
   matrixAggGenderAndSizeFromRow,
   normClubFromNormRow,
   rowKeyGenderForAgg,
   stableRowKeyForDup,
   unionClubsOrdered,
+  type ClubDisplaySummaryStats,
   type ClubSizeAggMode,
   type DuplicateAnalysis,
 } from "@/features/sizeAnalysis/clubSizeAggModes";
@@ -169,17 +171,27 @@ export function SizeAnalysisPage() {
     }
 
     return Array.from(byClub.values())
-      .map((club) => ({
-        ...club,
-        rows: club.rows.sort(
-          (a, b) => compareGenderForClubSize(a.gender, b.gender) || compareSizeLabel(a.size, b.size)
-        ),
-      }))
+      .map((club) => {
+        const displaySummary = computeClubDisplaySummaryStats(allRows, club.club);
+        return {
+          ...club,
+          displaySummary,
+          rows: club.rows.sort(
+            (a, b) => compareGenderForClubSize(a.gender, b.gender) || compareSizeLabel(a.size, b.size)
+          ),
+        };
+      })
       .sort((a, b) => a.club.localeCompare(b.club, "ko"));
   }, [allRows]);
 
   const clubViewDataKey = useMemo(
-    () => clubGroupedRows.map((c) => `${c.club}:${c.totalQty}:${c.rows.length}`).join("|"),
+    () =>
+      clubGroupedRows
+        .map(
+          (c) =>
+            `${c.club}:${c.totalQty}:${c.rows.length}:${c.displaySummary.totalPersons}:${c.displaySummary.sizedQtySum}:${c.displaySummary.missingSizePersons}`
+        )
+        .join("|"),
     [clubGroupedRows]
   );
 
@@ -377,7 +389,7 @@ export function SizeAnalysisPage() {
               rows={clubGroupedRows}
             />
           ) : (
-            <DuplicateMembersView rows={allRows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
+            <DuplicateMembersView allRows={allRows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
           )}
         </div>
       </div>
@@ -707,11 +719,17 @@ function lineGenderSizeQtyRow(r: any, lineIdx: number): string {
   return `${gPart} · ${qty}개 · 행 ${rowN}`;
 }
 
-/** duplicateRowIds를 단일 기준으로 사용해 중복 그룹만 표시 */
-export function DuplicateMembersView({ rows, duplicateRowIds }: { rows: any[]; duplicateRowIds: Set<string> }) {
+/** 상태 필터와 무관하게 전체 norm(allRows) + duplicateRowIds( analyzeDuplicateRows(allRows) ) 기준. */
+export function DuplicateMembersView({
+  allRows,
+  duplicateRowIds,
+}: {
+  allRows: any[];
+  duplicateRowIds: Set<string>;
+}) {
   const clubMap = new Map<string, Map<string, { r: any; i: number }[]>>();
-  for (let i = 0; i < rows.length; i += 1) {
-    const r = rows[i]!;
+  for (let i = 0; i < allRows.length; i += 1) {
+    const r = allRows[i]!;
     const name = String(r.memberNameRaw ?? r.memberName ?? "").trim();
     if (!name) continue;
     const club = normClubFromNormRow(r);
@@ -854,6 +872,7 @@ export function ClubGroupedView({
   rows: Array<{
     club: string;
     totalQty: number;
+    displaySummary: ClubDisplaySummaryStats;
     rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }>;
   }>;
 }) {
@@ -900,36 +919,6 @@ export function ClubGroupedView({
     });
   }, [rows, normRows, duplicateRowIds]);
 
-  const desktopMatrixBlocks = useMemo(() => {
-    return rows.map((club) => {
-      const clubRowsFlat = club.rows.map((r) => ({
-        club: club.club,
-        gender: r.gender,
-        size: r.size,
-        qty: r.qty,
-      }));
-      const sizes = buildColumnSizesForClub(club.rows);
-      const rowKeys = matrixGenderRowKeys(club.rows);
-      const qtyMap = new Map<string, number>();
-      for (const r of club.rows) {
-        const gk = rowKeyGenderForAgg(r.gender);
-        const k = `${gk}\0${r.size}`;
-        qtyMap.set(k, (qtyMap.get(k) ?? 0) + r.qty);
-      }
-      const headline = clubAggMatrixHeadline(club.club, clubRowsFlat, club.totalQty, dupByClub?.get(club.club));
-      const metaByKey = new Map<string, ClubAggCellMeta>();
-      for (const r of club.rows) {
-        const gk = rowKeyGenderForAgg(r.gender);
-        metaByKey.set(`${gk}\0${r.size}`, {
-          hasReview: r.hasReview,
-          hasUnres: r.hasUnresolved,
-          hasCorrected: false,
-        });
-      }
-      return { club: club.club, headline, sizes, rowKeys, qtyMap, metaByKey };
-    });
-  }, [rows, dupByClub]);
-
   if (rows.length === 0) return null;
 
   function toggleClub(name: string) {
@@ -955,19 +944,26 @@ export function ClubGroupedView({
             const dup = dupByClub?.get(club.club);
             const dupPart =
               dup && dup.persons > 0 ? ` · 중복 ${dup.persons}명/${dup.sheets}개` : "";
+            const headSummary = (
+              <span className="size-analysis-club-group-head__name">
+                <span className="size-analysis-club-group-head__clubtitle">{club.club}</span>
+                <span className="size-analysis-club-group-head__summary size-analysis-muted">
+                  총 인원 {club.displaySummary.totalPersons}명 / 사이즈 수량 {club.displaySummary.sizedQtySum}개 / 미입력{" "}
+                  {club.displaySummary.missingSizePersons}명{dupPart}
+                </span>
+              </span>
+            );
             return (
               <article key={`${idx}-${club.club}`} className="size-analysis-club-group-card">
                 <button
                   type="button"
-                  className="size-analysis-club-group-head"
+                  className="size-analysis-club-group-head size-analysis-club-group-head--mobile"
                   onClick={() => toggleClub(club.club)}
                   aria-expanded={isOpen}
                   aria-controls={panelId}
                   aria-label={`${club.club} 상세 ${isOpen ? "접기" : "펼치기"}`}
                 >
-                  <span className="size-analysis-club-group-head__name">
-                    {club.club} · 총 {club.totalQty}개{dupPart}
-                  </span>
+                  {headSummary}
                   <span className="size-analysis-club-group-head__right">
                     <span className="size-analysis-club-group-chevron" aria-hidden>
                       <svg
@@ -986,40 +982,40 @@ export function ClubGroupedView({
                     </span>
                   </span>
                 </button>
-                {isOpen ? (
-                  <div id={panelId} className="size-analysis-club-group-rows">
-                    <div className="size-analysis-club-group-mtx-wrap size-analysis-club-group-mobile-agg-stack">
-                      {mobileClubTripleMatrices[idx]!.map((blk) => (
-                        <ClubAggMatrixTableDesktop
-                          key={blk.modeKey}
-                          headline={blk.shortLabel}
-                          headlineAriaLabel={blk.headlineAriaLabel}
-                          shortHeadline
-                          sizes={blk.sizes}
-                          rowKeys={blk.rowKeys}
-                          qtyMap={blk.qtyMap}
-                          resolveMeta={blk.resolveMeta}
-                        />
-                      ))}
-                    </div>
+                <div
+                  className="size-analysis-club-group-head size-analysis-club-group-head--pc"
+                  aria-label={`${club.club} 요약`}
+                >
+                  {headSummary}
+                </div>
+                <div
+                  id={panelId}
+                  className={[
+                    "size-analysis-club-group-rows",
+                    !isOpen ? "size-analysis-club-group-rows--collapsed-mobile" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <div className="size-analysis-club-group-mtx-wrap size-analysis-club-group-mobile-agg-stack">
+                    {mobileClubTripleMatrices[idx]!.map((blk) => (
+                      <ClubAggMatrixTableDesktop
+                        key={blk.modeKey}
+                        headline={blk.shortLabel}
+                        headlineAriaLabel={blk.headlineAriaLabel}
+                        shortHeadline
+                        sizes={blk.sizes}
+                        rowKeys={blk.rowKeys}
+                        qtyMap={blk.qtyMap}
+                        resolveMeta={blk.resolveMeta}
+                      />
+                    ))}
                   </div>
-                ) : null}
+                </div>
               </article>
             );
           })}
         </div>
-      </div>
-      <div className="size-analysis-club-group-mtx-pc" aria-label="클럽별 보기(매트릭스)">
-        {desktopMatrixBlocks.map((b) => (
-          <ClubAggMatrixTableDesktop
-            key={b.club}
-            headline={b.headline}
-            sizes={b.sizes}
-            rowKeys={b.rowKeys}
-            qtyMap={b.qtyMap}
-            resolveMeta={(gk, sz) => b.metaByKey.get(`${gk}\0${sz}`) ?? EMPTY_CLUB_AGG_META}
-          />
-        ))}
       </div>
     </section>
   );
@@ -1058,7 +1054,8 @@ export function AnalysisSummaryCards({
     <section className="size-analysis-card">
       <h3>5) 결과 요약</h3>
       <p className="size-analysis-muted size-analysis-summary-scope-hint">
-        {filterLabel} 필터·현재 화면에 로드된 목록을 기준으로 집계합니다(중복 지표 포함).
+        중복 주문·중복 수량·검산은 전체 norm 행(allRows)과 analyzeDuplicateRows(duplicateRowIds) 기준입니다. 상태 필터는 전체 보기 테이블에만 적용됩니다
+        {filterLabel !== "all" ? ` (현재 필터: ${filterLabel})` : ""}.
       </p>
       <div className="size-analysis-summary-cards">
         {cards.map(([label, value]) => (
@@ -1279,28 +1276,6 @@ function groupClubAggRows(rows: Array<{ club: string; gender: string; size: stri
     by.get(c)!.push(r);
   }
   return by;
-}
-
-function clubAggMatrixHeadline(
-  club: string,
-  clubRows: Array<{ club: string; gender: string; size: string; qty: number }>,
-  totalQty: number,
-  dup: { persons: number; sheets: number } | undefined
-): string {
-  const by: Record<"여" | "남" | "공용", number> = { 여: 0, 남: 0, 공용: 0 };
-  for (const r of clubRows) {
-    const gk = rowKeyGenderForAgg(r.gender);
-    by[gk] += r.qty;
-  }
-  const gParts: string[] = [];
-  if (by.여 > 0) gParts.push(`여:${by.여}개`);
-  if (by.남 > 0) gParts.push(`남:${by.남}개`);
-  if (by.공용 > 0) gParts.push(`공용:${by.공용}개`);
-  const gStr = gParts.length ? `${gParts.join(" ")} ` : "";
-  const dupText =
-    !dup || dup.persons === 0 ? "중복자 없음" : `중복 ${dup.persons}건 · 중복분 ${dup.sheets}개`;
-  const deduped = totalQty - (dup?.sheets ?? 0);
-  return `${club} (${gStr}합계:${totalQty}개 / 중복:${dup?.sheets ?? 0}개 / 중복제외:${deduped}개 / ${dupText})`;
 }
 
 type ClubAggCellMeta = { hasReview: boolean; hasUnres: boolean; hasCorrected: boolean };

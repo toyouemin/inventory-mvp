@@ -1,3 +1,4 @@
+import { rowEligibleForDuplicatePersonGroup } from "./clubSizeAggModes";
 import { labelExcludeForDisplay } from "./excludeReasonLabels";
 import type { NormalizedRow } from "./types";
 import { duplicateGroupKeyFromRow } from "./duplicateKeyNormalize";
@@ -251,6 +252,7 @@ function personGroupKeyForDuplicate(r: NormalizedRow): string | null {
  * 중복 기준:
  * - 같은 클럽 + 같은 이름 그룹에서 1행만 정상 유지, 나머지는 중복자
  * - 유지행 선택: 성별(남/여)에 맞는 M/W 계열 우선, 없으면 입력 첫 행
+ * - 검토필요(needs_review) 및 사이즈 없음·미분류 행은 중복 처리하지 않음(검토 우선, analyzeDuplicateRows와 동일)
  */
 export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[] {
   const result = rows.map((r) => ({ ...r }));
@@ -259,6 +261,7 @@ export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[]
 
   result.forEach((r, i) => {
     if (r.excluded) return;
+    if (!rowEligibleForDuplicatePersonGroup(r)) return;
     const k = personGroupKeyForDuplicate(r);
     if (!k) return;
     if (!byPerson.has(k)) byPerson.set(k, []);

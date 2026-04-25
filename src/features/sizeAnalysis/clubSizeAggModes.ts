@@ -124,6 +124,58 @@ export function matrixAggGenderAndSizeFromRow(r: {
   );
 }
 
+/** 클럽 요약(총 인원 / 사이즈 수량 / 미입력) — 표시 사이즈가 비었거나 미분류면 제외 */
+export function rowHasDisplayableSizeForSummary(r: {
+  standardizedSize?: string | null;
+  sizeRaw?: string | null;
+  genderNormalized?: string | null;
+  genderRaw?: string | null;
+}): boolean {
+  const { size } = matrixAggGenderAndSizeFromRow(r);
+  const s = String(size ?? "").trim();
+  return Boolean(s && s !== "미분류");
+}
+
+/**
+ * 동일 클럽·이름 중복(1행 유지) 처리 **그룹 후보**.
+ * - 검토필요(needs_review), 표시 사이즈 없음·미분류는 제외(검토 우선).
+ * - DB에 제외(중복)로 이미 저장된 행은 그룹·duplicateRowIds 재계산에 **포함**해야 하므로 excluded 여부는 보지 않음.
+ */
+export function rowEligibleForDuplicatePersonGroup(r: any): boolean {
+  const st = String(r?.parseStatus ?? "").trim();
+  if (st === "needs_review") return false;
+  return rowHasDisplayableSizeForSummary(r);
+}
+
+export type ClubDisplaySummaryStats = {
+  /** 해당 클럽 norm 행 수(allRows, 중복·제외 행 포함) */
+  totalPersons: number;
+  /** 표시 가능한 사이즈가 있는 행만 qty 합 */
+  sizedQtySum: number;
+  /** 사이즈 없음·미분류인 행 수 */
+  missingSizePersons: number;
+};
+
+/**
+ * 클럽별 보기 상단 문구용. 집계/duplicateRowIds 로직과 무관하게 표시만 계산합니다.
+ */
+export function computeClubDisplaySummaryStats(rows: any[], club: string): ClubDisplaySummaryStats {
+  let totalPersons = 0;
+  let sizedQtySum = 0;
+  let missingSizePersons = 0;
+  for (const r of rows) {
+    if (normClubFromNormRow(r) !== club) continue;
+    totalPersons += 1;
+    const qty = rowQtyParsed(r);
+    if (rowHasDisplayableSizeForSummary(r)) {
+      sizedQtySum += qty;
+    } else {
+      missingSizePersons += 1;
+    }
+  }
+  return { totalPersons, sizedQtySum, missingSizePersons };
+}
+
 /** 여·남은 항상 행으로 두고, 공용은 데이터가 있을 때만 추가 */
 export function matrixGenderRowKeys(clubRows: Array<{ gender: string }>): Array<"여" | "남" | "공용"> {
   const keys: Array<"여" | "남" | "공용"> = ["여", "남"];
@@ -272,6 +324,7 @@ export type DuplicateAnalysis = {
  * 중복 기준: key = `duplicateGroupKeyFromRow` (normalizeClub + "::" + normalizeName, 원본 raw 정규화만)
  * - 같은 key 그룹이면 1행만 정상, 나머지 중복
  * - 유지행 선택: 성별(남/여)에 맞는 M/W·남/여 계열 우선, 없으면 입력 첫 행
+ * - `needs_review` 또는 표시 사이즈 없음·미분류 행은 중복 판정에서 제외(검토 우선)
  */
 export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
   const byPerson = new Map<string, { r: any; i: number }[]>();
@@ -279,6 +332,7 @@ export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
 
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
+    if (!rowEligibleForDuplicatePersonGroup(r)) continue;
     const pk = personDupKey(r);
     if (!pk) continue;
     if (!byPerson.has(pk)) byPerson.set(pk, []);

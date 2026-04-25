@@ -301,8 +301,10 @@ export function SizeAnalysisPage() {
 
   return (
     <main className="size-analysis-page">
-      <h2>사이즈 분석</h2>
-      <p className="size-analysis-muted">다양한 주문 파일을 사람별 주문행으로 정규화하고 사이즈 추출/표준화를 수행합니다.</p>
+      <div className="size-analysis-page__title-row">
+        <h2>사이즈 분석</h2>
+        <span className="size-analysis-muted size-analysis-page__title-tag">각 클럽별 사이즈 분류 및 분석 추출기</span>
+      </div>
 
       <div className="size-analysis-pc-grid">
         <SizeAnalysisUploadCard onUpload={uploadFile} loading={loading === "upload"} />
@@ -388,7 +390,10 @@ export function SizeAnalysisPage() {
 export function SizeAnalysisUploadCard({ onUpload, loading }: { onUpload: (file: File) => void; loading: boolean }) {
   return (
     <section className="size-analysis-card size-analysis-card--upload">
-      <h3>1) 업로드</h3>
+      <div className="size-analysis-upload-card__head">
+        <h3>1) 업로드</h3>
+        <span className="size-analysis-muted size-analysis-upload-card__hint">클럽별 이름은 통일 후 업로드</span>
+      </div>
       <input
         type="file"
         accept=".xlsx,.csv"

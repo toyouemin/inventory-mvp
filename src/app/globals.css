@@ -6253,6 +6253,24 @@ label {
   overflow-x: hidden;
 }
 
+.size-analysis-page__title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 4px;
+}
+
+.size-analysis-page__title-row h2 {
+  margin: 0;
+}
+
+.size-analysis-page__title-tag {
+  font-size: 0.8rem;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
 .size-analysis-card {
   background: #fff;
   border: 1px solid #e8ebef;
@@ -6266,6 +6284,24 @@ label {
 .size-analysis-muted {
   color: #6b7280;
   margin: 0;
+}
+
+.size-analysis-upload-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+}
+
+.size-analysis-card--upload .size-analysis-upload-card__head h3 {
+  margin: 0;
+}
+
+.size-analysis-upload-card__hint {
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.35;
 }
 
 .size-analysis-grid {
@@ -6642,11 +6678,18 @@ label {
   margin: 0 0 8px 0;
 }
 
+/* 필드 매핑: 클럽|이름 / 성별|사이즈 / 수량|주문내용 + 비고 전체 폭 (DOM 순서로 자동 배치) */
 .size-analysis-map-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
+  row-gap: 8px;
   margin-top: 4px;
+  align-items: stretch;
+}
+
+.size-analysis-map-fields > .size-analysis-field-row--role-note {
+  grid-column: 1 / -1;
 }
 
 .size-analysis-field-row {
@@ -7081,14 +7124,13 @@ label {
     gap: 6px;
   }
 
-  .size-analysis-page > h2 {
-    margin: 0 0 4px;
+  .size-analysis-page__title-row h2 {
     font-size: 1.12rem;
     line-height: 1.3;
   }
 
-  .size-analysis-page > p.size-analysis-muted {
-    margin: 0 0 2px;
+  .size-analysis-page__title-tag {
+    font-size: 0.75rem;
   }
 
   .size-analysis-card {
@@ -7277,11 +7319,15 @@ label {
     font-size: 0.82rem;
   }
 
-  .size-analysis-map-fields {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
+  .size-analysis-field-mapping .size-analysis-map-fields {
+    grid-template-columns: 1fr;
+    column-gap: 0;
+    row-gap: 6px;
     margin-top: 3px;
+  }
+
+  .size-analysis-field-mapping .size-analysis-map-fields > .size-analysis-field-row--role-note {
+    grid-column: 1;
   }
 
   .size-analysis-field-row {
@@ -7293,12 +7339,6 @@ label {
 
   .size-analysis-field-row__label {
     font-size: 0.8rem;
-  }
-
-  .size-analysis-field-row--role-club,
-  .size-analysis-field-row--role-name,
-  .size-analysis-field-row--role-item {
-    grid-column: 1 / -1;
   }
 
   .size-analysis-field-select,
@@ -7497,7 +7537,6 @@ label {
     gap: 16px;
   }
 
-  .size-analysis-page > p.size-analysis-muted,
   .size-analysis-card .size-analysis-muted {
     max-width: 78ch;
   }
@@ -7669,10 +7708,8 @@ label {
     gap: 14px;
   }
 
-  /* 4) 필드 매핑: PC에서 2열 정렬형 배치 */
+  /* 4) 필드 매핑: 넓은 화면에서 간격만 보강 (2열+비고 전체 폭은 베이스와 동일) */
   .size-analysis-field-mapping .size-analysis-map-fields {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: 14px;
     row-gap: 9px;
     margin-top: 6px;
@@ -7693,21 +7730,7 @@ label {
     box-sizing: border-box;
   }
 
-  .size-analysis-field-mapping .size-analysis-field-row--role-club,
-  .size-analysis-field-mapping .size-analysis-field-row--role-gender,
-  .size-analysis-field-mapping .size-analysis-field-row--role-qty,
-  .size-analysis-field-mapping .size-analysis-field-row--role-note {
-    grid-column: 1;
-  }
-
-  .size-analysis-field-mapping .size-analysis-field-row--role-name,
-  .size-analysis-field-mapping .size-analysis-field-row--role-size,
-  .size-analysis-field-mapping .size-analysis-field-row--role-item {
-    grid-column: 2;
-  }
-
-  .size-analysis-field-mapping .size-analysis-map-row,
-  .size-analysis-field-mapping .size-analysis-map-actions {
+  .size-analysis-field-mapping .size-analysis-map-fields > .size-analysis-field-row--role-note {
     grid-column: 1 / -1;
   }
 

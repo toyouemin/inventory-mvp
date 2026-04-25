@@ -1125,7 +1125,7 @@ export function ClubGroupedView({
               <article key={`${idx}-${club.club}`} className="size-analysis-club-group-card">
                 <button
                   type="button"
-                  className="size-analysis-club-group-head size-analysis-club-group-head--mobile"
+                  className="size-analysis-club-group-head"
                   onClick={() => toggleClub(club.club)}
                   aria-expanded={isOpen}
                   aria-controls={panelId}
@@ -1150,12 +1150,6 @@ export function ClubGroupedView({
                     </span>
                   </span>
                 </button>
-                <div
-                  className="size-analysis-club-group-head size-analysis-club-group-head--pc"
-                  aria-label={`${club.club} 요약`}
-                >
-                  {headSummary}
-                </div>
                 <div
                   id={panelId}
                   className={[

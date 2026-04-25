@@ -6653,11 +6653,6 @@ label {
   display: block;
 }
 
-.size-analysis-club-group-head--pc {
-  display: none;
-  cursor: default;
-}
-
 /* 중복자 보기: 리스트는 모바일만(표는 PC 전용 래퍼) */
 .size-analysis-dup-only-list--mobile {
   display: block;
@@ -7816,12 +7811,12 @@ label {
     gap: 14px;
   }
 
-  .size-analysis-club-group-head--mobile {
-    display: none !important;
+  /* 클럽별 보기: 헤더는 한 줄만 — PC에서는 치브론 숨김(아코디언은 모바일 폭에서만 시각적 토글) */
+  .size-analysis-club-group-head__right {
+    display: none;
   }
 
-  .size-analysis-club-group-head--pc {
-    display: flex !important;
+  .size-analysis-club-group-head {
     cursor: default;
   }
 

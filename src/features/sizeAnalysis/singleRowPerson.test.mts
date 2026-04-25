@@ -57,4 +57,22 @@ assert.equal(cRows[0]!.standardizedSize, "M95");
 assert.equal(cRows[0]!.parseStatus, "corrected");
 assert.equal(cRows[0]!.qtyParsed, 1, "default qty when conflated with size, no qty column");
 
+// 성별+숫자가 사이즈 문자열에 같이 있으면 수정완료(M/W 접두)
+const genderInSizeSheet = {
+  name: "S2",
+  rows: [
+    ["이름", "성별", "사이즈"],
+    ["가", "", "100(여자)"],
+    ["나", "", "남- 100"],
+    ["다", "", "M 105"],
+  ],
+};
+const gRows = parseSingleRowPerson(jobId, genderInSizeSheet, mappingNoQty);
+assert.equal(gRows[0]!.standardizedSize, "W100");
+assert.equal(gRows[0]!.parseStatus, "corrected");
+assert.equal(gRows[1]!.standardizedSize, "M100");
+assert.equal(gRows[1]!.parseStatus, "corrected");
+assert.equal(gRows[2]!.standardizedSize, "M105");
+assert.equal(gRows[2]!.parseStatus, "corrected");
+
 console.log("singleRowPerson test passed", { sample2Rows: rows.length });

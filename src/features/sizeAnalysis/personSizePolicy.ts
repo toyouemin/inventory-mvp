@@ -5,6 +5,10 @@ import { extractSizeGenderQty, normalizeGender, normalizeSize } from "./normaliz
 
 const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115", "120"]);
 
+/** 80~120 숫자만 (다른 자릿수와 붙지 않게) */
+const NUM_SIZE_IN_TEXT = /(?<![0-9])(80|85|90|95|100|105|110|115|120)(?![0-9])/g;
+const GENDER_MARK_RE = /남자|여자|남|여|[MWmw]/g;
+
 /** M100 / W90 (공백 허용) */
 const MW_NUMERIC = /^([MWmw])\s*(\d{2,3})$/;
 /** size가 숫자만 */
@@ -17,6 +21,71 @@ export type PersonSizePolicyResult = {
   parseConfidence: number;
   parseReason: string;
 };
+
+/**
+ * 사이즈 문자열 전용: 공백·`-` 제거, `()`는 제거하되 안쪽 글자는 남김.
+ */
+export function preprocessSizeForGenderNumParse(input: string): string {
+  return String(input)
+    .replace(/[()]/g, "")
+    .replace(/-/g, "")
+    .replace(/\s+/g, "");
+}
+
+function markerToMwLine(marker: string): "M" | "W" | null {
+  const t = marker;
+  if (/^남자$|^남$|^[Mm]$/.test(t)) return "M";
+  if (/^여자$|^여$|^[Ww]$/.test(t)) return "W";
+  return null;
+}
+
+function uniqueMwLineFromGenderMarkers(s: string): "M" | "W" | null {
+  GENDER_MARK_RE.lastIndex = 0;
+  const lines = new Set<"M" | "W">();
+  let m: RegExpExecArray | null;
+  while ((m = GENDER_MARK_RE.exec(s)) !== null) {
+    const line = markerToMwLine(m[0]!);
+    if (line) lines.add(line);
+  }
+  if (lines.size !== 1) return null;
+  return [...lines][0]!;
+}
+
+function uniqueNumericSizeFromString(s: string): string | null {
+  NUM_SIZE_IN_TEXT.lastIndex = 0;
+  const found: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = NUM_SIZE_IN_TEXT.exec(s)) !== null) {
+    found.push(m[1]!);
+  }
+  if (found.length === 0) return null;
+  const distinct = new Set(found);
+  if (distinct.size !== 1) return null;
+  return found[0]!;
+}
+
+/**
+ * 한 덩어리 문자열에서 성별 토큰 + 80~120 숫자가 모두 있으면 M100/W90 및 수정완료(corrected).
+ * (Prisma/UI 상 `corrected` = 수정완료)
+ */
+export function tryFixedMwFromGenderAndNumericInString(text: string | undefined): PersonSizePolicyResult | null {
+  const raw = String(text ?? "").trim();
+  if (!raw) return null;
+  const s = preprocessSizeForGenderNumParse(raw);
+  if (!s) return null;
+  const line = uniqueMwLineFromGenderMarkers(s);
+  const num = uniqueNumericSizeFromString(s);
+  if (line == null || num == null || !NUMERIC_SIZES.has(num)) return null;
+  const letter = line;
+  const genderNormalized: "남" | "여" = letter === "M" ? "남" : "여";
+  return {
+    standardizedSize: `${letter}${num}`,
+    genderNormalized,
+    parseStatus: "corrected",
+    parseConfidence: 0.93,
+    parseReason: "성별+숫자사이즈(80~120) 결합 → 표준 M/W 접두",
+  };
+}
 
 /**
  * size 열·성별 열 기준 (사이즈분석 people 경로) 정규화.
@@ -36,6 +105,11 @@ export function normalizePersonSizePolicy(sizeRaw: string | undefined, genderRaw
       parseConfidence: 0.2,
       parseReason: "사이즈 없음",
     };
+  }
+
+  const fromGenderNum = tryFixedMwFromGenderAndNumericInString(raw);
+  if (fromGenderNum) {
+    return fromGenderNum;
   }
 
   const m1 = raw.match(MW_NUMERIC);
@@ -116,6 +190,8 @@ export function normalizePersonSizePolicy(sizeRaw: string | undefined, genderRaw
 export function normalizePersonWithFallback(sizeRaw: string | undefined, genderRaw: string | undefined, mergedFallback: string): PersonSizePolicyResult {
   const primary = normalizePersonSizePolicy(sizeRaw, genderRaw);
   if (primary.standardizedSize) return primary;
+  const mergedFixed = tryFixedMwFromGenderAndNumericInString(mergedFallback);
+  if (mergedFixed) return mergedFixed;
   const p = extractSizeGenderQty(mergedFallback);
   if (p.size) {
     return {

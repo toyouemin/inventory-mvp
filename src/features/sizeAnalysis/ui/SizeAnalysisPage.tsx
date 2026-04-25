@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { buildColumnSizesForClub } from "@/features/sizeAnalysis/clubAggMatrixColumns";
 import {
@@ -22,8 +22,8 @@ import {
   type DuplicateAnalysis,
 } from "@/features/sizeAnalysis/clubSizeAggModes";
 import {
-  labelExcludeForDisplayWithFallback,
   labelSizeAnalysisParseStatusForRow,
+  labelSizeAnalysisReasonForRow,
 } from "@/features/sizeAnalysis/excludeReasonLabels";
 import { downloadSizeAnalysisResultXlsx } from "@/features/sizeAnalysis/exportSizeAnalysisXlsx";
 import {
@@ -90,6 +90,66 @@ function labelStructureType(v: string | null | undefined): string {
   return STRUCTURE_TYPE_LABEL[v as Mapping["structureType"]] ?? v;
 }
 
+function StepCheckIcon() {
+  return (
+    <svg className="size-analysis-wizard-step__check" width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M3 8.5L6.5 12L13 4.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SizeAnalysisWizardStep({
+  no,
+  title,
+  complete,
+  active,
+  locked,
+  className,
+  children,
+}: {
+  no: 1 | 2 | 3 | 4;
+  title: string;
+  complete: boolean;
+  active: boolean;
+  /** 이전 단계가 끝나지 않아 아직 진행할 수 없음 */
+  locked?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className={[
+        "size-analysis-card",
+        "size-analysis-wizard-step",
+        complete && "size-analysis-wizard-step--complete",
+        active && "size-analysis-wizard-step--active",
+        locked && "size-analysis-wizard-step--locked",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div className="size-analysis-wizard-step__head">
+        <div
+          className="size-analysis-wizard-step__index"
+          aria-hidden
+          data-complete={complete ? "1" : undefined}
+        >
+          {complete ? <StepCheckIcon /> : <span className="size-analysis-wizard-step__num">{no}</span>}
+        </div>
+        <h3 className="size-analysis-wizard-step__title">{title}</h3>
+      </div>
+      <div className="size-analysis-wizard-step__body">{children}</div>
+    </section>
+  );
+}
+
 function logExcludedRows(rows: any[], statusFilter: string): void {
   const excludedRows = rows.filter(
     (r) => Boolean(r?.excluded) || String(r?.parseStatus ?? "").trim() === "excluded"
@@ -106,7 +166,7 @@ function logExcludedRows(rows: any[], statusFilter: string): void {
     gender: String(r?.genderRaw ?? r?.genderNormalized ?? "").trim(),
     size: String(r?.sizeRaw ?? r?.standardizedSize ?? "").trim(),
     qty: r?.qtyRaw ?? r?.qtyParsed ?? "",
-    excludedReason: labelExcludeForDisplayWithFallback(r) || "(사유 없음)",
+    excludedReason: labelSizeAnalysisReasonForRow(r) || "—",
   }));
 
   // 제외 조건 점검을 위한 디버깅 출력
@@ -311,6 +371,21 @@ export function SizeAnalysisPage() {
     if (jobId) await refreshResult(jobId, next);
   }
 
+  const step1Complete = Boolean(jobId);
+  const step2Complete = Boolean(selectedSheet);
+  const step3Complete = Boolean(detectResult);
+  const step4Complete = mappingSaved;
+  const canUseSheet = step1Complete;
+  const canUseStructure = step1Complete && step2Complete;
+  const canUseMapping = step1Complete && step2Complete && step3Complete && Boolean(mapping);
+  const activeStepIndex =
+    !step1Complete ? 0
+    : !step2Complete ? 1
+    : !step3Complete ? 2
+    : !step4Complete ? 3
+    : -1;
+  const allSetupStepsComplete = step1Complete && step2Complete && step3Complete && step4Complete;
+
   return (
     <main className="size-analysis-page">
       <div className="size-analysis-page__title-row">
@@ -319,28 +394,97 @@ export function SizeAnalysisPage() {
       </div>
 
       <div className="size-analysis-pc-grid">
-        <SizeAnalysisUploadCard onUpload={uploadFile} loading={loading === "upload"} />
-        <WorkbookSheetSelector sheets={sheets} selectedSheet={selectedSheet} onSelect={setSelectedSheet} />
-        <StructureDetectionPanel
-          detectResult={detectResult}
-          loading={loading === "detect"}
-          onDetect={detectStructureAction}
-        />
+        <div className="size-analysis-wizard" aria-label="사이즈 분석 단계">
+          <SizeAnalysisWizardStep
+            no={1}
+            title="업로드"
+            complete={step1Complete}
+            active={activeStepIndex === 0}
+            className="size-analysis-card--upload"
+          >
+            <SizeAnalysisUploadCard onUpload={uploadFile} loading={loading === "upload"} />
+          </SizeAnalysisWizardStep>
 
-        <FieldMappingEditor
-          mapping={mapping}
-          onChange={(next) => {
-            setMapping(next);
-            setMappingSaved(false);
-          }}
-          onSave={saveMappingAction}
-          loading={loading === "mapping"}
-          saved={mappingSaved}
-          previewRows={detectResult?.previewRows as string[][] | undefined}
-        />
+          <SizeAnalysisWizardStep
+            no={2}
+            title="시트 선택"
+            complete={step2Complete}
+            active={activeStepIndex === 1}
+            locked={!step1Complete}
+            className="size-analysis-card--sheet-select"
+          >
+            <WorkbookSheetSelector
+              sheets={sheets}
+              selectedSheet={selectedSheet}
+              onSelect={setSelectedSheet}
+              disabled={!canUseSheet}
+            />
+          </SizeAnalysisWizardStep>
 
-        <section className="size-analysis-card size-analysis-run-card">
-          <button className="btn btn-primary" onClick={runAction} disabled={!jobId || loading !== ""}>
+          <SizeAnalysisWizardStep
+            no={3}
+            title="구조 분석"
+            complete={step3Complete}
+            active={activeStepIndex === 2}
+            locked={!step1Complete || !step2Complete}
+            className="size-analysis-card--detect"
+          >
+            <StructureDetectionPanel
+              detectResult={detectResult}
+              loading={loading === "detect"}
+              onDetect={detectStructureAction}
+              disabled={!canUseStructure}
+            />
+          </SizeAnalysisWizardStep>
+
+          <SizeAnalysisWizardStep
+            no={4}
+            title="필드 매핑"
+            complete={step4Complete}
+            active={activeStepIndex === 3}
+            locked={!step1Complete || !step2Complete || !step3Complete}
+            className="size-analysis-field-mapping"
+          >
+            {canUseMapping && mapping ? (
+              <FieldMappingEditor
+                mapping={mapping}
+                onChange={(next) => {
+                  setMapping(next);
+                  setMappingSaved(false);
+                }}
+                onSave={saveMappingAction}
+                loading={loading === "mapping"}
+                saved={mappingSaved}
+                previewRows={detectResult?.previewRows as string[][] | undefined}
+              />
+            ) : (
+              <p className="size-analysis-muted size-analysis-wizard-step__placeholder" role="status">
+                이전 단계(시트 선택·구조 분석)를 완료한 뒤 열·매핑을 지정할 수 있습니다.
+              </p>
+            )}
+          </SizeAnalysisWizardStep>
+        </div>
+
+        <section
+          className={[
+            "size-analysis-card",
+            "size-analysis-run-card",
+            allSetupStepsComplete && "size-analysis-run-card--ready",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={runAction}
+            disabled={!allSetupStepsComplete || loading !== ""}
+            title={
+              allSetupStepsComplete
+                ? undefined
+                : "업로드·시트·구조 분석·매핑확정을 모두 완료한 뒤 실행할 수 있습니다."
+            }
+          >
             {loading === "run" ? "분석 실행 중..." : "분석 실행"}
           </button>
         </section>
@@ -399,23 +543,31 @@ export function SizeAnalysisPage() {
   );
 }
 
-export function SizeAnalysisUploadCard({ onUpload, loading }: { onUpload: (file: File) => void; loading: boolean }) {
+export function SizeAnalysisUploadCard({ onUpload, loading: isUploading }: { onUpload: (file: File) => void; loading: boolean }) {
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+
   return (
-    <section className="size-analysis-card size-analysis-card--upload">
-      <div className="size-analysis-upload-card__head">
-        <h3>1) 업로드</h3>
-        <span className="size-analysis-muted size-analysis-upload-card__hint">클럽별 이름은 통일 후 업로드</span>
-      </div>
-      <input
-        type="file"
-        accept=".xlsx,.csv"
-        disabled={loading}
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onUpload(file);
-        }}
-      />
-    </section>
+    <div className="size-analysis-upload-card__inner">
+      <p className="size-analysis-muted size-analysis-upload-card__hint">클럽별 이름은 통일 후 업로드</p>
+      <label className="size-analysis-upload-card__file-label" aria-busy={isUploading}>
+        <input
+          type="file"
+          className="size-analysis-upload-card__file-input"
+          accept=".xlsx,.csv"
+          disabled={isUploading}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setSelectedFileName(file.name);
+              onUpload(file);
+            }
+          }}
+        />
+        <span className="size-analysis-upload-card__file-text" aria-live="polite">
+          {isUploading ? "업로드 중..." : selectedFileName ?? "파일을 선택"}
+        </span>
+      </label>
+    </div>
   );
 }
 
@@ -423,23 +575,28 @@ export function WorkbookSheetSelector({
   sheets,
   selectedSheet,
   onSelect,
+  disabled,
 }: {
   sheets: Array<{ name: string; rowCount: number }>;
   selectedSheet: string;
   onSelect: (name: string) => void;
+  disabled?: boolean;
 }) {
   return (
-    <section className="size-analysis-card size-analysis-card--sheet-select">
-      <h3>2) 시트 선택</h3>
-      <select value={selectedSheet} onChange={(e) => onSelect(e.target.value)}>
-        <option value="">시트 선택</option>
-        {sheets.map((s) => (
-          <option key={s.name} value={s.name}>
-            {s.name} ({s.rowCount}행)
-          </option>
-        ))}
-      </select>
-    </section>
+    <select
+      className="size-analysis-sheet-select"
+      value={selectedSheet}
+      onChange={(e) => onSelect(e.target.value)}
+      disabled={disabled}
+      aria-disabled={disabled ? true : undefined}
+    >
+      <option value="">시트 선택</option>
+      {sheets.map((s) => (
+        <option key={s.name} value={s.name}>
+          {s.name} ({s.rowCount}행)
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -447,26 +604,28 @@ export function StructureDetectionPanel({
   detectResult,
   loading,
   onDetect,
+  disabled,
 }: {
   detectResult: any;
   loading: boolean;
   onDetect: () => void;
+  disabled?: boolean;
 }) {
+  const off = Boolean(disabled) || loading;
   return (
-    <section className="size-analysis-card size-analysis-card--detect">
-      <h3>3) 구조 분석</h3>
-      <button className="btn btn-secondary" onClick={onDetect} disabled={loading}>
+    <div className="size-analysis-detect-panel">
+      <button className="btn btn-secondary" type="button" onClick={onDetect} disabled={off}>
         {loading ? "분석 중..." : "헤더/구조 자동 추천"}
       </button>
       {detectResult ? (
-        <div className="size-analysis-grid">
-          <div>
+        <div className="size-analysis-detect-outcome" role="region" aria-label="구조 분석 추천 결과">
+          <p className="size-analysis-detect-outcome__line">
             추천 헤더 행(1번째=첫 행): <strong>{Number(detectResult.headerRowIndex) + 1}</strong>번째
-          </div>
-          <div>추천 구조 유형: {labelStructureType(detectResult.structureType)}</div>
+          </p>
+          <p className="size-analysis-detect-outcome__line">추천 구조 유형: {labelStructureType(detectResult.structureType)}</p>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -479,6 +638,7 @@ export function FieldMappingEditor({
   loading,
   saved,
   previewRows,
+  disabled = false,
 }: {
   mapping: Mapping | null;
   onChange: (mapping: Mapping) => void;
@@ -486,6 +646,7 @@ export function FieldMappingEditor({
   loading: boolean;
   saved: boolean;
   previewRows?: string[][];
+  disabled?: boolean;
 }) {
   const maxCols = useMemo(
     () => (previewRows?.length ? maxColumnCountInPreview(previewRows, mapping?.headerRowIndex ?? 0) : 0),
@@ -521,10 +682,10 @@ export function FieldMappingEditor({
 
   const unknownUnmapped = UNKNOWN_REQUIRED.filter((k) => m.fields[k] === undefined);
   const unknownNeedsFix = m.structureType === "unknown" && unknownUnmapped.length > 0;
+  const formOff = disabled || loading;
 
   return (
-    <section className="size-analysis-card size-analysis-field-mapping">
-      <h3>4) 필드 매핑</h3>
+    <div className="size-analysis-field-mapping-inner">
       <p className="size-analysis-map-hint size-analysis-muted">
         열 번호는 <strong>1</strong>부터입니다 (A열=1, B열=2, C열=3). · 헤더 행을 맞춘 뒤 열을 선택하세요.
       </p>
@@ -534,6 +695,7 @@ export function FieldMappingEditor({
           <select
             className="size-analysis-field-select"
             value={m.structureType}
+            disabled={formOff}
             onChange={(e) => onChange({ ...m, structureType: e.target.value as Mapping["structureType"] })}
           >
             <option value="single_row_person">{STRUCTURE_TYPE_LABEL.single_row_person}</option>
@@ -550,6 +712,7 @@ export function FieldMappingEditor({
             min={1}
             max={49_999}
             value={m.headerRowIndex + 1}
+            disabled={formOff}
             onChange={(e) => {
               const n = Math.max(1, parseInt(e.target.value, 10) || 1);
               onChange({ ...m, headerRowIndex: n - 1 });
@@ -564,7 +727,12 @@ export function FieldMappingEditor({
       ) : null}
       {hasPreview ? (
         <div className="size-analysis-map-row">
-          <button type="button" className="btn btn-secondary size-analysis-btn-auto" onClick={applyHeaderAuto} disabled={loading}>
+          <button
+            type="button"
+            className="btn btn-secondary size-analysis-btn-auto"
+            onClick={applyHeaderAuto}
+            disabled={formOff}
+          >
             헤더 이름으로 자동 채우기
           </button>
         </div>
@@ -607,6 +775,7 @@ export function FieldMappingEditor({
                     .filter(Boolean)
                     .join(" ")}
                   value={idx0 === undefined ? "" : String(idx0)}
+                  disabled={formOff}
                   onChange={(e) => {
                     const v = e.target.value;
                     onChange({
@@ -630,6 +799,7 @@ export function FieldMappingEditor({
                     min={1}
                     placeholder="열 번호 (1=첫 열)"
                     value={idx0 === undefined ? "" : idx0 + 1}
+                    disabled={formOff}
                     onChange={(e) => {
                       const raw = e.target.value;
                       onChange({
@@ -650,21 +820,19 @@ export function FieldMappingEditor({
       {hasPreview ? (
         <p className="size-analysis-muted size-analysis-map-hint-2">열 순서만 선택해 맞추면 됩니다.</p>
       ) : (
-        <p className="size-analysis-muted size-analysis-map-hint-2">
-          먼저 &quot;3) 구조 분석&quot; 후 열을 선택하세요.
-        </p>
+        <p className="size-analysis-muted size-analysis-map-hint-2">구조 분석을 완료한 뒤 열을 선택하세요.</p>
       )}
       <div className="size-analysis-map-actions">
         <button
           className={`btn ${saved ? "size-analysis-map-save-btn--done" : "btn-secondary"}`}
           onClick={onSave}
-          disabled={loading || saved}
+          disabled={formOff || saved}
           type="button"
         >
           {loading ? "저장중..." : saved ? "매핑 완료" : "매핑확정"}
         </button>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -1035,6 +1203,8 @@ export function AnalysisSummaryCards({
   if (!summary) return null;
   const totalQty = (allRows ?? []).reduce((s, r) => s + rowQtyParsed(r), 0);
   const finalQty = totalQty - duplicateAnalysis.duplicateQtyTotal;
+  /** 기존 카드 `일반 수량` + `중복 수량` 합(별도 «검토필요 수량» 항목은 두지 않음) */
+  const actualShipQty = finalQty + duplicateAnalysis.duplicateQtyTotal;
   const filterLabel = STATUS_FILTER_LABEL[statusFilter as (typeof STATUS_FILTER_OPTIONS)[number]] ?? statusFilter;
   const cards: Array<[string, string | number]> = [
     ["총 정규화 행 수", summary.totalRows],
@@ -1048,6 +1218,7 @@ export function AnalysisSummaryCards({
     ["중복 주문(건)", duplicateAnalysis.duplicatePersonCount],
     ["중복 수량", duplicateAnalysis.duplicateQtyTotal],
     ["일반 수량", finalQty],
+    ["실제 출고 수량", actualShipQty],
     ["검산", totalQty === finalQty + duplicateAnalysis.duplicateQtyTotal ? "일치" : "불일치"],
   ];
   return (
@@ -1124,15 +1295,16 @@ function normalizedRowLine2Parts(r: any): {
   const conf = `신뢰도 ${Number(r.parseConfidence ?? 0).toFixed(2)}`;
   const st = String(r.parseStatus ?? "");
   if (st === "excluded" || r.excluded) {
-    const ex = labelExcludeForDisplayWithFallback(r);
+    const rsn = labelSizeAnalysisReasonForRow(r);
     return {
-      subline: [src, ex, conf].filter((x) => x && x.length > 0).join(" · "),
+      subline: [src, rsn, conf].filter((x) => x && x.length > 0).join(" · "),
       pill: null,
     };
   }
   if (st === "needs_review" || st === "unresolved" || st === "corrected") {
+    const rsn = labelSizeAnalysisReasonForRow(r);
     return {
-      subline: [src, conf].filter((x) => x && x.length > 0).join(" · "),
+      subline: [src, rsn, conf].filter((x) => x && x.length > 0).join(" · "),
       pill: st as "needs_review" | "unresolved" | "corrected",
     };
   }
@@ -1189,7 +1361,7 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
               <th>사이즈</th>
               <th>수량</th>
               <th>상태</th>
-              <th>중복 사유</th>
+              <th>사유</th>
               <th>신뢰도</th>
             </tr>
           </thead>
@@ -1210,9 +1382,7 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
                   <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
                   <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
                   <td data-label="상태">{labelSizeAnalysisParseStatusForRow(r)}</td>
-                  <td data-label="중복 사유">
-                    {r.parseStatus === "excluded" || r.excluded ? labelExcludeForDisplayWithFallback(r) : ""}
-                  </td>
+                  <td data-label="사유">{labelSizeAnalysisReasonForRow(r)}</td>
                   <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>
                 </tr>
               );

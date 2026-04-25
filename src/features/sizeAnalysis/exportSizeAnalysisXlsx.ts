@@ -13,7 +13,7 @@ import {
   stableRowKeyForDup,
   unionClubsOrdered,
 } from "./clubSizeAggModes";
-import { labelExcludeForDisplayWithFallback, labelSizeAnalysisParseStatusForRow } from "./excludeReasonLabels";
+import { labelSizeAnalysisParseStatusForRow, labelSizeAnalysisReasonForRow } from "./excludeReasonLabels";
 
 type DupInput = { duplicateRowIds: Set<string>; dupByClub: Map<string, { persons: number; sheets: number }> };
 
@@ -231,10 +231,8 @@ export function downloadSizeAnalysisResultXlsx(rows: any[], duplicateAnalysis: D
 }
 
 function buildSheetAll(rows: any[], duplicateRowIds: Set<string>) {
-  const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "중복 사유", "신뢰도", "중복여부"];
+  const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "사유", "신뢰도", "중복여부"];
   const body = rows.map((r, i) => {
-    const st = String(r.parseStatus ?? "");
-    const ex = st === "excluded" || r.excluded ? labelExcludeForDisplayWithFallback(r) : "";
     return [
     r.sourceRowIndex ?? "",
     r.clubNameRaw ?? r.clubNameNormalized ?? "",
@@ -243,7 +241,7 @@ function buildSheetAll(rows: any[], duplicateRowIds: Set<string>) {
     r.standardizedSize ?? r.sizeRaw ?? "",
     r.qtyParsed ?? r.qtyRaw ?? "",
     labelSizeAnalysisParseStatusForRow(r),
-    ex,
+    labelSizeAnalysisReasonForRow(r),
     Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
     duplicateRowIds.has(stableRowKeyForDup(r, i)) ? "예" : "아니오",
   ];
@@ -463,7 +461,7 @@ function buildSheetDupStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet
 }
 
 function buildSheetReview(rows: any[]) {
-  const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "신뢰도"];
+  const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "사유", "신뢰도"];
   const sub = rows.filter((r) => {
     const st = String(r.parseStatus ?? "");
     return st === "needs_review" || st === "unresolved";
@@ -479,6 +477,7 @@ function buildSheetReview(rows: any[]) {
     r.standardizedSize ?? r.sizeRaw ?? "",
     r.qtyParsed ?? r.qtyRaw ?? "",
     labelSizeAnalysisParseStatusForRow(r),
+    labelSizeAnalysisReasonForRow(r),
     Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
   ]);
   return [header, ...body];
@@ -488,7 +487,7 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
   const hasData = aoa.length > 1 && aoa[1]!.length > 1;
   if (!hasData) {
     const ws = buildStyledAoaSheet(aoa, {
-      centerCols: new Set([0, 3, 4, 5, 7]),
+      centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
       emptyMessage: "(검토필요·미분류에 해당하는 행이 없습니다)",
     });
     const addr = XLSX.utils.encode_cell({ r: 1, c: 0 });
@@ -499,7 +498,7 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
     return ws;
   }
   return buildStyledAoaSheet(aoa, {
-    centerCols: new Set([0, 3, 4, 5, 7]),
+    centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
       if (c !== 6) return null;

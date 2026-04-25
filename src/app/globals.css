@@ -7075,6 +7075,11 @@ label {
   background: #ecfdf5 !important;
 }
 
+.size-analysis-club-agg-mtx-cell--duplicate {
+  background: #ffedd5 !important;
+  color: #9a3412;
+}
+
 .size-analysis-norm-compact {
   border: 1px solid #e5e7eb;
   border-radius: 6px;

@@ -1057,7 +1057,7 @@ export function ClubGroupedView({
 
     const modeDefs = [
       { modeKey: "total" as const, shortLabel: "총", ariaLabel: CLUB_AGG_MODE_LABEL.total, flat: flatTotal },
-      { modeKey: "deduped" as const, shortLabel: "제외", ariaLabel: CLUB_AGG_MODE_LABEL.deduped, flat: flatDeduped },
+      { modeKey: "deduped" as const, shortLabel: "일반 수량", ariaLabel: CLUB_AGG_MODE_LABEL.deduped, flat: flatDeduped },
       { modeKey: "duplicate" as const, shortLabel: "중복", ariaLabel: CLUB_AGG_MODE_LABEL.duplicate, flat: flatDup },
     ];
 
@@ -1077,6 +1077,7 @@ export function ClubGroupedView({
           modeKey: m.modeKey,
           shortLabel: m.shortLabel,
           headlineAriaLabel: `${name} · ${m.ariaLabel}`,
+          isDuplicateMatrix: m.modeKey === "duplicate",
           sizes,
           rowKeys,
           qtyMap,
@@ -1166,6 +1167,7 @@ export function ClubGroupedView({
                         headline={blk.shortLabel}
                         headlineAriaLabel={blk.headlineAriaLabel}
                         shortHeadline
+                        isDuplicateMatrix={blk.isDuplicateMatrix}
                         sizes={blk.sizes}
                         rowKeys={blk.rowKeys}
                         qtyMap={blk.qtyMap}
@@ -1451,6 +1453,7 @@ function ClubAggMatrixTableDesktop({
   headline,
   headlineAriaLabel,
   shortHeadline,
+  isDuplicateMatrix,
   sizes,
   rowKeys,
   qtyMap,
@@ -1461,6 +1464,8 @@ function ClubAggMatrixTableDesktop({
   headlineAriaLabel?: string;
   /** 클럽별 보기 모바일 3블록용 — 제목 한 줄만 강조 */
   shortHeadline?: boolean;
+  /** 클럽별 보기(중복 블록): 셀 배경색을 중복 전용 색상으로 통일 */
+  isDuplicateMatrix?: boolean;
   sizes: string[];
   rowKeys: Array<"여" | "남" | "공용">;
   qtyMap: Map<string, number>;
@@ -1505,12 +1510,16 @@ function ClubAggMatrixTableDesktop({
                   const q = qtyMap.get(`${gk}\0${sz}`) ?? 0;
                   const meta = resolveMeta(gk, sz);
                   const stBits: string[] = [];
-                  if (meta.hasReview) stBits.push("검토필요");
-                  if (meta.hasUnres) stBits.push("미분류");
-                  if (meta.hasCorrected) stBits.push("수정완료");
+                  if (!isDuplicateMatrix) {
+                    if (meta.hasReview) stBits.push("검토필요");
+                    if (meta.hasUnres) stBits.push("미분류");
+                    if (meta.hasCorrected) stBits.push("수정완료");
+                  }
                   const stLabel = stBits.length ? stBits.join(", ") : undefined;
                   let stateClass = "";
-                  if (meta.hasReview) stateClass = "size-analysis-club-agg-mtx-cell--review";
+                  if (isDuplicateMatrix && q > 0) {
+                    stateClass = "size-analysis-club-agg-mtx-cell--duplicate";
+                  } else if (meta.hasReview) stateClass = "size-analysis-club-agg-mtx-cell--review";
                   else if (meta.hasUnres) stateClass = "size-analysis-club-agg-mtx-cell--unres";
                   else if (meta.hasCorrected) stateClass = "size-analysis-club-agg-mtx-cell--corrected";
                   const show = q > 0 ? String(q) : "";

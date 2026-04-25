@@ -9,6 +9,7 @@ export type EstimateSheetItem = {
   quantity: number;
   unit?: string;
   unitPrice: number;
+  note?: string;
   isExtra?: boolean;
 };
 
@@ -17,6 +18,7 @@ export type EstimateSheetData = {
   receiverName: string;
   eventName?: string;
   memo?: string;
+  totalNote?: string;
 };
 
 export type EstimateSheetSupplier = {
@@ -140,6 +142,7 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
             <th>단위</th>
             <th>단가</th>
             <th>금액</th>
+            <th>비고</th>
           </tr>
         </thead>
         <tbody>
@@ -153,12 +156,14 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
                 <td>{item.unit || "개"}</td>
                 <td>{Number(item.unitPrice || 0).toLocaleString("ko-KR")}</td>
                 <td>{amount.toLocaleString("ko-KR")}</td>
+                <td>{item.note || ""}</td>
               </tr>
             );
           })}
           {Array.from({ length: Math.max(0, 4 - normalItems.length) }).map((_, index) => (
             <tr key={`normal-empty-${index}`}>
               <td>&nbsp;</td>
+              <td />
               <td />
               <td />
               <td />
@@ -173,6 +178,9 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
         <div>용 품 합 계</div>
         <strong>₩{totalAmount.toLocaleString("ko-KR")}</strong>
       </div>
+
+      <div className="estimate-sheet__sub-memo-title">비 고</div>
+      <div className="estimate-sheet__sub-memo">{data.totalNote || "\n"}</div>
 
       <table className="estimate-sheet__items estimate-sheet__items--extra">
         <thead>

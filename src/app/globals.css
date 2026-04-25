@@ -253,6 +253,9 @@
 .estimate-sheet__amount-text {
   justify-content: center;
   text-align: center;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .estimate-sheet__amount-label::after,
@@ -300,6 +303,12 @@
   white-space: normal;
 }
 
+.estimate-sheet__items th:nth-child(7),
+.estimate-sheet__items td:nth-child(7) {
+  text-align: left;
+  white-space: normal;
+}
+
 .estimate-sheet__total {
   margin-top: 0;
   border-top: 1px solid #000;
@@ -314,6 +323,28 @@
 
 .estimate-sheet__items--extra {
   margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.estimate-sheet__sub-memo-title {
+  margin-top: 6px;
+  border: 1px solid #000;
+  border-bottom: 0;
+  padding: 6px 8px;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.estimate-sheet__sub-memo {
+  border: 1px solid #000;
+  min-height: 54px;
+  white-space: pre-line;
+  padding: 8px;
+  line-height: 1.45;
+  font-size: 15px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  margin-top: 6px;
   margin-bottom: 8px;
 }
 
@@ -374,11 +405,11 @@
 .estimate-sheet__manager {
   margin-top: 8px;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   border-top: 1px solid #000;
   padding-top: 6px;
   font-size: 14px;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
@@ -3712,6 +3743,8 @@ label {
 
 .transaction-items__estimate-memo {
   margin-top: 8px;
+  display: grid;
+  gap: 6px;
 }
 
 .transaction-items__estimate-memo label {

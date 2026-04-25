@@ -33,7 +33,8 @@ type TransactionStatementFormData = {
   estimateEventName: string;
   estimateManagerName: string;
   estimateManagerPhone: string;
-  estimateMemo: string;
+  estimateTotalNote: string;
+  estimateFooterMemo: string;
   items: StatementItemFormRow[];
 };
 
@@ -200,7 +201,8 @@ export default function TransactionStatementPage() {
     estimateEventName: "",
     estimateManagerName: DEFAULT_ESTIMATE_MANAGER_NAME,
     estimateManagerPhone: DEFAULT_ESTIMATE_MANAGER_PHONE,
-    estimateMemo: "",
+    estimateTotalNote: "",
+    estimateFooterMemo: "",
     items: [makeRow(1)],
   });
   const [downloading, setDownloading] = useState(false);
@@ -269,7 +271,7 @@ export default function TransactionStatementPage() {
     const estimateItems = computedRows.filter((row) => row.name.trim() !== "");
     const itemCount = estimateItems.length;
     const totalQty = estimateItems.reduce((sum, row) => sum + row.qtyNumber, 0);
-    const memo = formData.estimateMemo.trim();
+    const memo = formData.estimateFooterMemo.trim();
     return {
       quoteDate: formData.issueDate,
       receiver: formData.customerName.trim() || formData.customerRepresentative.trim() || "—",
@@ -290,7 +292,7 @@ export default function TransactionStatementPage() {
     formData.estimateEventName,
     formData.estimateManagerName,
     formData.estimateManagerPhone,
-    formData.estimateMemo,
+    formData.estimateFooterMemo,
     totals.totalAmount,
     showVatIncluded,
   ]);
@@ -412,7 +414,7 @@ export default function TransactionStatementPage() {
           issueDate: formData.issueDate,
           receiverName: formData.customerRepresentative.trim(),
           eventName: formData.estimateEventName.trim(),
-          memo: formData.estimateMemo.trim(),
+          memo: formData.estimateFooterMemo.trim(),
           vatIncluded: showVatIncluded,
           supplier: {
             businessNumber: FIXED_SUPPLIER.bizNo,
@@ -774,12 +776,10 @@ export default function TransactionStatementPage() {
                     금액(자동)
                     <input value={row.amount.toLocaleString("ko-KR")} readOnly />
                   </label>
-                  {documentType === "statement" ? (
-                    <label>
-                      비고
-                      <input value={row.note} onChange={(event) => updateItem(row.id, "note", event.target.value)} />
-                    </label>
-                  ) : null}
+                  <label>
+                    비고
+                    <input value={row.note} onChange={(event) => updateItem(row.id, "note", event.target.value)} />
+                  </label>
                 </div>
                 <div className="transaction-item-row__actions">
                   <button type="button" className="btn btn-primary btn-compact" onClick={addRow}>
@@ -800,11 +800,20 @@ export default function TransactionStatementPage() {
           {documentType === "estimate" ? (
             <div className="transaction-items__estimate-memo">
               <label>
-                공통 비고
+                용품합계 아래 비고
                 <textarea
-                  value={formData.estimateMemo}
-                  onChange={(event) => updateFormField("estimateMemo", event.target.value)}
-                  placeholder="견적서 하단 비고에 표시됩니다."
+                  value={formData.estimateTotalNote}
+                  onChange={(event) => updateFormField("estimateTotalNote", event.target.value)}
+                  placeholder="견적서의 용품합계 아래 비고 칸에 표시됩니다."
+                  rows={3}
+                />
+              </label>
+              <label>
+                하단 공통 비고
+                <textarea
+                  value={formData.estimateFooterMemo}
+                  onChange={(event) => updateFormField("estimateFooterMemo", event.target.value)}
+                  placeholder="견적서 하단 큰 비고 박스에 표시됩니다."
                   rows={4}
                 />
               </label>
@@ -908,7 +917,8 @@ export default function TransactionStatementPage() {
                 date: formData.issueDate,
                 receiverName: formData.customerRepresentative,
                 eventName: formData.estimateEventName,
-                memo: formData.estimateMemo,
+                memo: formData.estimateFooterMemo,
+                totalNote: formData.estimateTotalNote,
               }}
               items={computedRows.map((row) => ({
                 id: row.id,
@@ -917,6 +927,7 @@ export default function TransactionStatementPage() {
                 quantity: row.qtyNumber,
                 unit: "개",
                 unitPrice: row.unitPriceNumber,
+                note: row.note,
                 isExtra: false,
               }))}
               supplier={{
@@ -978,7 +989,8 @@ export default function TransactionStatementPage() {
                   date: formData.issueDate,
                   receiverName: formData.customerRepresentative,
                   eventName: formData.estimateEventName,
-                  memo: formData.estimateMemo,
+                  memo: formData.estimateFooterMemo,
+                  totalNote: formData.estimateTotalNote,
                 }}
                 items={computedRows.map((row) => ({
                   id: row.id,
@@ -987,6 +999,7 @@ export default function TransactionStatementPage() {
                   quantity: row.qtyNumber,
                   unit: "개",
                   unitPrice: row.unitPriceNumber,
+                  note: row.note,
                   isExtra: false,
                 }))}
                 supplier={{

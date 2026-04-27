@@ -179,9 +179,6 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
         <strong>₩{totalAmount.toLocaleString("ko-KR")}</strong>
       </div>
 
-      <div className="estimate-sheet__sub-memo-title">비 고</div>
-      <div className="estimate-sheet__sub-memo">{data.totalNote || "\n"}</div>
-
       <table className="estimate-sheet__items estimate-sheet__items--extra">
         <thead>
           <tr>

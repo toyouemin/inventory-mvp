@@ -210,6 +210,7 @@ export default function TransactionStatementPage() {
   const [errorMessage, setErrorMessage] = useState("");
   /** 거래 요약 토글과 동일: 끄면 미리보기·JPG에도 부가세 관련 문구·공급/세액 숨김 */
   const [showVatIncluded, setShowVatIncluded] = useState(true);
+  const [estimateInputToExtra, setEstimateInputToExtra] = useState(false);
 
   const computedRows = useMemo(
     () =>
@@ -398,7 +399,7 @@ export default function TransactionStatementPage() {
             quantity: row.qtyNumber,
             unit: "개",
             unitPrice: row.unitPriceNumber,
-            isExtra: false,
+            isExtra: estimateInputToExtra,
           }));
 
         if (!formData.customerName.trim()) {
@@ -741,6 +742,24 @@ export default function TransactionStatementPage() {
         <div className="transaction-items">
           <div className="transaction-items__header">
             <h2>품목 리스트</h2>
+            {documentType === "estimate" ? (
+              <div className="transaction-items__extra-toggle" role="group" aria-label="견적서 품목 입력 위치">
+                <button
+                  type="button"
+                  className={`btn btn-compact transaction-items__extra-toggle-btn ${!estimateInputToExtra ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => setEstimateInputToExtra(false)}
+                >
+                  기본 입력
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-compact transaction-items__extra-toggle-btn ${estimateInputToExtra ? "btn-primary" : "btn-secondary"}`}
+                  onClick={() => setEstimateInputToExtra(true)}
+                >
+                  아래칸 입력
+                </button>
+              </div>
+            ) : null}
           </div>
           <div className="transaction-items__rows">
             {computedRows.map((row, index) => (
@@ -799,15 +818,6 @@ export default function TransactionStatementPage() {
           </div>
           {documentType === "estimate" ? (
             <div className="transaction-items__estimate-memo">
-              <label>
-                용품합계 아래 비고
-                <textarea
-                  value={formData.estimateTotalNote}
-                  onChange={(event) => updateFormField("estimateTotalNote", event.target.value)}
-                  placeholder="견적서의 용품합계 아래 비고 칸에 표시됩니다."
-                  rows={3}
-                />
-              </label>
               <label>
                 하단 공통 비고
                 <textarea
@@ -928,7 +938,7 @@ export default function TransactionStatementPage() {
                 unit: "개",
                 unitPrice: row.unitPriceNumber,
                 note: row.note,
-                isExtra: false,
+                isExtra: estimateInputToExtra,
               }))}
               supplier={{
                 businessNumber: FIXED_SUPPLIER.bizNo,
@@ -1000,7 +1010,7 @@ export default function TransactionStatementPage() {
                   unit: "개",
                   unitPrice: row.unitPriceNumber,
                   note: row.note,
-                  isExtra: false,
+                  isExtra: estimateInputToExtra,
                 }))}
                 supplier={{
                   businessNumber: FIXED_SUPPLIER.bizNo,

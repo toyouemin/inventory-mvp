@@ -75,4 +75,33 @@ assert.equal(gRows[1]!.parseStatus, "corrected");
 assert.equal(gRows[2]!.standardizedSize, "M105");
 assert.equal(gRows[2]!.parseStatus, "corrected");
 
+// 성별 열 M/W/F/Male/Female 인식: 숫자 사이즈와 결합 시 남/여 접두 보정
+const mwGenderSheet = {
+  name: "S3",
+  rows: [
+    ["이름", "성별", "사이즈"],
+    ["가", "M", "95"],
+    ["나", "W", "90"],
+    ["다", "female", "100"],
+  ],
+};
+const mwRows = parseSingleRowPerson(jobId, mwGenderSheet, mappingNoQty);
+assert.equal(mwRows[0]!.standardizedSize, "M95");
+assert.equal(mwRows[0]!.genderNormalized, "남");
+assert.equal(mwRows[1]!.standardizedSize, "W90");
+assert.equal(mwRows[1]!.genderNormalized, "여");
+assert.equal(mwRows[2]!.standardizedSize, "W100");
+assert.equal(mwRows[2]!.genderNormalized, "여");
+
+// 사이즈 열의 알파 M은 그대로 사이즈로 유지되어야 함
+const alphaSizeSheet = {
+  name: "S4",
+  rows: [
+    ["이름", "성별", "사이즈"],
+    ["라", "", "M"],
+  ],
+};
+const alphaRows = parseSingleRowPerson(jobId, alphaSizeSheet, mappingNoQty);
+assert.equal(alphaRows[0]!.standardizedSize, "M");
+
 console.log("singleRowPerson test passed", { sample2Rows: rows.length });

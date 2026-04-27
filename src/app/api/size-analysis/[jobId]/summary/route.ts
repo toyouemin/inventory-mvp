@@ -42,18 +42,20 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
     }
     const qty = row.qtyParsed ?? 0;
     originalTotalQty += qty;
-    if (!row.excluded) {
+    const status = String(row.parseStatus ?? "").trim();
+    const includeInAggregation = !row.excluded && (status === "auto_confirmed" || status === "corrected");
+    if (includeInAggregation) {
       aggregatedTotalQty += qty;
       const club = row.clubNameNormalized || "미분류";
-        const gender = String(row.genderNormalized ?? "").trim();
+      const gender = String(row.genderNormalized ?? "").trim();
       const size = row.standardizedSize || "미분류";
       clubSize[club] = clubSize[club] ?? {};
       clubSize[club][size] = (clubSize[club][size] ?? 0) + qty;
 
-        const key = `${club}\0${gender}\0${size}`;
-        const cur = clubGenderSize.get(key) ?? { club, gender, size, qty: 0 };
-        cur.qty += qty;
-        clubGenderSize.set(key, cur);
+      const key = `${club}\0${gender}\0${size}`;
+      const cur = clubGenderSize.get(key) ?? { club, gender, size, qty: 0 };
+      cur.qty += qty;
+      clubGenderSize.set(key, cur);
     }
   }
 

@@ -2,7 +2,7 @@ import { rowEligibleForDuplicatePersonGroup, rowExcludedByEmptyQuantity } from "
 import { labelExcludeForDisplay } from "./excludeReasonLabels";
 import type { NormalizedRow, StructureType } from "./types";
 import { duplicateGroupKeyFromRow, duplicateGroupKeyFromRowWithSize } from "./duplicateKeyNormalize";
-import { extractSizeGenderQty, normalizeGender, normalizeSize } from "./normalize";
+import { extractSizeGenderQty, normalizeGender, normalizeGenderFromColumn, normalizeSize } from "./normalize";
 
 const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115", "120"]);
 
@@ -96,7 +96,7 @@ export function tryFixedMwFromGenderAndNumericInString(text: string | undefined)
  * - size 없음/비정상 → 검토필요
  */
 export function normalizePersonSizePolicy(sizeRaw: string | undefined, genderRaw: string | undefined): PersonSizePolicyResult {
-  const genderFromCol = normalizeGender(genderRaw);
+  const genderFromCol = normalizeGenderFromColumn(genderRaw);
   const raw = String(sizeRaw ?? "").trim();
   if (!raw) {
     return {

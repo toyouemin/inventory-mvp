@@ -6804,6 +6804,10 @@ label {
   border-top: 2px solid #cbd5e1;
 }
 
+.size-analysis-club-members-row--dup td {
+  background: #fff4e8;
+}
+
 .size-analysis-filter-row {
   display: flex;
   flex-wrap: wrap;
@@ -6881,6 +6885,23 @@ label {
   text-align: left;
   font-size: 0.86rem;
   word-break: break-word;
+}
+
+.size-analysis-table--normalized th.size-analysis-include-col,
+.size-analysis-table--normalized td.size-analysis-include-col {
+  width: 96px;
+  min-width: 96px;
+  max-width: 96px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.size-analysis-include-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .size-analysis-error {

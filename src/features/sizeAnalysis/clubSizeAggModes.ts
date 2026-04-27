@@ -83,6 +83,13 @@ export function rowQtyParsed(r: any): number {
   return Number.isFinite(Number(q)) ? Number(q) : 0;
 }
 
+/** 최종 집계 포함 조건: auto_confirmed/corrected 이고 excluded 아님 */
+export function rowIncludedInFinalAggregation(r: any): boolean {
+  const st = String(r?.parseStatus ?? "").trim();
+  if (Boolean(r?.excluded) || st === "excluded") return false;
+  return st === "auto_confirmed" || st === "corrected";
+}
+
 /**
  * 정규화 행 배열에서 행을 유일히 가리킬 키(DB id 우선, 없으면 배열 인덱스).
  * (과거 `src:sourceRow`는 한 원본 행→여러 norm 행이 같은 키로 묶이는 오류가 있음)
@@ -236,6 +243,7 @@ function sortedAggRowsFromDetailMap(detailMap: Map<string, AggRow>): AggRow[] {
 export function buildAggRowsTotal(rows: any[]): AggRow[] {
   const detailMap = new Map<string, AggRow>();
   for (const r of rows) {
+    if (!rowIncludedInFinalAggregation(r)) continue;
     const club = normClubFromNormRow(r);
     const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
@@ -250,6 +258,7 @@ export function buildAggRowsDuplicate(rows: any[], duplicateRowIds: Set<string>)
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
     if (!duplicateRowIds.has(stableRowId(r, i))) continue;
+    if (!rowIncludedInFinalAggregation(r)) continue;
     const club = normClubFromNormRow(r);
     const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
@@ -283,6 +292,7 @@ export function buildAggRowsDedupedFirst(rows: any[], duplicateRowIds: Set<strin
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
     if (duplicateRowIds.has(stableRowId(r, i))) continue;
+    if (!rowIncludedInFinalAggregation(r)) continue;
     const club = normClubFromNormRow(r);
     const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
@@ -359,6 +369,7 @@ export function analyzeDuplicateRows(rows: any[], structureType?: StructureType)
   let totalQty = 0;
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
+    if (!rowIncludedInFinalAggregation(r)) continue;
     totalQty += rowQtyParsed(r);
   }
 

@@ -197,10 +197,22 @@ export async function runAnalysis(jobId: string) {
   }
 
   const structureType = mappingJson.structureType;
-  rows = rows.map((r) => ({
-    ...r,
-    metaJson: { ...(r.metaJson ?? {}), structureType },
-  }));
+  rows = rows.map((r) => {
+    const nameMissing = String(r.memberNameRaw ?? r.memberName ?? "").trim() === "";
+    if (nameMissing && !r.excluded) {
+      return {
+        ...r,
+        parseStatus: "needs_review" as const,
+        parseReason: "이름 없음",
+        parseConfidence: Math.min(Number(r.parseConfidence ?? 0), 0.35),
+        metaJson: { ...(r.metaJson ?? {}), structureType },
+      };
+    }
+    return {
+      ...r,
+      metaJson: { ...(r.metaJson ?? {}), structureType },
+    };
+  });
   // size_matrix만 클럽+이름+사이즈 중복 / 그 외는 클럽+이름만(기존). 0/빈 제외는 size_matrix에서만 중복 판별 제외.
   rows = applyDuplicateSizePolicy(rows, structureType);
 

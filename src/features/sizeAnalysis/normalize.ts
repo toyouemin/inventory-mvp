@@ -41,6 +41,20 @@ export function normalizeGender(raw: string | null | undefined): "남" | "여" |
   return undefined;
 }
 
+/**
+ * 성별 "열" 값 전용 정규화.
+ * - M/m/Male/male -> 남
+ * - W/w/F/f/Female/female -> 여
+ * - 그 외 기본 normalizeGender 규칙 사용
+ */
+export function normalizeGenderFromColumn(raw: string | null | undefined): "남" | "여" | "공용" | undefined {
+  const t = String(raw ?? "").trim();
+  if (!t) return undefined;
+  if (/^(m|male)$/i.test(t)) return "남";
+  if (/^(w|f|female)$/i.test(t)) return "여";
+  return normalizeGender(t);
+}
+
 export function extractSizeGenderQty(raw: string | null | undefined): ParsePiece {
   const s = preprocessCell(raw);
   if (!s) {

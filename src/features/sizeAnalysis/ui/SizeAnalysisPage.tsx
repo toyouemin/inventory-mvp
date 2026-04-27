@@ -16,6 +16,7 @@ import {
   matrixAggGenderAndSizeFromRow,
   normClubFromNormRow,
   rowKeyGenderForAgg,
+  rowIncludedInFinalAggregation,
   stableRowKeyForDup,
   unionClubsOrdered,
   type ClubDisplaySummaryStats,
@@ -41,6 +42,39 @@ type Mapping = {
   fields: Record<string, number | undefined>;
   slotGroups?: Array<Record<string, number | undefined>>;
 };
+
+function hasField(mapping: Mapping, key: string): boolean {
+  return mapping.fields[key] !== undefined;
+}
+
+function hasUnknownRequiredFields(mapping: Mapping): boolean {
+  const hasName = hasField(mapping, "name");
+  const hasClub = hasField(mapping, "club");
+  const hasSizeQty = hasField(mapping, "size") && hasField(mapping, "qty");
+  if (!hasName || !hasClub) return false;
+  return hasSizeQty || hasField(mapping, "item");
+}
+
+function isMappingReadyForRun(mapping: Mapping | null): boolean {
+  if (!mapping) return false;
+  const hasName = hasField(mapping, "name");
+  const hasClub = hasField(mapping, "club");
+  if (!hasName || !hasClub) return false;
+  if (mapping.structureType === "single_row_person") {
+    return hasField(mapping, "size");
+  }
+  if (mapping.structureType === "repeated_slots") {
+    const groups = mapping.slotGroups ?? [];
+    return groups.some((g) => g.club !== undefined && g.name !== undefined && g.size !== undefined);
+  }
+  if (mapping.structureType === "size_matrix") {
+    return hasClub;
+  }
+  if (mapping.structureType === "unknown") {
+    return hasUnknownRequiredFields(mapping);
+  }
+  return false;
+}
 
 /** 화면 표시 전용(내부 API/DB 값은 영문 유지) */
 const STRUCTURE_TYPE_LABEL: Record<Mapping["structureType"], string> = {
@@ -195,6 +229,18 @@ function isRowExcludedByEmptyQuantity(r: any): boolean {
   return false;
 }
 
+function isNameMissingRow(r: any): boolean {
+  return String(r?.memberNameRaw ?? r?.memberName ?? "").trim() === "";
+}
+
+function displayReasonForNormalizedRow(r: any): string {
+  if (isNameMissingRow(r)) {
+    const hasSize = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim() !== "";
+    return hasSize ? "이름 없음" : "이름 없음 / 사이즈 없음";
+  }
+  return labelSizeAnalysisReasonForRow(r);
+}
+
 export function SizeAnalysisPage() {
   const [jobId, setJobId] = useState<string>("");
   const [sheets, setSheets] = useState<Array<{ name: string; rowCount: number }>>([]);
@@ -323,6 +369,11 @@ export function SizeAnalysisPage() {
 
   async function saveMappingAction() {
     if (!jobId || !selectedSheet || !mapping) return;
+    if (!isMappingReadyForRun(mapping)) {
+      setMappingSaved(false);
+      setError("필수 매핑을 완료해주세요");
+      return;
+    }
     setLoading("mapping");
     setError("");
     try {
@@ -344,6 +395,10 @@ export function SizeAnalysisPage() {
 
   async function runAction() {
     if (!jobId) return;
+    if (!mappingSaved) {
+      setError("필수 매핑을 완료해주세요");
+      return;
+    }
     setLoading("run");
     setError("");
     try {
@@ -391,6 +446,22 @@ export function SizeAnalysisPage() {
   async function onStatusChange(next: string) {
     setStatusFilter(next);
     if (jobId) await refreshResult(jobId, next);
+  }
+
+  async function toggleIncludeNameMissingRow(row: any, include: boolean) {
+    if (!jobId || !row?.id) return;
+    const res = await fetch(`/api/size-analysis/${jobId}/correct`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        rowId: row.id,
+        includeNameMissingQty: include,
+        parseReason: include ? "이름 없음 수량 포함(사용자 확인)" : "이름 없음",
+      }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "이름 없음 포함 처리 실패");
+    await refreshResult(jobId, statusFilter);
   }
 
   useEffect(() => {
@@ -513,11 +584,16 @@ export function SizeAnalysisPage() {
             title={
               allSetupStepsComplete
                 ? undefined
-                : "업로드·시트·구조 분석·매핑확정을 모두 완료한 뒤 실행할 수 있습니다."
+                : "필수 매핑을 완료해주세요"
             }
           >
             {loading === "run" ? "분석 실행 중..." : "분석 실행"}
           </button>
+          {!allSetupStepsComplete ? (
+            <p className="size-analysis-muted" role="note">
+              필수 매핑을 완료해주세요
+            </p>
+          ) : null}
         </section>
 
         <div className="size-analysis-grid-item size-analysis-grid-item--summary">
@@ -552,7 +628,11 @@ export function SizeAnalysisPage() {
           <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} />
           {detailViewMode === "all" ? (
             <>
-              <AnalysisRowsTable rows={rows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
+              <AnalysisRowsTable
+                rows={rows}
+                duplicateRowIds={duplicateAnalysis.duplicateRowIds}
+                onToggleIncludeNameMissingRow={toggleIncludeNameMissingRow}
+              />
               <ClubSizeSummaryTable duplicateRowIds={duplicateAnalysis.duplicateRowIds} normRows={allRows} />
             </>
           ) : detailViewMode === "club" ? (
@@ -566,7 +646,7 @@ export function SizeAnalysisPage() {
           ) : detailViewMode === "duplicates" ? (
             <DuplicateMembersView allRows={allRows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
           ) : (
-            <ClubMembersView allRows={allRows} />
+            <ClubMembersView allRows={allRows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
           )}
         </div>
       </div>
@@ -868,7 +948,7 @@ export function FieldMappingEditor({
           disabled={formOff || saved}
           type="button"
         >
-          {loading ? "저장중..." : saved ? "매핑 완료" : "매핑확정"}
+          {loading ? "저장중..." : saved ? "매핑 완료됨" : "매핑 완료"}
         </button>
       </div>
     </div>
@@ -1075,28 +1155,56 @@ export function DuplicateMembersView({
   );
 }
 
-export function ClubMembersView({ allRows }: { allRows: any[] }) {
-  type MemberAggRow = { name: string; gender: string; size: string; qty: number };
-  const byClub = new Map<string, Map<string, MemberAggRow>>();
-  for (const r of allRows) {
-    const st = String(r?.parseStatus ?? "").trim();
-    if (Boolean(r?.excluded) || st === "excluded") continue;
-    const club = normClubFromNormRow(r);
-    const name = String(r?.memberNameRaw ?? r?.memberName ?? "").trim() || "(이름 없음)";
-    const gender = String(r?.genderNormalized ?? r?.genderRaw ?? "").trim() || "미분류";
-    const size = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim() || "미분류";
-    const qty = rowQtyParsed(r);
-    const key = `${name}\0${gender}\0${size}`;
-    if (!byClub.has(club)) byClub.set(club, new Map());
-    const rowMap = byClub.get(club)!;
-    const cur = rowMap.get(key) ?? { name, gender, size, qty: 0 };
-    cur.qty += qty;
-    rowMap.set(key, cur);
-  }
+export function ClubMembersView({
+  allRows,
+  duplicateRowIds,
+}: {
+  allRows: any[];
+  duplicateRowIds: Set<string>;
+}) {
+  type MemberAggRow = { name: string; gender: string; size: string; qty: number; hasDup: boolean };
+  const [includeDuplicates, setIncludeDuplicates] = useState(true);
+  const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
 
-  const sections = Array.from(byClub.entries())
+  const sections = useMemo(() => {
+    const byClub = new Map<string, Map<string, MemberAggRow>>();
+    for (let i = 0; i < allRows.length; i += 1) {
+      const r = allRows[i]!;
+      const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
+      const includeByFinal = rowIncludedInFinalAggregation(r);
+      const includeByDupToggle = includeDuplicates && isDup;
+      if (!includeByFinal && !includeByDupToggle) continue;
+      const club = normClubFromNormRow(r);
+      const name = String(r?.memberNameRaw ?? r?.memberName ?? "").trim() || "(이름 없음)";
+      const gender = String(r?.genderNormalized ?? r?.genderRaw ?? "").trim() || "미분류";
+      const size = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim() || "미분류";
+      const qty = rowQtyParsed(r);
+      const key = `${name}\0${gender}\0${size}`;
+      if (!byClub.has(club)) byClub.set(club, new Map());
+      const rowMap = byClub.get(club)!;
+      const cur = rowMap.get(key) ?? { name, gender, size, qty: 0, hasDup: false };
+      cur.qty += qty;
+      if (isDup) cur.hasDup = true;
+      rowMap.set(key, cur);
+    }
+
+    const dupByClub = new Map<string, { persons: number; sheets: number }>();
+    for (let i = 0; i < allRows.length; i += 1) {
+      const r = allRows[i]!;
+      if (!duplicateRowIds.has(stableRowKeyForDup(r, i))) continue;
+      const club = normClubFromNormRow(r);
+      const d = dupByClub.get(club) ?? { persons: 0, sheets: 0 };
+      d.persons += 1;
+      d.sheets += rowQtyParsed(r);
+      dupByClub.set(club, d);
+    }
+
+    return Array.from(byClub.entries())
     .map(([club, rowMap]) => ({
       club,
+      totalQty: Array.from(rowMap.values()).reduce((sum, row) => sum + row.qty, 0),
+      displaySummary: computeClubDisplaySummaryStats(allRows, club),
+      dupSummary: dupByClub.get(club) ?? { persons: 0, sheets: 0 },
       rows: Array.from(rowMap.values()).sort(
         (a, b) =>
           a.name.localeCompare(b.name, "ko") ||
@@ -1106,6 +1214,16 @@ export function ClubMembersView({ allRows }: { allRows: any[] }) {
     }))
     .filter((sec) => sec.rows.length > 0)
     .sort((a, b) => a.club.localeCompare(b.club, "ko"));
+  }, [allRows, duplicateRowIds, includeDuplicates]);
+
+  function toggleClub(club: string) {
+    setExpandedClubs((prev) => {
+      const next = new Set(prev);
+      if (next.has(club)) next.delete(club);
+      else next.add(club);
+      return next;
+    });
+  }
 
   if (sections.length === 0) {
     return (
@@ -1120,20 +1238,85 @@ export function ClubMembersView({ allRows }: { allRows: any[] }) {
     <section className="size-analysis-card size-analysis-club-members-section">
       <h3>클럽별 명단</h3>
       <p className="size-analysis-muted">
-        allRows 기준으로 제외 행은 숨기고, 같은 클럽·이름·성별·사이즈는 수량을 합산해 표시합니다.
+        클럽별로 같은 이름·성별·사이즈 수량을 합산해 표시합니다.
       </p>
+      <label className="size-analysis-muted size-analysis-include-toggle">
+        <input
+          type="checkbox"
+          checked={includeDuplicates}
+          onChange={(e) => setIncludeDuplicates(e.target.checked)}
+        />
+        중복자 포함
+      </label>
 
       <div className="size-analysis-dup-only-list--mobile">
         {sections.map((sec) => (
-          <article key={sec.club} className="size-analysis-dup-club">
-            <h4 className="size-analysis-dup-club__title">{sec.club}</h4>
-            <ul className="size-analysis-dup-person__lines">
-              {sec.rows.map((row) => (
-                <li key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}>
-                  - {row.name} · {row.gender} {row.size} · {row.qty}개
-                </li>
-              ))}
-            </ul>
+          <article key={sec.club} className="size-analysis-club-group-card">
+            <button
+              type="button"
+              className="size-analysis-club-group-head"
+              onClick={() => toggleClub(sec.club)}
+              aria-expanded={expandedClubs.has(sec.club)}
+              aria-label={`${sec.club} 명단 ${expandedClubs.has(sec.club) ? "접기" : "펼치기"}`}
+            >
+              <span className="size-analysis-club-group-head__name">
+                <span className="size-analysis-club-group-head__clubtitle">{sec.club}</span>
+                <span className="size-analysis-club-group-head__summary size-analysis-muted">
+                  총 인원 {sec.displaySummary.totalPersons}명 / 사이즈 수량 {sec.displaySummary.sizedQtySum}개 / 미입력{" "}
+                  {sec.displaySummary.missingSizePersons}명
+                  {sec.dupSummary.persons > 0 ? ` / 중복 ${sec.dupSummary.persons}명·${sec.dupSummary.sheets}개` : ""}
+                </span>
+              </span>
+              <span className="size-analysis-club-group-head__right">
+                <span className="size-analysis-club-group-chevron" aria-hidden>
+                  <svg
+                    className={
+                      expandedClubs.has(sec.club)
+                        ? "size-analysis-club-group-chevron__svg is-open"
+                        : "size-analysis-club-group-chevron__svg"
+                    }
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+              </span>
+            </button>
+            {expandedClubs.has(sec.club) ? (
+              <div className="size-analysis-dup-pc-table-scroll">
+                <table className="size-analysis-dup-pc-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">이름</th>
+                      <th scope="col">성별</th>
+                      <th scope="col">사이즈</th>
+                      <th scope="col">수량</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sec.rows.map((row) => (
+                      <tr
+                        key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}
+                        className={row.hasDup ? "size-analysis-club-members-row--dup" : ""}
+                      >
+                        <td>
+                          {row.name}{" "}
+                          {row.hasDup ? <span className="size-analysis-dup-line-tag--dup">중복</span> : null}
+                        </td>
+                        <td>{row.gender}</td>
+                        <td>{row.size}</td>
+                        <td>{row.qty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
@@ -1141,7 +1324,7 @@ export function ClubMembersView({ allRows }: { allRows: any[] }) {
       <div className="size-analysis-dup-pc-wrap" aria-label="클럽별 명단 표(PC)">
         {sections.map((sec) => (
           <div key={`${sec.club}-pc`} className="size-analysis-dup-pc-club">
-            <h4 className="size-analysis-dup-pc-club__title">{sec.club}</h4>
+            <h4 className="size-analysis-dup-pc-club__title">{sec.club} ({sec.totalQty}개)</h4>
             <div className="size-analysis-dup-pc-table-scroll">
               <table className="size-analysis-dup-pc-table">
                 <thead>
@@ -1155,9 +1338,14 @@ export function ClubMembersView({ allRows }: { allRows: any[] }) {
                 </thead>
                 <tbody>
                   {sec.rows.map((row, idx) => (
-                    <tr key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}>
+                    <tr
+                      key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}
+                      className={row.hasDup ? "size-analysis-club-members-row--dup" : ""}
+                    >
                       <td>{idx === 0 ? sec.club : ""}</td>
-                      <td>{row.name}</td>
+                      <td>
+                        {row.name} {row.hasDup ? <span className="size-analysis-dup-line-tag--dup">중복</span> : null}
+                      </td>
                       <td>{row.gender}</td>
                       <td>{row.size}</td>
                       <td>{row.qty}</td>
@@ -1462,8 +1650,8 @@ export function AnalysisSummaryCards({
   statusFilter: string;
 }) {
   if (!summary) return null;
-  const totalQty = (allRows ?? []).reduce((s, r) => s + rowQtyParsed(r), 0);
-  const finalQty = totalQty - duplicateAnalysis.duplicateQtyTotal;
+  const totalQty = duplicateAnalysis.totalQty;
+  const finalQty = duplicateAnalysis.normalQty;
   const filterLabel = STATUS_FILTER_LABEL[statusFilter as (typeof STATUS_FILTER_OPTIONS)[number]] ?? statusFilter;
   const cards: Array<[string, string | number]> = [
     ["총 정규화 행 수", summary.totalRows],
@@ -1552,14 +1740,14 @@ function normalizedRowLine2Parts(r: any): {
   const conf = `신뢰도 ${Number(r.parseConfidence ?? 0).toFixed(2)}`;
   const st = String(r.parseStatus ?? "");
   if (st === "excluded" || r.excluded) {
-    const rsn = labelSizeAnalysisReasonForRow(r);
+    const rsn = displayReasonForNormalizedRow(r);
     return {
       subline: [src, rsn, conf].filter((x) => x && x.length > 0).join(" · "),
       pill: null,
     };
   }
   if (st === "needs_review" || st === "unresolved" || st === "corrected") {
-    const rsn = labelSizeAnalysisReasonForRow(r);
+    const rsn = displayReasonForNormalizedRow(r);
     return {
       subline: [src, rsn, conf].filter((x) => x && x.length > 0).join(" · "),
       pill: st as "needs_review" | "unresolved" | "corrected",
@@ -1579,7 +1767,15 @@ function normCompactClass(st: string | undefined) {
   return "size-analysis-norm-compact";
 }
 
-export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; duplicateRowIds: Set<string> }) {
+export function AnalysisRowsTable({
+  rows,
+  duplicateRowIds,
+  onToggleIncludeNameMissingRow,
+}: {
+  rows: any[];
+  duplicateRowIds: Set<string>;
+  onToggleIncludeNameMissingRow?: (row: any, include: boolean) => Promise<void>;
+}) {
   return (
     <section className="size-analysis-card size-analysis-norm-section">
       <h3>7) 정규화 행</h3>
@@ -1595,6 +1791,16 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
               </p>
               <div className="size-analysis-norm-compact__row2">
                 <p className="size-analysis-norm-compact__line2">{subline}</p>
+                {isNameMissingRow(r) && (r.parseStatus === "needs_review" || r.parseStatus === "corrected") ? (
+                  <label className="size-analysis-muted" style={{ marginLeft: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={String(r.parseStatus ?? "") === "corrected"}
+                      onChange={(e) => void onToggleIncludeNameMissingRow?.(r, e.target.checked)}
+                    />{" "}
+                    수량 포함
+                  </label>
+                ) : null}
                 {pill === "needs_review" ? (
                   <span className="size-analysis-mini-pill size-analysis-mini-pill--review">검토필요</span>
                 ) : pill === "unresolved" ? (
@@ -1619,6 +1825,7 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
               <th>수량</th>
               <th>상태</th>
               <th>사유</th>
+              <th className="size-analysis-include-col">수량 포함</th>
               <th>신뢰도</th>
             </tr>
           </thead>
@@ -1639,7 +1846,21 @@ export function AnalysisRowsTable({ rows, duplicateRowIds }: { rows: any[]; dupl
                   <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
                   <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
                   <td data-label="상태">{labelSizeAnalysisParseStatusForRow(r)}</td>
-                  <td data-label="사유">{labelSizeAnalysisReasonForRow(r)}</td>
+                  <td data-label="사유">{displayReasonForNormalizedRow(r)}</td>
+                  <td data-label="수량 포함" className="size-analysis-include-col">
+                    {isNameMissingRow(r) && (r.parseStatus === "needs_review" || r.parseStatus === "corrected") ? (
+                      <label className="size-analysis-include-toggle">
+                        <input
+                          type="checkbox"
+                          checked={String(r.parseStatus ?? "") === "corrected"}
+                          onChange={(e) => void onToggleIncludeNameMissingRow?.(r, e.target.checked)}
+                        />{" "}
+                        수량 포함
+                      </label>
+                    ) : (
+                      ""
+                    )}
+                  </td>
                   <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>
                 </tr>
               );
@@ -1823,7 +2044,14 @@ export function ClubSizeSummaryTable({
   }, [normRows, aggMode, duplicateRowIds]);
 
   const baseClubs = useMemo(
-    () => unionClubsOrdered([buildAggRowsTotal(normRows)]),
+    () =>
+      Array.from(
+        new Set(
+          (normRows ?? [])
+            .map((r) => normClubFromNormRow(r))
+            .filter((club) => String(club ?? "").trim().length > 0)
+        )
+      ).sort((a, b) => a.localeCompare(b, "ko")),
     [normRows]
   );
 

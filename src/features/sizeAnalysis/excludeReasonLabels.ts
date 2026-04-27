@@ -61,7 +61,11 @@ function reasonFromExcludeMeta(r: {
   const code = String(r.excludeReason ?? "").trim();
   const det = String(r.excludeDetail ?? "").trim();
 
-  if (code === "duplicate_person_group" || det === "same_club_same_name_keep_one") {
+  if (
+    code === "duplicate_person_group" ||
+    det === "same_club_same_name_keep_one" ||
+    det === "same_club_same_name_same_size_keep_one"
+  ) {
     return DISPLAY_REASON.same_club_name;
   }
   if (code === "duplicate_gender_filter") {

@@ -104,4 +104,29 @@ const t4dup = parseManualItemOrderSegment("95 95");
 assert.equal(t4dup.size, "95");
 assert.equal(t4dup.qty, 1);
 
+const mw1 = parseManualItemOrderSegment("M100 1개");
+assert.equal(mw1.gender, "남");
+assert.equal(mw1.size, "100");
+assert.equal(mw1.qty, 1);
+
+const mw2 = parseManualItemOrderSegment("W95 1개");
+assert.equal(mw2.gender, "여");
+assert.equal(mw2.size, "95");
+assert.equal(mw2.qty, 1);
+
+const n100 = parseManualItemOrderSegment("100 2개");
+assert.equal(n100.size, "100");
+assert.equal(n100.qty, 2);
+
+const mixed = splitOrderItemSegments("남 M 2 / 여 S 1 / 100 3").map((seg) => parseManualItemOrderSegment(seg));
+assert.equal(mixed.length, 3);
+assert.equal(mixed[0]!.gender, "남");
+assert.equal(mixed[0]!.size, "M");
+assert.equal(mixed[0]!.qty, 2);
+assert.equal(mixed[1]!.gender, "여");
+assert.equal(mixed[1]!.size, "S");
+assert.equal(mixed[1]!.qty, 1);
+assert.equal(mixed[2]!.size, "100");
+assert.equal(mixed[2]!.qty, 3);
+
 console.log("unknownManualItem test passed:", { totalRows: rows.length, allAuto: ok.length });

@@ -10,6 +10,8 @@ const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115
 const ALPHA_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "FREE"] as const;
 const ALPHA_RE = /\b(4XL|3XL|2XL|XL|XS|FREE|S|M|L)\b/i;
 const QTY_RE = /(\d{1,4})\s*(장|개|EA|PCS)?\b/i;
+const QTY_WITH_UNIT_RE = /(\d{1,4})\s*(장|개|EA|PCS)\b/i;
+const TRAILING_QTY_RE = /(?:^|[\s])(\d{1,4})\s*$/;
 const NUM_RE = /\b(80|85|90|95|100|105|110|115|120)\b/;
 
 export function preprocessCell(value: string | null | undefined): string {
@@ -48,8 +50,15 @@ export function extractSizeGenderQty(raw: string | null | undefined): ParsePiece
   const gender = normalizeGender(s);
   const numSize = s.match(NUM_RE)?.[1];
   const alphaSize = s.match(ALPHA_RE)?.[1]?.toUpperCase();
-  const qtyHit = s.match(QTY_RE)?.[1];
-  const qty = qtyHit ? Number(qtyHit) : undefined;
+  const qtyHitWithUnit = s.match(QTY_WITH_UNIT_RE)?.[1];
+  const trailingQtyHit = s.match(TRAILING_QTY_RE)?.[1];
+  const numericTokenCount = [...s.matchAll(/\d{1,4}/g)].length;
+  const qty =
+    qtyHitWithUnit != null
+      ? Number(qtyHitWithUnit)
+      : trailingQtyHit != null && numericTokenCount >= 2
+        ? Number(trailingQtyHit)
+        : undefined;
 
   const sizeCandidates = [numSize, alphaSize].filter(Boolean) as string[];
   const uniqueSizes = new Set(sizeCandidates);
@@ -155,6 +164,7 @@ const RE_ALPHA_SIZE_QTY = new RegExp(
   "i"
 );
 const RE_GENDER_NUMSIZE_QTY = /^\s*(남|여|공용)\s*([0-9]{2,3})\s+(\d{1,4})\s*(?:장|개|EA|PCS)?\s*$/i;
+const RE_MW_NUMSIZE_QTY = /^\s*([MW])\s*([0-9]{2,3})\s+(\d{1,4})\s*(?:장|개|EA|PCS)?\s*$/i;
 const RE_NUM_NUM = /^\s*([0-9]{2,3})\s+(\d{1,4})\s*(?:장|개|EA|PCS)?\s*$/;
 const RE_GENDER_ALPHA_QTY = new RegExp(
   `^\\s*(남|여|공용)\\s*(${ALPHA_SIZE_TOKEN})\\s+(\\d{1,4})\\s*(?:장|개|EA|PCS)?\\s*$`,
@@ -348,6 +358,25 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
         qty: r.qty,
         confidence: r.confidence,
         reason: "수동: 숫자사이즈+수량 — " + r.reason,
+        status: r.status,
+      };
+    }
+  }
+
+  m = t.match(RE_MW_NUMSIZE_QTY);
+  if (m) {
+    const mw = m[1].toUpperCase();
+    const sizeNorm = normalizeSize(m[2]);
+    const q = Number(m[3]);
+    const gNorm: "남" | "여" = mw === "M" ? "남" : "여";
+    if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
+      const r = applyUnknownManualQtySizeRules(sizeNorm, q);
+      return {
+        gender: gNorm,
+        size: sizeNorm,
+        qty: r.qty,
+        confidence: r.confidence,
+        reason: "수동: M/W+숫자사이즈+수량 — " + r.reason,
         status: r.status,
       };
     }

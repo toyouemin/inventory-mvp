@@ -1,7 +1,7 @@
-import { rowEligibleForDuplicatePersonGroup } from "./clubSizeAggModes";
+import { rowEligibleForDuplicatePersonGroup, rowExcludedByEmptyQuantity } from "./clubSizeAggModes";
 import { labelExcludeForDisplay } from "./excludeReasonLabels";
-import type { NormalizedRow } from "./types";
-import { duplicateGroupKeyFromRow } from "./duplicateKeyNormalize";
+import type { NormalizedRow, StructureType } from "./types";
+import { duplicateGroupKeyFromRow, duplicateGroupKeyFromRowWithSize } from "./duplicateKeyNormalize";
 import { extractSizeGenderQty, normalizeGender, normalizeSize } from "./normalize";
 
 const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115", "120"]);
@@ -244,25 +244,29 @@ function pickKeepIndex(indices: number[], rows: NormalizedRow[]): number {
   return indices[0]!;
 }
 
-function personGroupKeyForDuplicate(r: NormalizedRow): string | null {
-  return duplicateGroupKeyFromRow(r);
-}
-
 /**
  * 중복 기준:
- * - 같은 클럽 + 같은 이름 그룹에서 1행만 정상 유지, 나머지는 중복자
+ * - **size_matrix**: 클럽 + 이름 + 표시 사이즈 — 0/빈 수량 제외 행은 맵에 넣지 않음
+ * - **그 외 구조**: 클럽 + 이름만(기존과 동일)
  * - 유지행 선택: 성별(남/여)에 맞는 M/W 계열 우선, 없으면 입력 첫 행
  * - 검토필요(needs_review) 및 사이즈 없음·미분류 행은 중복 처리하지 않음(검토 우선, analyzeDuplicateRows와 동일)
  */
-export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[] {
+export function applyDuplicateSizePolicy(rows: NormalizedRow[], structureType: StructureType): NormalizedRow[] {
+  const isMatrix = structureType === "size_matrix";
+
+  function keyForRow(r: NormalizedRow): string | null {
+    return isMatrix ? duplicateGroupKeyFromRowWithSize(r) : duplicateGroupKeyFromRow(r);
+  }
+
   const result = rows.map((r) => ({ ...r }));
   const byPerson = new Map<string, number[]>();
   const excludeIdx = new Set<number>();
 
   result.forEach((r, i) => {
+    if (isMatrix && rowExcludedByEmptyQuantity(r)) return;
     if (r.excluded) return;
     if (!rowEligibleForDuplicatePersonGroup(r)) return;
-    const k = personGroupKeyForDuplicate(r);
+    const k = keyForRow(r);
     if (!k) return;
     if (!byPerson.has(k)) byPerson.set(k, []);
     byPerson.get(k)!.push(i);
@@ -282,7 +286,9 @@ export function applyDuplicateSizePolicy(rows: NormalizedRow[]): NormalizedRow[]
     if (!excludeIdx.has(i)) continue;
     const prev = result[i]!;
     const excludeReason = "duplicate_person_group";
-    const excludeDetail = "same_club_same_name_keep_one";
+    const excludeDetail = isMatrix
+      ? "same_club_same_name_same_size_keep_one"
+      : "same_club_same_name_keep_one";
     const display = labelExcludeForDisplay({
       excluded: true,
       parseStatus: "excluded",

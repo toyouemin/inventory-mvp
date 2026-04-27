@@ -11,6 +11,10 @@ export async function GET(req: Request, ctx: { params: { jobId: string } }) {
   const where: Prisma.SizeAnalysisRowWhereInput = { jobId: ctx.params.jobId };
   if (status === "excluded") {
     where.excluded = true;
+    /** UI: excludedScope=duplicates → `excludeReason`이 duplicate_* 인 행만(0/빈 수량 제외는 제외) */
+    if (url.searchParams.get("excludedScope") === "duplicates") {
+      where.excludeReason = { startsWith: "duplicate_" };
+    }
   } else if (status) {
     where.parseStatus = status as never;
   }

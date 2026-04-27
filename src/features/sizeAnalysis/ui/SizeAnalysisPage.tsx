@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { buildColumnSizesForClub } from "@/features/sizeAnalysis/clubAggMatrixColumns";
+import type { StructureType } from "@/features/sizeAnalysis/types";
 import {
   analyzeDuplicateRows,
   buildAggRowsDedupedFirst,
@@ -67,8 +68,8 @@ const STATUS_FILTER_LABEL: Record<(typeof STATUS_FILTER_OPTIONS)[number], string
   needs_review: "검토필요",
   unresolved: "미분류",
   corrected: "수정완료",
-  /** API 값은 `excluded` (중복·빈 수량 등 공통) */
-  excluded: "제외",
+  /** API 값은 `excluded` — 테이블은 중복자만 표시 */
+  excluded: "제외(중복)",
 };
 
 const PARSE_STATUS_LABEL: Record<string, string> = {
@@ -76,7 +77,7 @@ const PARSE_STATUS_LABEL: Record<string, string> = {
   needs_review: "검토필요",
   unresolved: "미분류",
   corrected: "수정완료",
-  excluded: "제외",
+  excluded: "제외(중복)",
 };
 
 function labelParseStatus(v: string | null | undefined): string {
@@ -182,6 +183,18 @@ function rowQtyParsed(r: any): number {
   return Number.isFinite(Number(q)) ? Number(q) : 0;
 }
 
+function isRowExcludedByEmptyQuantity(r: any): boolean {
+  const parseReason = String(r?.parseReason ?? "").trim();
+  if (parseReason.includes("0/빈 수량 제외")) return true;
+  const qtyRaw = r?.qtyRaw;
+  const qtyParsed = r?.qtyParsed;
+  const rawText = String(qtyRaw ?? "").trim();
+  const parsedNum = Number(qtyParsed);
+  if (rawText === "" || rawText === "0") return true;
+  if (Number.isFinite(parsedNum) && parsedNum <= 0) return true;
+  return false;
+}
+
 export function SizeAnalysisPage() {
   const [jobId, setJobId] = useState<string>("");
   const [sheets, setSheets] = useState<Array<{ name: string; rowCount: number }>>([]);
@@ -196,8 +209,15 @@ export function SizeAnalysisPage() {
   const [error, setError] = useState<string>("");
   const [mappingSaved, setMappingSaved] = useState(false);
   const [detailViewMode, setDetailViewMode] = useState<"all" | "club" | "duplicates">("all");
+  const autoDetectedKeyRef = useRef<string>("");
 
-  const duplicateAnalysis = useMemo(() => analyzeDuplicateRows(allRows), [allRows]);
+  const structureTypeForDup: StructureType | undefined =
+    mapping?.structureType ??
+    (allRows[0]?.metaJson?.structureType as StructureType | undefined);
+  const duplicateAnalysis = useMemo(
+    () => analyzeDuplicateRows(allRows, structureTypeForDup),
+    [allRows, structureTypeForDup]
+  );
 
   const clubGroupedRows = useMemo(() => {
     const byClub = new Map<string, { club: string; totalQty: number; rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }> }>();
@@ -357,7 +377,9 @@ export function SizeAnalysisPage() {
     const rowsUrl =
       status === "all"
         ? `/api/size-analysis/${id}/rows?excludeExcluded=1`
-        : `/api/size-analysis/${id}/rows?status=${encodeURIComponent(status)}`;
+        : status === "excluded"
+          ? `/api/size-analysis/${id}/rows?status=excluded&excludedScope=duplicates`
+          : `/api/size-analysis/${id}/rows?status=${encodeURIComponent(status)}`;
     const rowsRes = await fetch(rowsUrl, { cache: "no-store" });
     const rowsJson = await rowsRes.json();
     if (!rowsRes.ok) throw new Error(rowsJson.error ?? "행 조회 실패");
@@ -370,6 +392,15 @@ export function SizeAnalysisPage() {
     setStatusFilter(next);
     if (jobId) await refreshResult(jobId, next);
   }
+
+  useEffect(() => {
+    if (!jobId || !selectedSheet) return;
+    const key = `${jobId}\0${selectedSheet}`;
+    if (autoDetectedKeyRef.current === key) return;
+    if (loading === "detect") return;
+    autoDetectedKeyRef.current = key;
+    void detectStructureAction();
+  }, [jobId, selectedSheet]);
 
   const step1Complete = Boolean(jobId);
   const step2Complete = Boolean(selectedSheet);
@@ -615,7 +646,7 @@ export function StructureDetectionPanel({
   return (
     <div className="size-analysis-detect-panel">
       <button className="btn btn-secondary" type="button" onClick={onDetect} disabled={off}>
-        {loading ? "분석 중..." : "헤더/구조 자동 추천"}
+        {loading ? "분석 중..." : "구조 다시 분석"}
       </button>
       {detectResult ? (
         <div className="size-analysis-detect-outcome" role="region" aria-label="구조 분석 추천 결과">
@@ -629,7 +660,7 @@ export function StructureDetectionPanel({
   );
 }
 
-const UNKNOWN_REQUIRED = ["name", "club", "item"] as const;
+const UNKNOWN_REQUIRED_BASE = ["name", "club"] as const;
 
 export function FieldMappingEditor({
   mapping,
@@ -666,7 +697,12 @@ export function FieldMappingEditor({
   const hasPreview = maxCols > 0;
   const previewLen = previewRows?.length ?? 0;
   const headerOutOfPreview = m.headerRowIndex >= previewLen;
-  const requiredUnknownSet = new Set<string>(UNKNOWN_REQUIRED);
+  const hasSizeQtyColumns = m.fields.size !== undefined && m.fields.qty !== undefined;
+  const unknownRequired = [
+    ...UNKNOWN_REQUIRED_BASE,
+    ...(hasSizeQtyColumns ? [] : (["item"] as const)),
+  ];
+  const requiredUnknownSet = new Set<string>(unknownRequired);
 
   function columnLabelForIndex(zeroIdx: number): string {
     const h = String(headerCells[zeroIdx] ?? "").trim() || "제목 없음";
@@ -680,7 +716,7 @@ export function FieldMappingEditor({
     onChange({ ...m, fields: next });
   }
 
-  const unknownUnmapped = UNKNOWN_REQUIRED.filter((k) => m.fields[k] === undefined);
+  const unknownUnmapped = unknownRequired.filter((k) => m.fields[k] === undefined);
   const unknownNeedsFix = m.structureType === "unknown" && unknownUnmapped.length > 0;
   const formOff = disabled || loading;
 
@@ -739,7 +775,8 @@ export function FieldMappingEditor({
       ) : null}
       {unknownNeedsFix ? (
         <p className="size-analysis-field-warning" role="alert">
-          <strong>직접 매핑</strong>에서는 <strong>이름·클럽·주문내용</strong>을 모두 지정해 주세요. · 미지정:{" "}
+          <strong>직접 매핑</strong>에서는 <strong>이름·클럽</strong>을 지정해 주세요.
+          {!hasSizeQtyColumns ? " 주문내용은 사이즈/수량 열이 없을 때만 필요합니다." : ""} · 미지정:{" "}
           {unknownUnmapped.map((k) => FIELD_ROLE_LABEL[k] ?? k).join(", ")}
         </p>
       ) : null}
@@ -887,7 +924,7 @@ function lineGenderSizeQtyRow(r: any, lineIdx: number): string {
   return `${gPart} · ${qty}개 · 행 ${rowN}`;
 }
 
-/** 상태 필터와 무관하게 전체 norm(allRows) + duplicateRowIds( analyzeDuplicateRows(allRows) ) 기준. */
+/** 상태 필터와 무관하게 전체 norm(allRows) + duplicateRowIds(analyzeDuplicateRows, 구조 타입 반영) 기준. */
 export function DuplicateMembersView({
   allRows,
   duplicateRowIds,
@@ -895,28 +932,39 @@ export function DuplicateMembersView({
   allRows: any[];
   duplicateRowIds: Set<string>;
 }) {
-  const clubMap = new Map<string, Map<string, { r: any; i: number }[]>>();
+  type DupKeyGroup = {
+    club: string;
+    name: string;
+    size: string;
+    list: { r: any; i: number }[];
+  };
+  const clubMap = new Map<string, Map<string, DupKeyGroup>>();
   for (let i = 0; i < allRows.length; i += 1) {
     const r = allRows[i]!;
+    if (isRowExcludedByEmptyQuantity(r)) continue;
     const name = String(r.memberNameRaw ?? r.memberName ?? "").trim();
     if (!name) continue;
     const club = normClubFromNormRow(r);
+    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
+    const key = `${club}\0${name}\0${size}`;
     if (!clubMap.has(club)) clubMap.set(club, new Map());
-    const nameMap = clubMap.get(club)!;
-    if (!nameMap.has(name)) nameMap.set(name, []);
-    nameMap.get(name)!.push({ r, i });
+    const keyMap = clubMap.get(club)!;
+    const cur = keyMap.get(key) ?? { club, name, size, list: [] };
+    cur.list.push({ r, i });
+    keyMap.set(key, cur);
   }
 
-  const sections: { club: string; groups: { name: string; list: { r: any; i: number }[] }[] }[] = [];
+  const sections: { club: string; groups: DupKeyGroup[] }[] = [];
   for (const club of Array.from(clubMap.keys()).sort((a, b) => a.localeCompare(b, "ko"))) {
-    const nameMap = clubMap.get(club)!;
-    const groups: { name: string; list: { r: any; i: number }[] }[] = [];
-    for (const [name, list] of nameMap) {
+    const keyMap = clubMap.get(club)!;
+    const groups: DupKeyGroup[] = [];
+    for (const group of keyMap.values()) {
+      const list = group.list;
       if (!list.some(({ r, i }) => duplicateRowIds.has(stableRowKeyForDup(r, i)))) continue;
       const listSorted = [...list].sort(compareRowsBySourceThenIndex);
-      groups.push({ name, list: listSorted });
+      groups.push({ ...group, list: listSorted });
     }
-    groups.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    groups.sort((a, b) => a.name.localeCompare(b.name, "ko") || compareSizeLabel(a.size, b.size));
     if (groups.length) sections.push({ club, groups });
   }
 
@@ -933,7 +981,7 @@ export function DuplicateMembersView({
     <section className="size-analysis-card size-analysis-dup-only-section">
       <h3>중복자 보기</h3>
       <p className="size-analysis-muted size-analysis-dup-only-hint">
-        duplicateRowIds 단일 기준으로 분류합니다. 같은 클럽·이름·사이즈 반복(첫 행 제외)과 M/W 성별 충돌만 중복으로 표시됩니다.
+        duplicateRowIds 기준으로, 중복 키(클럽·이름·사이즈) 그룹만 표시합니다. 0/빈 수량 제외 행은 상세 목록에서 숨깁니다.
       </p>
       <div className="size-analysis-dup-only-list--mobile">
         {sections.map((sec) => (
@@ -945,9 +993,9 @@ export function DuplicateMembersView({
                 .filter(({ r, i }) => duplicateRowIds.has(stableRowKeyForDup(r, i)))
                 .reduce((s, { r }) => s + rowQtyParsed(r), 0);
               return (
-                <div key={g.name} className="size-analysis-dup-person">
+                <div key={`${sec.club}\0${g.name}\0${g.size}`} className="size-analysis-dup-person">
                   <p className="size-analysis-dup-person__name">
-                    {g.name} · 전체 {total}개 (중복분 {dupQty}개)
+                    {g.name} · {g.size} · 전체 {total}개 (중복분 {dupQty}개)
                   </p>
                   <ul className="size-analysis-dup-person__lines">
                     {g.list.map(({ r, i }, j) => {
@@ -987,7 +1035,7 @@ export function DuplicateMembersView({
                   </tr>
                 </thead>
                 {sec.groups.map((g) => (
-                  <tbody key={`${sec.club}\0${g.name}`} className="size-analysis-dup-pc-tbody-group">
+                  <tbody key={`${sec.club}\0${g.name}\0${g.size}`} className="size-analysis-dup-pc-tbody-group">
                     {g.list.map(({ r, i }, j) => {
                       const src =
                         r.sourceRowIndex != null && String(r.sourceRowIndex).trim() !== ""
@@ -1320,7 +1368,8 @@ export function AnalysisSummaryCards({
     ["검토필요", summary.needs_review],
     ["미분류", summary.unresolved],
     ["수정완료", summary.corrected],
-    ["제외", summary.excluded],
+    ["제외(중복자)", summary.excludedDuplicateCount ?? 0],
+    ["빈 수량 제외", summary.excludedEmptyQtyCount ?? 0],
     ["원본 총수량", totalQty],
     ["중복 제외 수량", finalQty],
     ["중복 주문(건)", duplicateAnalysis.duplicatePersonCount],
@@ -1330,7 +1379,7 @@ export function AnalysisSummaryCards({
     <section className="size-analysis-card">
       <h3>5) 결과 요약</h3>
       <p className="size-analysis-muted size-analysis-summary-scope-hint">
-        윗줄 여섯 항목은 파싱 상태(자동확정·검토필요 등)별 행 건수입니다. 아래 수량은 norm 행 전체 기준이며, 중복 제외 수량 = 원본 총수량 − 중복 수량입니다. 6) 상태 필터는 전체 보기 테이블에만 적용됩니다
+        윗줄은 파싱 상태별·제외(중복/빈 셀) 건수입니다. 6) «제외(중복)» 필터는 중복자만 표시하며(빈 수량 셀은 집계 숫자로만), 아래 수량은 norm 전체·중복 집계 기준(중복 제외 수량 = 원본 − 중복)입니다. 전체 보기 테이블에만 필터가 적용됩니다
         {filterLabel !== "all" ? ` (현재 필터: ${filterLabel})` : ""}.
       </p>
       <div className="size-analysis-summary-cards">

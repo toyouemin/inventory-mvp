@@ -3,8 +3,8 @@ import { preprocessCell } from "./normalize";
 
 const ROLE_KEYWORDS: Record<HeaderRole, RegExp> = {
   club: /(클럽|소속|단체|팀|CLUB)/i,
-  name: /(이름|성명|NAME)/i,
-  gender: /(성별|남여|GENDER|SEX)/i,
+  name: /(이름|성명|고객명|고객|NAME)/i,
+  gender: /(성별|남여|젠더|GENDER|SEX)/i,
   size: /(사이즈|SIZE|치수)/i,
   qty: /(수량|수|QTY|QUANTITY|장수)/i,
   item: /(품목|상품|ITEM)/i,
@@ -15,8 +15,8 @@ const REQUIRED_PERSON_ROLES: Array<"club" | "name" | "gender" | "size"> = ["club
 
 const PERSON_HEADER_ALIASES: Record<"club" | "name" | "gender" | "size", string[]> = {
   club: ["클럽", "club", "팀", "소속"],
-  name: ["이름", "성명", "name"],
-  gender: ["성별", "성", "gender", "sex", "남녀"],
+  name: ["이름", "성명", "고객명", "고객", "name"],
+  gender: ["성별", "성", "젠더", "gender", "sex", "남녀"],
   size: ["사이즈", "size", "치수"],
 };
 

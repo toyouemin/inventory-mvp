@@ -7,6 +7,8 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
     where: { jobId: ctx.params.jobId },
     select: {
       parseStatus: true,
+      parseReason: true,
+      excludeReason: true,
       qtyParsed: true,
       excluded: true,
       standardizedSize: true,
@@ -22,6 +24,8 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
     corrected: 0,
     excluded: 0,
   };
+  let excludedDuplicateCount = 0;
+  let excludedEmptyQtyCount = 0;
   let originalTotalQty = 0;
   let aggregatedTotalQty = 0;
   const clubSize: Record<string, Record<string, number>> = {};
@@ -30,6 +34,12 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
 
   for (const row of rows) {
     statusCounts[row.parseStatus] += 1;
+    if (row.parseStatus === "excluded") {
+      const er = String(row.excludeReason ?? "");
+      const pr = String(row.parseReason ?? "");
+      if (er.startsWith("duplicate_")) excludedDuplicateCount += 1;
+      else if (pr.includes("0/빈 수량 제외")) excludedEmptyQtyCount += 1;
+    }
     const qty = row.qtyParsed ?? 0;
     originalTotalQty += qty;
     if (!row.excluded) {
@@ -80,6 +90,8 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
   return Response.json({
     totalRows: rows.length,
     ...statusCounts,
+    excludedDuplicateCount,
+    excludedEmptyQtyCount,
     originalTotalQty,
     aggregatedTotalQty,
     verificationMatched: originalTotalQty === aggregatedTotalQty,

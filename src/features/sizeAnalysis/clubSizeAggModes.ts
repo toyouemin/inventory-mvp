@@ -4,8 +4,9 @@
  */
 
 import { buildColumnSizesForClub } from "./clubAggMatrixColumns";
-import { duplicateGroupKeyFromRow, normalizeClubForDuplicate } from "./duplicateKeyNormalize";
+import { duplicateGroupKeyFromRow, duplicateGroupKeyFromRowWithSize } from "./duplicateKeyNormalize";
 import { matrixDisplayFromSizeFields } from "./matrixSizeDisplay";
+import type { StructureType } from "./types";
 
 export type ClubSizeAggMode = "total" | "duplicate" | "deduped";
 
@@ -36,11 +37,9 @@ function personNameKeyForDupGroup(r: { memberNameRaw?: unknown; memberName?: unk
     .replace(/\s+/g, " ");
 }
 
-function personDupKey(r: any): string | null {
-  const name = personNameKeyForDupGroup(r);
-  if (!name) return null;
-  const club = normClubFromNormRow(r);
-  return `${club}\0${name}`;
+/** 0/빈 수량 제외(사이즈표 셀 등) — 중복 판정에서 제외 */
+export function rowExcludedByEmptyQuantity(r: any): boolean {
+  return String(r?.parseReason ?? "").includes("0/빈 수량 제외");
 }
 
 function sizeLine(standardizedSize: string | null | undefined): "M" | "W" | null {
@@ -321,19 +320,27 @@ export type DuplicateAnalysis = {
 };
 
 /**
- * 중복 기준: key = `duplicateGroupKeyFromRow` (normalizeClub + "::" + normalizeName, 원본 raw 정규화만)
- * - 같은 key 그룹이면 1행만 정상, 나머지 중복
- * - 유지행 선택: 성별(남/여)에 맞는 M/W·남/여 계열 우선, 없으면 입력 첫 행
- * - `needs_review` 또는 표시 사이즈 없음·미분류 행은 중복 판정에서 제외(검토 우선)
+ * 중복 기준 (`structureType` 또는 행 `metaJson.structureType` — 없으면 **클럽+이름** 레거시와 동일):
+ * - **size_matrix**: 클럽 + 이름 + 표시 사이즈 / 0·빈 수량 제외 행은 중복 판정 제외
+ * - **그 외**: 클럽 + 이름만 (기존과 동일)
  */
-export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
+export function analyzeDuplicateRows(rows: any[], structureType?: StructureType): DuplicateAnalysis {
+  const st =
+    structureType ?? (rows[0]?.metaJson?.structureType as StructureType | undefined);
+  const isMatrix = st === "size_matrix";
+
+  function keyForRow(r: any): string | null {
+    return isMatrix ? duplicateGroupKeyFromRowWithSize(r) : duplicateGroupKeyFromRow(r);
+  }
+
   const byPerson = new Map<string, { r: any; i: number }[]>();
   const duplicateRowIds = new Set<string>();
 
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
+    if (isMatrix && rowExcludedByEmptyQuantity(r)) continue;
     if (!rowEligibleForDuplicatePersonGroup(r)) continue;
-    const pk = personDupKey(r);
+    const pk = keyForRow(r);
     if (!pk) continue;
     if (!byPerson.has(pk)) byPerson.set(pk, []);
     byPerson.get(pk)!.push({ r, i });
@@ -371,41 +378,6 @@ export function analyzeDuplicateRows(rows: any[]): DuplicateAnalysis {
 
   const normalQty = totalQty - duplicateQtyTotal;
   const duplicatePersonCount = duplicateRowIds.size;
-
-  console.log(
-    "[size-analysis][전체] originalTotalQty=",
-    totalQty,
-    "duplicateQty=",
-    duplicateQtyTotal,
-    "dedupedQty=",
-    normalQty
-  );
-
-  const targetClubKey = "88민턴";
-  const clubRows = rows
-    .map((r, i) => ({ r, i }))
-    .filter(
-      ({ r }) =>
-        normalizeClubForDuplicate(String(r.clubNameRaw ?? r.clubNameNormalized ?? "")) === targetClubKey
-    );
-  if (clubRows.length > 0) {
-    const clubTotalQty = clubRows.reduce((s, x) => s + rowQtyParsed(x.r), 0);
-    const clubDupRows = clubRows.filter(({ r, i }) => duplicateRowIds.has(stableRowId(r, i)));
-    const clubDupQty = clubDupRows.reduce((s, x) => s + rowQtyParsed(x.r), 0);
-    const clubNormalQty = clubTotalQty - clubDupQty;
-    console.log("[size-analysis][88민턴] totalQty=", clubTotalQty);
-    console.log("[size-analysis][88민턴] duplicateQty=", clubDupQty);
-    console.log("[size-analysis][88민턴] dedupedQty=", clubNormalQty);
-    console.table(
-      clubDupRows.map(({ r }) => ({
-        originalRowNumber: (r.sourceRowIndex ?? 0) + 1,
-        club: String(r.clubNameRaw ?? r.clubNameNormalized ?? "").trim() || "미분류",
-        name: String(r.memberNameRaw ?? r.memberName ?? "").trim() || "—",
-        gender: String(r.genderNormalized ?? r.genderRaw ?? "").trim() || "—",
-        size: String(r.standardizedSize ?? r.sizeRaw ?? "").trim() || "—",
-      }))
-    );
-  }
 
   return {
     duplicateRowIds,

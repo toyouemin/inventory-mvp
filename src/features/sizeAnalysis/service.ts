@@ -179,15 +179,30 @@ export async function runAnalysis(jobId: string) {
   } else if (mappingJson.structureType === "size_matrix") rows = parseSizeMatrix(jobId, sheet, mappingJson);
   else if (mappingJson.structureType === "unknown") {
     const f = mappingJson.fields;
-    if (f.name === undefined || f.club === undefined || f.item === undefined) {
-      throw new Error("unknown 구조에서는 이름·클럽·주문내용(품목) 열이 모두 지정된 뒤 매핑을 저장해 주세요.");
+    const hasSizeQtyColumns = f.size !== undefined && f.qty !== undefined;
+    if (f.name === undefined || f.club === undefined) {
+      throw new Error("unknown 구조에서는 이름·클럽 열이 지정된 뒤 매핑을 저장해 주세요.");
     }
-    rows = parseUnknownManualItem(jobId, sheet, mappingJson);
+    if (hasSizeQtyColumns) {
+      // size+qty 열이 있으면 주문내용 파싱 없이 단일행 파서로 처리 가능.
+      rows = parseSingleRowPerson(jobId, sheet, mappingJson);
+    } else {
+      if (f.item === undefined) {
+        throw new Error("unknown 구조에서는 사이즈/수량 열이 없을 때 주문내용(품목) 열이 필요합니다.");
+      }
+      rows = parseUnknownManualItem(jobId, sheet, mappingJson);
+    }
   } else {
     throw new Error("지원하지 않는 structureType 입니다.");
   }
 
-  rows = applyDuplicateSizePolicy(rows);
+  const structureType = mappingJson.structureType;
+  rows = rows.map((r) => ({
+    ...r,
+    metaJson: { ...(r.metaJson ?? {}), structureType },
+  }));
+  // size_matrix만 클럽+이름+사이즈 중복 / 그 외는 클럽+이름만(기존). 0/빈 제외는 size_matrix에서만 중복 판별 제외.
+  rows = applyDuplicateSizePolicy(rows, structureType);
 
   await prisma.sizeAnalysisRow.deleteMany({ where: { jobId } });
   if (rows.length > 0) {

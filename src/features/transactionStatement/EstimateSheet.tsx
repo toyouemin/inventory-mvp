@@ -141,10 +141,19 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
       </div>
 
       <table className="estimate-sheet__items">
+        <colgroup>
+          <col className="estimate-sheet__col-type" />
+          <col className="estimate-sheet__col-name" />
+          <col className="estimate-sheet__col-qty" />
+          <col className="estimate-sheet__col-unit" />
+          <col className="estimate-sheet__col-unit-price" />
+          <col className="estimate-sheet__col-amount" />
+          <col className="estimate-sheet__col-note" />
+        </colgroup>
         <thead>
           <tr>
-            <th>구분</th>
             <th>품명</th>
+            <th>규격</th>
             <th>수량</th>
             <th>단위</th>
             <th>단가</th>
@@ -187,10 +196,19 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
       </div>
 
       <table className="estimate-sheet__items estimate-sheet__items--extra">
+        <colgroup>
+          <col className="estimate-sheet__col-type" />
+          <col className="estimate-sheet__col-name" />
+          <col className="estimate-sheet__col-qty" />
+          <col className="estimate-sheet__col-unit" />
+          <col className="estimate-sheet__col-unit-price" />
+          <col className="estimate-sheet__col-amount" />
+          <col className="estimate-sheet__col-note" />
+        </colgroup>
         <thead>
           <tr>
-            <th>구분</th>
             <th>품명</th>
+            <th>규격</th>
             <th>수량</th>
             <th>단위</th>
             <th>단가</th>

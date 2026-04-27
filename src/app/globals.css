@@ -14,6 +14,21 @@
   width: 860px;
 }
 
+/* JPG 캡처 시 html2canvas 안티앨리어싱으로 선 굵기 차이가 생기는 것을 완화 */
+.estimate-sheet__capture-fixed .estimate-sheet__supplier table,
+.estimate-sheet__capture-fixed .estimate-sheet__items {
+  border-collapse: collapse;
+  border-spacing: 0;
+  border: 1px solid #111;
+}
+
+.estimate-sheet__capture-fixed .estimate-sheet__supplier th,
+.estimate-sheet__capture-fixed .estimate-sheet__supplier td,
+.estimate-sheet__capture-fixed .estimate-sheet__items th,
+.estimate-sheet__capture-fixed .estimate-sheet__items td {
+  border: 1px solid #111;
+}
+
 .estimate-sheet__title {
   text-align: center;
   font-size: 40px;
@@ -85,6 +100,10 @@
 }
 
 .estimate-sheet__receiver-value--name-underlined {
+  flex: 0 0 auto;
+  display: inline-block;
+  width: fit-content;
+  max-width: 100%;
   text-decoration: none;
   border-bottom: 2px solid #000;
   padding-bottom: 1px;
@@ -111,7 +130,7 @@
   width: 100%;
   border-collapse: collapse;
   border-spacing: 0;
-  table-layout: auto;
+  table-layout: fixed;
 }
 
 .estimate-sheet__supplier tr,
@@ -318,16 +337,42 @@
   padding-right: 10px;
 }
 
-.estimate-sheet__items th:nth-child(1),
-.estimate-sheet__items td:nth-child(1) {
+.estimate-sheet__col-type,
+.estimate-sheet__col-name,
+.estimate-sheet__col-qty,
+.estimate-sheet__col-unit,
+.estimate-sheet__col-unit-price,
+.estimate-sheet__col-amount,
+.estimate-sheet__col-note {
   width: auto;
-  min-width: 0;
 }
 
-.estimate-sheet__items th:nth-child(2),
-.estimate-sheet__items td:nth-child(2) {
-  width: auto;
-  min-width: 0;
+.estimate-sheet__col-type {
+  width: 20%;
+}
+
+.estimate-sheet__col-name {
+  width: 20%;
+}
+
+.estimate-sheet__col-qty {
+  width: 8%;
+}
+
+.estimate-sheet__col-unit {
+  width: 6%;
+}
+
+.estimate-sheet__col-unit-price {
+  width: 14%;
+}
+
+.estimate-sheet__col-amount {
+  width: 16%;
+}
+
+.estimate-sheet__col-note {
+  width: 16%;
 }
 
 .estimate-sheet__items th:nth-child(3),
@@ -338,30 +383,9 @@
 .estimate-sheet__items td:nth-child(4),
 .estimate-sheet__items td:nth-child(5),
 .estimate-sheet__items td:nth-child(6) {
-  width: 1%;
   text-align: center;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.estimate-sheet__items th:nth-child(3),
-.estimate-sheet__items td:nth-child(3) {
-  min-width: 56px;
-}
-
-.estimate-sheet__items th:nth-child(4),
-.estimate-sheet__items td:nth-child(4) {
-  min-width: 56px;
-}
-
-.estimate-sheet__items th:nth-child(5),
-.estimate-sheet__items td:nth-child(5) {
-  min-width: 92px;
-}
-
-.estimate-sheet__items th:nth-child(6),
-.estimate-sheet__items td:nth-child(6) {
-  min-width: 108px;
 }
 
 .estimate-sheet__items td:nth-child(4) {
@@ -378,8 +402,6 @@
 
 .estimate-sheet__items th:nth-child(7),
 .estimate-sheet__items td:nth-child(7) {
-  width: auto;
-  min-width: 0;
   text-align: center;
   white-space: nowrap;
 }
@@ -388,18 +410,25 @@
 .estimate-sheet__items td:nth-child(2),
 .estimate-sheet__items td:nth-child(7) {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .estimate-sheet__items tbody td:nth-child(1),
 .estimate-sheet__items tbody td:nth-child(2) {
   text-align: center;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .estimate-sheet__items tbody td:nth-child(7) {
   text-align: center;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 .estimate-sheet__total {
@@ -451,6 +480,10 @@
 }
 
 .estimate-sheet__memo {
+  width: 100%;
+  box-sizing: border-box;
+  margin-left: 0;
+  margin-right: 0;
   border: 1px solid #000;
   min-height: 100px;
   white-space: pre-line;

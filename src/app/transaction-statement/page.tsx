@@ -929,8 +929,8 @@ export default function TransactionStatementPage() {
               }}
               items={computedRows.map((row) => ({
                 id: row.id,
-                category: row.spec,
-                name: row.name,
+                category: row.name,
+                name: row.spec,
                 quantity: row.qtyNumber,
                 unit: row.unit || "개",
                 unitPrice: row.unitPriceNumber,
@@ -1001,8 +1001,8 @@ export default function TransactionStatementPage() {
                 }}
                 items={computedRows.map((row) => ({
                   id: row.id,
-                  category: row.spec,
-                  name: row.name,
+                  category: row.name,
+                  name: row.spec,
                   quantity: row.qtyNumber,
                   unit: row.unit || "개",
                   unitPrice: row.unitPriceNumber,

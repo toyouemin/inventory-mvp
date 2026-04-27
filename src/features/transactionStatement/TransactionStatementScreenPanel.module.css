@@ -164,31 +164,31 @@
   font-size: 12.5px;
 }
 
-/* 품목·규격은 남은 폭을 나눠 쓰고, 수량·금액은 좁게 고정 비율 */
+/* 품목·규격 중심으로 폭을 배분하고 숫자 컬럼 좌우 여백을 최소화 */
 .colProduct {
-  width: 31%;
+  width: 34%;
 }
 
 .colSpec {
-  width: 27%;
+  width: 29%;
 }
 
 .colQty {
-  width: 14%;
+  width: 11%;
 }
 
 .colUnit {
-  width: 12%;
+  width: 9%;
 }
 
 .colAmount {
-  width: 16%;
+  width: 17%;
 }
 
 .itemsTable th,
 .itemsTable td {
   border: 1px solid var(--border, #e3ddd6);
-  padding: 5px 6px;
+  padding: 4px 3px;
   text-align: left;
   vertical-align: top;
 }
@@ -220,8 +220,8 @@
 .cellQty,
 .cellUnit,
 .cellAmount {
-  padding-left: 3px;
-  padding-right: 4px;
+  padding-left: 2px;
+  padding-right: 2px;
   text-align: center;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

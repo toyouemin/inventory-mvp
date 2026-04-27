@@ -374,6 +374,34 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
   let cMax = 0;
   let r = 0;
 
+  // 상단 전체 메트릭스 3블록
+  const overallModes = [
+    { kind: "total" as const, label: "전체 합계", flat: buildAggRowsTotal(rows) },
+    { kind: "deduped" as const, label: "전체 일반 수량", flat: buildAggRowsDedupedFirst(rows, duplicateRowIds) },
+    { kind: "duplicate" as const, label: "전체 중복수량", flat: buildAggRowsDuplicate(rows, duplicateRowIds) },
+  ] as const;
+  for (let mi = 0; mi < overallModes.length; mi += 1) {
+    const mode = overallModes[mi]!;
+    if (mi > 0) r += 1;
+    const b = buildClubAggBlock("전체", mode.flat);
+    const titleText = `${mode.label} (${b.totalQty}개)`;
+    const out = appendClubMatrixSection(
+      ws,
+      enc,
+      merges,
+      r,
+      b,
+      titleText,
+      styleClubAggBlockTitle(mode.kind),
+      false
+    );
+    r = out.r;
+    cMax = Math.max(cMax, out.cMax);
+  }
+
+  // 전체 블록과 클럽별 블록 사이 간격
+  r += 1;
+
   for (let bi = 0; bi < clubsOrdered.length; bi += 1) {
     const club = clubsOrdered[bi]!;
     for (let mi = 0; mi < modes.length; mi += 1) {
@@ -402,6 +430,10 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
   ws["!merges"] = merges;
   ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rMax, c: cMax } });
   autoFitColumns(ws, worksheetToAoa(ws));
+  // 클럽별집계 시트의 첫 열(성별)은 자동 너비가 과하게 넓어지기 쉬워 절반으로 축소
+  if (Array.isArray(ws["!cols"]) && ws["!cols"]![0] && typeof ws["!cols"]![0].wch === "number") {
+    ws["!cols"]![0].wch = Math.max(4, ws["!cols"]![0].wch! * 0.5);
+  }
   applyExcelDownloadFontToWorksheet(ws);
   return ws;
 }

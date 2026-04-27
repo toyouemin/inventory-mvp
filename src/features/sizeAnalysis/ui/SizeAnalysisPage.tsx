@@ -505,7 +505,7 @@ export function SizeAnalysisPage() {
         <section className="size-analysis-card size-analysis-xlsx-export">
           <h3>엑셀 내보내기</h3>
           <p className="size-analysis-muted size-analysis-xlsx-export__hint">
-            전체 목록(allRows)과 단일 중복 집계(duplicateRowIds)를 기준으로, 시트(전체목록·클럽별집계·중복자·검토필요) 4개를 저장합니다.
+            전체 목록과 단일 중복 집계를 기준으로, 시트(전체목록·클럽별집계·중복자·검토필요) 4개를 저장합니다.
           </p>
           <button
             type="button"
@@ -1045,6 +1045,60 @@ export function ClubGroupedView({
   }>;
 }) {
   const [expanded, setExpanded] = useState(() => defaultExpandedClubSet(rows));
+  const [overallExpanded, setOverallExpanded] = useState(true);
+
+  const overallTripleMatrices = useMemo(() => {
+    const statusByCell = buildCellStatusMap(normRows);
+    const needsReviewQty = (normRows ?? []).reduce((sum, r) => {
+      const st = String(r?.parseStatus ?? "").trim();
+      if (st !== "needs_review") return sum;
+      return sum + rowQtyParsed(r);
+    }, 0);
+    const modeDefs = [
+      { modeKey: "total" as const, label: "전체 합계", flat: buildAggRowsTotal(normRows) },
+      { modeKey: "deduped" as const, label: "전체 일반 수량", flat: buildAggRowsDedupedFirst(normRows, duplicateRowIds) },
+      { modeKey: "duplicate" as const, label: "전체 중복수량", flat: buildAggRowsDuplicate(normRows, duplicateRowIds) },
+    ];
+    return modeDefs.map((m) => {
+      const totalQty = m.flat.reduce((s, r) => s + r.qty, 0);
+      const sizes = buildColumnSizesForClub(m.flat);
+      const rowKeys = matrixGenderRowKeys(m.flat);
+      const qtyMap = new Map<string, number>();
+      for (const r of m.flat) {
+        const gk = rowKeyGenderForAgg(r.gender);
+        const k = `${gk}\0${r.size}`;
+        qtyMap.set(k, (qtyMap.get(k) ?? 0) + r.qty);
+      }
+      const baseHeadline = `${m.label} (${totalQty}개)`;
+      const headline =
+        m.modeKey === "total"
+          ? `${baseHeadline} · 검토필요(${needsReviewQty}개 포함)`
+          : baseHeadline;
+      return {
+        modeKey: m.modeKey,
+        headline,
+        headlineAriaLabel: headline,
+        isDuplicateMatrix: m.modeKey === "duplicate",
+        sizes,
+        rowKeys,
+        qtyMap,
+        resolveMeta: (gk: "여" | "남" | "공용", sz: string) => {
+          let hasReview = false;
+          let hasUnres = false;
+          let hasCorrected = false;
+          for (const clubName of rows.map((x) => x.club)) {
+            const meta = statusByCell.get(`${clubName}\0${gk}\0${sz}`);
+            if (!meta) continue;
+            hasReview = hasReview || meta.hasReview;
+            hasUnres = hasUnres || meta.hasUnres;
+            hasCorrected = hasCorrected || meta.hasCorrected;
+            if (hasReview && hasUnres && hasCorrected) break;
+          }
+          return { hasReview, hasUnres, hasCorrected };
+        },
+      };
+    });
+  }, [normRows, duplicateRowIds, rows]);
 
   /** 모바일 아코디언: 엑셀 클럽별집계와 동일 총/제외/중복 3블록(집계 함수 재사용) */
   const mobileClubTripleMatrices = useMemo(() => {
@@ -1073,9 +1127,10 @@ export function ClubGroupedView({
           const k = `${gk}\0${r.size}`;
           qtyMap.set(k, (qtyMap.get(k) ?? 0) + r.qty);
         }
+        const totalQty = clubRows.reduce((sum, row) => sum + row.qty, 0);
         return {
           modeKey: m.modeKey,
-          shortLabel: m.shortLabel,
+          shortLabel: `${m.shortLabel}(${totalQty}개)`,
           headlineAriaLabel: `${name} · ${m.ariaLabel}`,
           isDuplicateMatrix: m.modeKey === "duplicate",
           sizes,
@@ -1105,6 +1160,65 @@ export function ClubGroupedView({
       <p className="size-analysis-muted size-analysis-club-group-hint">
         클럽·성별·사이즈별 수량을 8) 집계와 같은 매트릭스로 확인할 수 있습니다.
       </p>
+      <div className="size-analysis-club-group-list">
+        <article className="size-analysis-club-group-card">
+          <button
+            type="button"
+            className="size-analysis-club-group-head"
+            onClick={() => setOverallExpanded((v) => !v)}
+            aria-expanded={overallExpanded}
+            aria-controls="size-analysis-club-overall-panel"
+            aria-label={`전체 상세 ${overallExpanded ? "접기" : "펼치기"}`}
+          >
+            <span className="size-analysis-club-group-head__name">
+              <span className="size-analysis-club-group-head__clubtitle">전체</span>
+            </span>
+            <span className="size-analysis-club-group-head__right">
+              <span className="size-analysis-club-group-chevron" aria-hidden>
+                <svg
+                  className={
+                    overallExpanded
+                      ? "size-analysis-club-group-chevron__svg is-open"
+                      : "size-analysis-club-group-chevron__svg"
+                  }
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </span>
+            </span>
+          </button>
+          <div
+            id="size-analysis-club-overall-panel"
+            className={[
+              "size-analysis-club-group-rows",
+              !overallExpanded ? "size-analysis-club-group-rows--collapsed-mobile" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="size-analysis-club-group-mtx-wrap size-analysis-club-group-mobile-agg-stack">
+              {overallTripleMatrices.map((blk) => (
+                <ClubAggMatrixTableDesktop
+                  key={`overall-${blk.modeKey}`}
+                  headline={blk.headline}
+                  headlineAriaLabel={blk.headlineAriaLabel}
+                  isDuplicateMatrix={blk.isDuplicateMatrix}
+                  sizes={blk.sizes}
+                  rowKeys={blk.rowKeys}
+                  qtyMap={blk.qtyMap}
+                  resolveMeta={blk.resolveMeta}
+                />
+              ))}
+            </div>
+          </div>
+        </article>
+      </div>
       <div className="size-analysis-club-group-accordion--mobile">
         <div className="size-analysis-club-group-list">
           {rows.map((club, idx) => {

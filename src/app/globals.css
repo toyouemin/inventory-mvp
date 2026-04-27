@@ -7420,6 +7420,10 @@ label {
     margin: 0 0 6px 0;
   }
 
+  .size-analysis-xlsx-export__hint {
+    font-size: 0.79rem;
+  }
+
   .size-analysis-stage-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;

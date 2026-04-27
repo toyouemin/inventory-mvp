@@ -95,12 +95,14 @@
   width: max-content;
   max-width: 100%;
   min-width: 0;
+  border-spacing: 0;
 }
 
 .estimate-sheet__supplier table {
   width: auto;
   max-width: 100%;
   border-collapse: collapse;
+  border-spacing: 0;
   table-layout: auto;
   border: 1px solid #000;
 }
@@ -108,6 +110,7 @@
 .estimate-sheet__items {
   width: 100%;
   border-collapse: collapse;
+  border-spacing: 0;
   table-layout: auto;
 }
 

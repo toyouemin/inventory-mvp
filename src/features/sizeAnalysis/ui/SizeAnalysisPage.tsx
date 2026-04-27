@@ -1313,8 +1313,6 @@ export function AnalysisSummaryCards({
   if (!summary) return null;
   const totalQty = (allRows ?? []).reduce((s, r) => s + rowQtyParsed(r), 0);
   const finalQty = totalQty - duplicateAnalysis.duplicateQtyTotal;
-  /** 기존 카드 `일반 수량` + `중복 수량` 합(별도 «검토필요 수량» 항목은 두지 않음) */
-  const actualShipQty = finalQty + duplicateAnalysis.duplicateQtyTotal;
   const filterLabel = STATUS_FILTER_LABEL[statusFilter as (typeof STATUS_FILTER_OPTIONS)[number]] ?? statusFilter;
   const cards: Array<[string, string | number]> = [
     ["총 정규화 행 수", summary.totalRows],
@@ -1324,18 +1322,15 @@ export function AnalysisSummaryCards({
     ["수정완료", summary.corrected],
     ["제외", summary.excluded],
     ["원본 총수량", totalQty],
-    ["최종 집계 수량", finalQty],
+    ["중복 제외 수량", finalQty],
     ["중복 주문(건)", duplicateAnalysis.duplicatePersonCount],
     ["중복 수량", duplicateAnalysis.duplicateQtyTotal],
-    ["일반 수량", finalQty],
-    ["실제 출고 수량", actualShipQty],
-    ["검산", totalQty === finalQty + duplicateAnalysis.duplicateQtyTotal ? "일치" : "불일치"],
   ];
   return (
     <section className="size-analysis-card">
       <h3>5) 결과 요약</h3>
       <p className="size-analysis-muted size-analysis-summary-scope-hint">
-        중복 주문·중복 수량·검산은 전체 norm 행(allRows)과 analyzeDuplicateRows(duplicateRowIds) 기준입니다. 상태 필터는 전체 보기 테이블에만 적용됩니다
+        윗줄 여섯 항목은 파싱 상태(자동확정·검토필요 등)별 행 건수입니다. 아래 수량은 norm 행 전체 기준이며, 중복 제외 수량 = 원본 총수량 − 중복 수량입니다. 6) 상태 필터는 전체 보기 테이블에만 적용됩니다
         {filterLabel !== "all" ? ` (현재 필터: ${filterLabel})` : ""}.
       </p>
       <div className="size-analysis-summary-cards">

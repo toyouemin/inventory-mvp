@@ -107,7 +107,7 @@
 .estimate-sheet__items {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .estimate-sheet__supplier th,
@@ -124,7 +124,6 @@
 }
 
 .estimate-sheet__supplier th {
-  background: #fafafa;
   white-space: nowrap;
   padding-left: 4px;
   padding-right: 4px;
@@ -285,16 +284,41 @@
 }
 
 .estimate-sheet__items th {
-  background: #fafafa;
+  background: #ececec;
   text-align: center;
   font-weight: 700;
+  font-size: 15px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.estimate-sheet__supplier th {
+  background: #ececec;
 }
 
 .estimate-sheet__items td {
   min-height: 38px;
   height: auto;
-  line-height: 1.45;
-  vertical-align: top;
+  line-height: 1.35;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 16px;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.estimate-sheet__items th:nth-child(1),
+.estimate-sheet__items td:nth-child(1) {
+  width: auto;
+  min-width: 0;
+}
+
+.estimate-sheet__items th:nth-child(2),
+.estimate-sheet__items td:nth-child(2) {
+  width: auto;
+  min-width: 0;
 }
 
 .estimate-sheet__items th:nth-child(3),
@@ -305,20 +329,68 @@
 .estimate-sheet__items td:nth-child(4),
 .estimate-sheet__items td:nth-child(5),
 .estimate-sheet__items td:nth-child(6) {
-  text-align: right;
+  width: 1%;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
+.estimate-sheet__items th:nth-child(3),
+.estimate-sheet__items td:nth-child(3) {
+  min-width: 56px;
+}
+
+.estimate-sheet__items th:nth-child(4),
+.estimate-sheet__items td:nth-child(4) {
+  min-width: 56px;
+}
+
+.estimate-sheet__items th:nth-child(5),
+.estimate-sheet__items td:nth-child(5) {
+  min-width: 92px;
+}
+
+.estimate-sheet__items th:nth-child(6),
+.estimate-sheet__items td:nth-child(6) {
+  min-width: 108px;
+}
+
 .estimate-sheet__items td:nth-child(4) {
   text-align: center;
-  white-space: normal;
+  white-space: nowrap;
+}
+
+.estimate-sheet__items thead th:nth-child(5),
+.estimate-sheet__items thead th:nth-child(6),
+.estimate-sheet__items tbody td:nth-child(5),
+.estimate-sheet__items tbody td:nth-child(6) {
+  text-align: right;
 }
 
 .estimate-sheet__items th:nth-child(7),
 .estimate-sheet__items td:nth-child(7) {
-  text-align: left;
-  white-space: normal;
+  width: auto;
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.estimate-sheet__items td:nth-child(1),
+.estimate-sheet__items td:nth-child(2),
+.estimate-sheet__items td:nth-child(7) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.estimate-sheet__items tbody td:nth-child(1),
+.estimate-sheet__items tbody td:nth-child(2) {
+  text-align: center;
+}
+
+.estimate-sheet__items tbody td:nth-child(7) {
+  text-align: center;
 }
 
 .estimate-sheet__total {

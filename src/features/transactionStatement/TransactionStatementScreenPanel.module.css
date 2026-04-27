@@ -160,29 +160,29 @@
   width: 100%;
   min-width: 280px;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
   font-size: 12.5px;
 }
 
-/* 품목·규격 중심으로 폭을 배분하고 숫자 컬럼 좌우 여백을 최소화 */
+/* 품목·규격은 내용 기준으로 유동, 숫자 컬럼은 최소 폭 유지 */
 .colProduct {
-  width: 34%;
+  width: auto;
 }
 
 .colSpec {
-  width: 29%;
+  width: auto;
 }
 
 .colQty {
-  width: 11%;
+  width: 1%;
 }
 
 .colUnit {
-  width: 9%;
+  width: 1%;
 }
 
 .colAmount {
-  width: 17%;
+  width: 1%;
 }
 
 .itemsTable th,
@@ -335,6 +335,22 @@
   .itemsTable th,
   .itemsTable td {
     padding: 5px 6px;
+  }
+
+  .colProduct,
+  .colSpec {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cellProduct,
+  .cellSpec {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .totalsAmount {

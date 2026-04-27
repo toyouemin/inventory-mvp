@@ -32,7 +32,6 @@ type TransactionStatementFormData = {
   customerBusinessItem: string;
   issueDate: string;
   tradeDate: string;
-  estimateEventName: string;
   estimateManagerName: string;
   estimateManagerPhone: string;
   estimateTotalNote: string;
@@ -203,7 +202,6 @@ export default function TransactionStatementPage() {
     customerBusinessItem: "",
     issueDate: formatYmd(new Date()),
     tradeDate: formatYmd(new Date()),
-    estimateEventName: "",
     estimateManagerName: DEFAULT_ESTIMATE_MANAGER_NAME,
     estimateManagerPhone: DEFAULT_ESTIMATE_MANAGER_PHONE,
     estimateTotalNote: "",
@@ -392,7 +390,7 @@ export default function TransactionStatementPage() {
         const bytes = exportEstimateExcel({
           issueDate: formData.issueDate,
           receiverName: formData.customerRepresentative.trim(),
-          eventName: formData.estimateEventName.trim(),
+          eventName: formData.customerName.trim(),
           memo: formData.estimateFooterMemo.trim(),
           vatIncluded: showVatIncluded,
           supplier: {
@@ -570,7 +568,7 @@ export default function TransactionStatementPage() {
       const dataUrl = canvas.toDataURL("image/jpeg", 0.98);
       const fileName =
         documentType === "estimate"
-          ? `${buildEstimateJpgBaseFileName(formData.estimateEventName, formData.issueDate)}.jpg`
+          ? `${buildEstimateJpgBaseFileName(formData.customerName, formData.issueDate)}.jpg`
           : `${buildStatementBaseFileName(formData.customerName, formData.issueDate)}.jpg`;
       const anchor = document.createElement("a");
       anchor.href = dataUrl;
@@ -691,8 +689,8 @@ export default function TransactionStatementPage() {
               <label className="transaction-form-grid__customer">
                 행사명(대회명)
                 <input
-                  value={formData.estimateEventName}
-                  onChange={(event) => updateFormField("estimateEventName", event.target.value)}
+                  value={formData.customerName}
+                  onChange={(event) => updateFormField("customerName", event.target.value)}
                 />
               </label>
             </div>
@@ -845,7 +843,7 @@ export default function TransactionStatementPage() {
               </div>
               <div className={panelStyles.summaryInline}>
                 <span className={panelStyles.summaryItem}>
-                  <strong>행사명</strong> {formData.estimateEventName.trim() || "—"}
+                  <strong>행사명</strong> {formData.customerName.trim() || "—"}
                 </span>
               </div>
             </div>
@@ -923,7 +921,7 @@ export default function TransactionStatementPage() {
               data={{
                 date: formData.issueDate,
                 receiverName: formData.customerRepresentative,
-                eventName: formData.estimateEventName,
+                eventName: formData.customerName,
                 memo: formData.estimateFooterMemo,
                 totalNote: formData.estimateTotalNote,
               }}
@@ -995,7 +993,7 @@ export default function TransactionStatementPage() {
                 data={{
                   date: formData.issueDate,
                   receiverName: formData.customerRepresentative,
-                  eventName: formData.estimateEventName,
+                  eventName: formData.customerName,
                   memo: formData.estimateFooterMemo,
                   totalNote: formData.estimateTotalNote,
                 }}

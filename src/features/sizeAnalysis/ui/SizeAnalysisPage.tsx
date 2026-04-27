@@ -1237,7 +1237,7 @@ export function ClubMembersView({
   return (
     <section className="size-analysis-card size-analysis-club-members-section">
       <h3>클럽별 명단</h3>
-      <p className="size-analysis-muted">
+      <p className="size-analysis-muted size-analysis-club-members-desc">
         클럽별로 같은 이름·성별·사이즈 수량을 합산해 표시합니다.
       </p>
       <label className="size-analysis-muted size-analysis-include-toggle">
@@ -1290,6 +1290,12 @@ export function ClubMembersView({
             {expandedClubs.has(sec.club) ? (
               <div className="size-analysis-dup-pc-table-scroll">
                 <table className="size-analysis-dup-pc-table">
+                  <colgroup>
+                    <col className="size-analysis-club-members-col-name" />
+                    <col className="size-analysis-club-members-col-gender" />
+                    <col className="size-analysis-club-members-col-size" />
+                    <col className="size-analysis-club-members-col-qty" />
+                  </colgroup>
                   <thead>
                     <tr>
                       <th scope="col">이름</th>

@@ -6890,10 +6890,18 @@ label {
 /* 중복자 보기: 리스트는 모바일만(표는 PC 전용 래퍼) */
 .size-analysis-dup-only-list--mobile {
   display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .size-analysis-dup-pc-wrap {
   display: none;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .size-analysis-dup-pc-club {
@@ -6914,24 +6922,46 @@ label {
 
 .size-analysis-dup-pc-table-scroll {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .size-analysis-dup-pc-table {
   width: 100%;
-  min-width: 520px;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.875rem;
   background: #fff;
 }
 
+.size-analysis-club-members-col-name {
+  width: 42%;
+}
+
+.size-analysis-club-members-col-gender {
+  width: 16%;
+}
+
+.size-analysis-club-members-col-size {
+  width: 24%;
+}
+
+.size-analysis-club-members-col-qty {
+  width: 18%;
+}
+
 .size-analysis-dup-pc-table th,
 .size-analysis-dup-pc-table td {
+  box-sizing: border-box;
   border: 1px solid #e5e7eb;
   padding: 5px 8px;
   vertical-align: middle;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .size-analysis-dup-pc-table thead th {
@@ -6944,7 +6974,7 @@ label {
 
 .size-analysis-dup-pc-table td:nth-child(1),
 .size-analysis-dup-pc-table td:nth-child(2) {
-  word-break: break-word;
+  min-width: 0;
 }
 
 .size-analysis-dup-pc-table td:nth-child(3),
@@ -6986,6 +7016,10 @@ label {
 
 .size-analysis-club-members-row--dup td {
   background: #fff4e8;
+}
+
+.size-analysis-club-members-desc {
+  font-size: 10px;
 }
 
 .size-analysis-filter-row {
@@ -7977,6 +8011,15 @@ label {
     display: block;
     border-radius: 4px;
     padding: 0;
+  }
+
+  .size-analysis-dup-pc-table {
+    font-size: 0.8rem;
+  }
+
+  .size-analysis-dup-pc-table th,
+  .size-analysis-dup-pc-table td {
+    padding: 4px 5px;
   }
 
   .size-analysis-club-line-mobile {

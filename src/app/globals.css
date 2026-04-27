@@ -3702,23 +3702,6 @@ label {
   font-size: 18px;
 }
 
-.transaction-items__extra-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.transaction-items__extra-toggle-btn {
-  height: 30px;
-  min-height: 30px;
-  padding: 0 10px;
-  font-size: 0.82rem;
-  line-height: 1;
-  margin: 0;
-}
-
 .transaction-items__rows {
   display: flex;
   flex-direction: column;
@@ -3757,6 +3740,16 @@ label {
   flex-wrap: wrap;
   justify-content: flex-end;
   margin-top: 4px;
+}
+
+.transaction-item-row__actions--estimate {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  justify-content: stretch;
+}
+
+.transaction-item-row__actions--estimate .btn {
+  width: 100%;
 }
 
 .transaction-items__estimate-memo {
@@ -4060,6 +4053,10 @@ label {
     min-height: 0;
     padding-top: 10px;
     padding-bottom: 10px;
+  }
+
+  .transaction-item-row__actions--estimate {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .transaction-item-row {

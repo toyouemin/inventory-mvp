@@ -19,6 +19,7 @@ type StatementItemFormRow = {
   qty: string;
   unitPrice: string;
   note: string;
+  isExtra: boolean;
 };
 
 type TransactionStatementFormData = {
@@ -82,6 +83,7 @@ function makeRow(idSuffix: number): StatementItemFormRow {
     qty: "",
     unitPrice: "",
     note: "",
+    isExtra: false,
   };
 }
 
@@ -210,8 +212,6 @@ export default function TransactionStatementPage() {
   const [errorMessage, setErrorMessage] = useState("");
   /** 거래 요약 토글과 동일: 끄면 미리보기·JPG에도 부가세 관련 문구·공급/세액 숨김 */
   const [showVatIncluded, setShowVatIncluded] = useState(true);
-  const [estimateInputToExtra, setEstimateInputToExtra] = useState(false);
-
   const computedRows = useMemo(
     () =>
       formData.items.map((row) => {
@@ -349,18 +349,21 @@ export default function TransactionStatementPage() {
     ]
   );
 
-  function updateItem(id: string, key: keyof StatementItemFormRow, value: string): void {
+  function updateItem(id: string, key: keyof StatementItemFormRow, value: string | boolean): void {
     setFormData((prev) => ({
       ...prev,
       items: prev.items.map((row) => {
         if (row.id !== id) return row;
+        if (key === "isExtra") {
+          return { ...row, isExtra: Boolean(value) };
+        }
         if (key === "unitPrice") {
-          return { ...row, unitPrice: formatThousandsWithComma(value) };
+          return { ...row, unitPrice: formatThousandsWithComma(String(value)) };
         }
         if (key === "qty") {
-          return { ...row, [key]: normalizeNumericInput(value) };
+          return { ...row, [key]: normalizeNumericInput(String(value)) };
         }
-        return { ...row, [key]: value };
+        return { ...row, [key]: String(value) };
       }),
     }));
   }
@@ -399,7 +402,7 @@ export default function TransactionStatementPage() {
             quantity: row.qtyNumber,
             unit: "개",
             unitPrice: row.unitPriceNumber,
-            isExtra: estimateInputToExtra,
+            isExtra: row.isExtra,
           }));
 
         if (!formData.customerName.trim()) {
@@ -742,24 +745,6 @@ export default function TransactionStatementPage() {
         <div className="transaction-items">
           <div className="transaction-items__header">
             <h2>품목 리스트</h2>
-            {documentType === "estimate" ? (
-              <div className="transaction-items__extra-toggle" role="group" aria-label="견적서 품목 입력 위치">
-                <button
-                  type="button"
-                  className={`btn btn-compact transaction-items__extra-toggle-btn ${!estimateInputToExtra ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => setEstimateInputToExtra(false)}
-                >
-                  기본 입력
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-compact transaction-items__extra-toggle-btn ${estimateInputToExtra ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => setEstimateInputToExtra(true)}
-                >
-                  아래칸 입력
-                </button>
-              </div>
-            ) : null}
           </div>
           <div className="transaction-items__rows">
             {computedRows.map((row, index) => (
@@ -800,10 +785,24 @@ export default function TransactionStatementPage() {
                     <input value={row.note} onChange={(event) => updateItem(row.id, "note", event.target.value)} />
                   </label>
                 </div>
-                <div className="transaction-item-row__actions">
+                <div
+                  className={`transaction-item-row__actions${
+                    documentType === "estimate" ? " transaction-item-row__actions--estimate" : ""
+                  }`}
+                >
                   <button type="button" className="btn btn-primary btn-compact" onClick={addRow}>
                     품목 추가
                   </button>
+                  {documentType === "estimate" ? (
+                    <button
+                      type="button"
+                      className={`btn btn-compact ${row.isExtra ? "btn-primary" : "btn-secondary"}`}
+                      onClick={() => updateItem(row.id, "isExtra", !row.isExtra)}
+                      aria-pressed={row.isExtra}
+                    >
+                      {row.isExtra ? "경품입력" : "기본입력"}
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="btn btn-danger btn-compact"
@@ -938,7 +937,7 @@ export default function TransactionStatementPage() {
                 unit: "개",
                 unitPrice: row.unitPriceNumber,
                 note: row.note,
-                isExtra: estimateInputToExtra,
+                isExtra: row.isExtra,
               }))}
               supplier={{
                 businessNumber: FIXED_SUPPLIER.bizNo,
@@ -1010,7 +1009,7 @@ export default function TransactionStatementPage() {
                   unit: "개",
                   unitPrice: row.unitPriceNumber,
                   note: row.note,
-                  isExtra: estimateInputToExtra,
+                  isExtra: row.isExtra,
                 }))}
                 supplier={{
                   businessNumber: FIXED_SUPPLIER.bizNo,

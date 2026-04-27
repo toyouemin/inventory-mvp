@@ -208,7 +208,7 @@ export function SizeAnalysisPage() {
   const [loading, setLoading] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [mappingSaved, setMappingSaved] = useState(false);
-  const [detailViewMode, setDetailViewMode] = useState<"all" | "club" | "duplicates">("all");
+  const [detailViewMode, setDetailViewMode] = useState<"all" | "club" | "duplicates" | "clubMembers">("all");
   const autoDetectedKeyRef = useRef<string>("");
 
   const structureTypeForDup: StructureType | undefined =
@@ -563,8 +563,10 @@ export function SizeAnalysisPage() {
               normRows={allRows}
               rows={clubGroupedRows}
             />
-          ) : (
+          ) : detailViewMode === "duplicates" ? (
             <DuplicateMembersView allRows={allRows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
+          ) : (
+            <ClubMembersView allRows={allRows} />
           )}
         </div>
       </div>
@@ -877,17 +879,13 @@ export function DetailViewSwitch({
   mode,
   onChange,
 }: {
-  mode: "all" | "club" | "duplicates";
-  onChange: (mode: "all" | "club" | "duplicates") => void;
+  mode: "all" | "club" | "duplicates" | "clubMembers";
+  onChange: (mode: "all" | "club" | "duplicates" | "clubMembers") => void;
 }) {
   return (
     <section className="size-analysis-card size-analysis-view-switch-card">
       <h3 className="size-analysis-view-switch__heading">보기 전환</h3>
-      <div
-        className="size-analysis-view-switch size-analysis-view-switch--segmented size-analysis-view-switch--3"
-        role="group"
-        aria-label="결과 보기 전환"
-      >
+      <div className="size-analysis-view-switch size-analysis-view-switch--segmented" role="group" aria-label="결과 보기 전환">
         <button
           type="button"
           className={`btn ${mode === "all" ? "btn-primary" : "btn-secondary"}`}
@@ -908,6 +906,13 @@ export function DetailViewSwitch({
           onClick={() => onChange("duplicates")}
         >
           중복자 보기
+        </button>
+        <button
+          type="button"
+          className={`btn ${mode === "clubMembers" ? "btn-primary" : "btn-secondary"}`}
+          onClick={() => onChange("clubMembers")}
+        >
+          클럽별 명단
         </button>
       </div>
     </section>
@@ -1061,6 +1066,104 @@ export function DuplicateMembersView({
                     })}
                   </tbody>
                 ))}
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+export function ClubMembersView({ allRows }: { allRows: any[] }) {
+  type MemberAggRow = { name: string; gender: string; size: string; qty: number };
+  const byClub = new Map<string, Map<string, MemberAggRow>>();
+  for (const r of allRows) {
+    const st = String(r?.parseStatus ?? "").trim();
+    if (Boolean(r?.excluded) || st === "excluded") continue;
+    const club = normClubFromNormRow(r);
+    const name = String(r?.memberNameRaw ?? r?.memberName ?? "").trim() || "(이름 없음)";
+    const gender = String(r?.genderNormalized ?? r?.genderRaw ?? "").trim() || "미분류";
+    const size = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim() || "미분류";
+    const qty = rowQtyParsed(r);
+    const key = `${name}\0${gender}\0${size}`;
+    if (!byClub.has(club)) byClub.set(club, new Map());
+    const rowMap = byClub.get(club)!;
+    const cur = rowMap.get(key) ?? { name, gender, size, qty: 0 };
+    cur.qty += qty;
+    rowMap.set(key, cur);
+  }
+
+  const sections = Array.from(byClub.entries())
+    .map(([club, rowMap]) => ({
+      club,
+      rows: Array.from(rowMap.values()).sort(
+        (a, b) =>
+          a.name.localeCompare(b.name, "ko") ||
+          compareGenderForClubSize(a.gender, b.gender) ||
+          compareSizeLabel(a.size, b.size)
+      ),
+    }))
+    .filter((sec) => sec.rows.length > 0)
+    .sort((a, b) => a.club.localeCompare(b.club, "ko"));
+
+  if (sections.length === 0) {
+    return (
+      <section className="size-analysis-card">
+        <h3>클럽별 명단</h3>
+        <p className="size-analysis-muted">표시할 명단이 없습니다.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="size-analysis-card size-analysis-club-members-section">
+      <h3>클럽별 명단</h3>
+      <p className="size-analysis-muted">
+        allRows 기준으로 제외 행은 숨기고, 같은 클럽·이름·성별·사이즈는 수량을 합산해 표시합니다.
+      </p>
+
+      <div className="size-analysis-dup-only-list--mobile">
+        {sections.map((sec) => (
+          <article key={sec.club} className="size-analysis-dup-club">
+            <h4 className="size-analysis-dup-club__title">{sec.club}</h4>
+            <ul className="size-analysis-dup-person__lines">
+              {sec.rows.map((row) => (
+                <li key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}>
+                  - {row.name} · {row.gender} {row.size} · {row.qty}개
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+
+      <div className="size-analysis-dup-pc-wrap" aria-label="클럽별 명단 표(PC)">
+        {sections.map((sec) => (
+          <div key={`${sec.club}-pc`} className="size-analysis-dup-pc-club">
+            <h4 className="size-analysis-dup-pc-club__title">{sec.club}</h4>
+            <div className="size-analysis-dup-pc-table-scroll">
+              <table className="size-analysis-dup-pc-table">
+                <thead>
+                  <tr>
+                    <th scope="col">클럽</th>
+                    <th scope="col">이름</th>
+                    <th scope="col">성별</th>
+                    <th scope="col">사이즈</th>
+                    <th scope="col">수량</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sec.rows.map((row, idx) => (
+                    <tr key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}>
+                      <td>{idx === 0 ? sec.club : ""}</td>
+                      <td>{row.name}</td>
+                      <td>{row.gender}</td>
+                      <td>{row.size}</td>
+                      <td>{row.qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
               </table>
             </div>
           </div>

@@ -174,11 +174,15 @@
 }
 
 .colQty {
-  width: 16%;
+  width: 14%;
+}
+
+.colUnit {
+  width: 12%;
 }
 
 .colAmount {
-  width: 26%;
+  width: 16%;
 }
 
 .itemsTable th,
@@ -214,15 +218,17 @@
 }
 
 .cellQty,
+.cellUnit,
 .cellAmount {
   padding-left: 3px;
   padding-right: 4px;
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .cellAmount {
+  text-align: right;
   letter-spacing: -0.02em;
 }
 

@@ -64,7 +64,7 @@ const FIXED_SUPPLIER = {
 } as const;
 
 const TRANSACTION_STATEMENT_GUIDE_TEXT = "정보 입력→명세표 미리보기→JPG 저장→발송";
-const ITEM_UNIT_OPTIONS = ["개", "장", "타", "세트"] as const;
+const ITEM_UNIT_OPTIONS = ["개", "장", "타", "세트", "자루"] as const;
 
 /** 출력 푸터(은행·URL 등은 사업 정보에 맞게 수정) */
 const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
@@ -252,6 +252,7 @@ export default function TransactionStatementPage() {
           name: row.name,
           spec: row.spec,
           qty: row.qtyNumber,
+          unit: row.unit || "개",
           unitPrice: row.unitPriceNumber,
           amount: row.amount,
           note: row.note,
@@ -266,40 +267,11 @@ export default function TransactionStatementPage() {
         name: row.name,
         spec: row.spec,
         qty: row.qty,
+        unit: row.unit || "개",
         amount: row.amount,
       })),
     [printLines]
   );
-
-  const estimateSummary = useMemo(() => {
-    const estimateItems = computedRows.filter((row) => row.name.trim() !== "");
-    const itemCount = estimateItems.length;
-    const totalQty = estimateItems.reduce((sum, row) => sum + row.qtyNumber, 0);
-    const memo = formData.estimateFooterMemo.trim();
-    return {
-      quoteDate: formData.issueDate,
-      receiver: formData.customerName.trim() || formData.customerRepresentative.trim() || "—",
-      eventName: formData.estimateEventName.trim() || "—",
-      itemCount,
-      totalQty,
-      totalAmount: totals.totalAmount,
-      vatLabel: showVatIncluded ? "VAT 포함" : "VAT 별도",
-      managerName: formData.estimateManagerName.trim() || "—",
-      managerPhone: formData.estimateManagerPhone.trim() || "—",
-      memo: memo || "—",
-    };
-  }, [
-    computedRows,
-    formData.issueDate,
-    formData.customerName,
-    formData.customerRepresentative,
-    formData.estimateEventName,
-    formData.estimateManagerName,
-    formData.estimateManagerPhone,
-    formData.estimateFooterMemo,
-    totals.totalAmount,
-    showVatIncluded,
-  ]);
 
   const shouldShowErrorMessage =
     !!errorMessage && !(documentType === "estimate" && errorMessage === "공급받는자 상호를 입력해 주세요.");
@@ -431,8 +403,8 @@ export default function TransactionStatementPage() {
             tel: FIXED_SUPPLIER.tel,
             fax: FIXED_SUPPLIER.fax,
             bankAccount: DEFAULT_ESTIMATE_BANK_ACCOUNT,
-            managerName: formData.estimateManagerName.trim() || FIXED_SUPPLIER.managerName,
-            managerPhone: formData.estimateManagerPhone.trim() || FIXED_SUPPLIER.managerPhone,
+            managerName: FIXED_SUPPLIER.managerName,
+            managerPhone: FIXED_SUPPLIER.managerPhone,
             email: FIXED_SUPPLIER.email,
           },
           items: payloadItems,
@@ -725,23 +697,6 @@ export default function TransactionStatementPage() {
               </label>
             </div>
 
-            <div className="estimate-form__row estimate-form__row--2col">
-              <label className="transaction-form-grid__customer">
-                담당자
-                <input
-                  value={formData.estimateManagerName}
-                  onChange={(event) => updateFormField("estimateManagerName", event.target.value)}
-                />
-              </label>
-              <label className="transaction-form-grid__customer">
-                담당자 연락처
-                <input
-                  value={formData.estimateManagerPhone}
-                  inputMode="numeric"
-                  onChange={(event) => updateFormField("estimateManagerPhone", normalizePhoneInput(event.target.value))}
-                />
-              </label>
-            </div>
           </div>
         )}
 
@@ -761,24 +716,23 @@ export default function TransactionStatementPage() {
                     규격
                     <input value={row.spec} onChange={(event) => updateItem(row.id, "spec", event.target.value)} />
                   </label>
-                  <label>
+                  <label className="transaction-item-row__qty-unit-field">
                     수량
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={row.qty}
-                      onChange={(event) => updateItem(row.id, "qty", event.target.value)}
-                    />
-                  </label>
-                  <label className="transaction-item-row__unit-field">
-                    단위
-                    <select value={row.unit} onChange={(event) => updateItem(row.id, "unit", event.target.value)}>
-                      {ITEM_UNIT_OPTIONS.map((unitOption) => (
-                        <option key={unitOption} value={unitOption}>
-                          {unitOption}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="transaction-item-row__qty-unit-controls">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={row.qty}
+                        onChange={(event) => updateItem(row.id, "qty", event.target.value)}
+                      />
+                      <select value={row.unit} onChange={(event) => updateItem(row.id, "unit", event.target.value)}>
+                        {ITEM_UNIT_OPTIONS.map((unitOption) => (
+                          <option key={unitOption} value={unitOption}>
+                            {unitOption}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </label>
                   <label>
                     단가
@@ -866,7 +820,7 @@ export default function TransactionStatementPage() {
         ) : (
           <section className={panelStyles.panel}>
             <div className={panelStyles.panelHeader}>
-              <h2 className={panelStyles.panelTitle}>견적서 요약</h2>
+              <h2 className={panelStyles.panelTitle}>거래 요약</h2>
               <label className={panelStyles.vatToggle}>
                 <span className={panelStyles.vatToggleLabel}>부가세 포함 표시</span>
                 <input
@@ -878,44 +832,75 @@ export default function TransactionStatementPage() {
                 <span className={panelStyles.vatToggleTrack} aria-hidden />
               </label>
             </div>
-            <div className={panelStyles.summaryStack} role="group" aria-label="견적서 요약 정보">
+            <div className={panelStyles.summaryStack} role="group" aria-label="견적서 거래 요약">
               <div className={panelStyles.summaryInline}>
                 <span className={panelStyles.summaryItem}>
-                  <strong>견적일</strong> {estimateSummary.quoteDate || "—"}
-                </span>
-                <span className={panelStyles.summaryItem}>
-                  <strong>수신</strong> {estimateSummary.receiver}
-                </span>
-                <span className={panelStyles.summaryItem}>
-                  <strong>행사명</strong> {estimateSummary.eventName}
+                  <strong>견적일</strong> {formData.issueDate || "—"}
                 </span>
               </div>
               <div className={panelStyles.summaryInline}>
                 <span className={panelStyles.summaryItem}>
-                  <strong>품목 수</strong> {estimateSummary.itemCount.toLocaleString("ko-KR")}
-                </span>
-                <span className={panelStyles.summaryItem}>
-                  <strong>총 수량</strong> {estimateSummary.totalQty.toLocaleString("ko-KR")}
-                </span>
-                <span className={panelStyles.summaryItem}>
-                  <strong>견적금액</strong> {estimateSummary.totalAmount.toLocaleString("ko-KR")}원
-                </span>
-                <span className={panelStyles.summaryItem}>
-                  <strong>{estimateSummary.vatLabel}</strong>
+                  <strong>수신</strong> {formData.customerRepresentative.trim() || "—"}
                 </span>
               </div>
               <div className={panelStyles.summaryInline}>
                 <span className={panelStyles.summaryItem}>
-                  <strong>담당자</strong> {estimateSummary.managerName}
-                </span>
-                <span className={panelStyles.summaryItem}>
-                  <strong>담당자 연락처</strong> {estimateSummary.managerPhone}
+                  <strong>행사명</strong> {formData.estimateEventName.trim() || "—"}
                 </span>
               </div>
-              <div className={panelStyles.summaryInline}>
-                <span className={panelStyles.summaryItem}>
-                  <strong>비고</strong> {estimateSummary.memo}
+            </div>
+            <div className={panelStyles.itemsWrap}>
+              <table className={panelStyles.itemsTable}>
+                <colgroup>
+                  <col className={panelStyles.colProduct} />
+                  <col className={panelStyles.colSpec} />
+                  <col className={panelStyles.colQty} />
+                  <col className={panelStyles.colUnit} />
+                  <col className={panelStyles.colAmount} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>품목명</th>
+                    <th>규격</th>
+                    <th>수량</th>
+                    <th>단위</th>
+                    <th>금액</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {screenLines.length === 0 ? (
+                    <tr>
+                      <td colSpan={5}>입력된 품목이 없습니다.</td>
+                    </tr>
+                  ) : (
+                    screenLines.map((row) => (
+                      <tr key={row.id}>
+                        <td className={panelStyles.cellProduct}>{row.name}</td>
+                        <td className={panelStyles.cellSpec}>{row.spec}</td>
+                        <td className={panelStyles.cellQty}>{row.qty.toLocaleString("ko-KR")}</td>
+                        <td className={panelStyles.cellUnit}>{row.unit || "개"}</td>
+                        <td className={panelStyles.cellAmount}>{row.amount.toLocaleString("ko-KR")}원</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className={panelStyles.totals}>
+              <div className={panelStyles.totalsPrimary}>
+                <span className={panelStyles.totalsAmount}>
+                  합계 금액 {totals.totalAmount.toLocaleString("ko-KR")}원
+                  {showVatIncluded ? <span className={panelStyles.totalsVat}>(VAT포함)</span> : null}
+                  <span className={panelStyles.totalsAmountKorean}> ({settlement.amountKoreanText})</span>
                 </span>
+                {showVatIncluded ? (
+                  <span className={panelStyles.totalsMeta}>
+                    총수량 {totals.totalQty.toLocaleString("ko-KR")} · 공급 {settlement.supplyAmount.toLocaleString("ko-KR")} ·
+                    세액 {settlement.taxAmount.toLocaleString("ko-KR")}
+                  </span>
+                ) : (
+                  <span className={panelStyles.totalsMeta}>총수량 {totals.totalQty.toLocaleString("ko-KR")}</span>
+                )}
               </div>
             </div>
             <div className={panelStyles.previewRow}>
@@ -960,8 +945,8 @@ export default function TransactionStatementPage() {
                 tel: FIXED_SUPPLIER.tel,
                 fax: FIXED_SUPPLIER.fax,
                 bankAccount: DEFAULT_ESTIMATE_BANK_ACCOUNT,
-                managerName: formData.estimateManagerName || FIXED_SUPPLIER.managerName,
-                managerPhone: formData.estimateManagerPhone || FIXED_SUPPLIER.managerPhone,
+                managerName: FIXED_SUPPLIER.managerName,
+                managerPhone: FIXED_SUPPLIER.managerPhone,
                 email: FIXED_SUPPLIER.email,
               }}
               vatIncluded={showVatIncluded}
@@ -1032,8 +1017,8 @@ export default function TransactionStatementPage() {
                   tel: FIXED_SUPPLIER.tel,
                   fax: FIXED_SUPPLIER.fax,
                   bankAccount: DEFAULT_ESTIMATE_BANK_ACCOUNT,
-                  managerName: formData.estimateManagerName || FIXED_SUPPLIER.managerName,
-                  managerPhone: formData.estimateManagerPhone || FIXED_SUPPLIER.managerPhone,
+                  managerName: FIXED_SUPPLIER.managerName,
+                  managerPhone: FIXED_SUPPLIER.managerPhone,
                   email: FIXED_SUPPLIER.email,
                 }}
                 vatIncluded={showVatIncluded}

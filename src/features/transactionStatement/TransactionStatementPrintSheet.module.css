@@ -255,7 +255,8 @@
 
 .table thead th:nth-child(3),
 .table thead th:nth-child(4),
-.table thead th:nth-child(5) {
+.table thead th:nth-child(5),
+.table thead th:nth-child(6) {
   text-align: center;
   padding-left: 10px;
   padding-right: 10px;
@@ -279,6 +280,11 @@
 }
 
 .colQty {
+  width: 1%;
+  min-width: 56px;
+}
+
+.colUnit {
   width: 1%;
   min-width: 56px;
 }
@@ -314,11 +320,11 @@
   padding-right: 10px;
 }
 
-.table tbody td:nth-child(4).cellNum {
+.table tbody td:nth-child(5).cellNum {
   padding-right: 10px;
 }
 
-.table tbody td:nth-child(5).cellNum {
+.table tbody td:nth-child(6).cellNum {
   padding-left: 10px;
 }
 

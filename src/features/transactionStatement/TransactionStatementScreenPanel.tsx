@@ -7,6 +7,7 @@ export type TransactionStatementScreenLine = {
   name: string;
   spec: string;
   qty: number;
+  unit: string;
   amount: number;
 };
 
@@ -115,6 +116,7 @@ export function TransactionStatementScreenPanel({
             <col className={styles.colProduct} />
             <col className={styles.colSpec} />
             <col className={styles.colQty} />
+            <col className={styles.colUnit} />
             <col className={styles.colAmount} />
           </colgroup>
           <thead>
@@ -122,13 +124,14 @@ export function TransactionStatementScreenPanel({
               <th>품목명</th>
               <th>규격</th>
               <th>수량</th>
+              <th>단위</th>
               <th>금액</th>
             </tr>
           </thead>
           <tbody>
             {lines.length === 0 ? (
               <tr>
-                <td colSpan={4}>입력된 품목이 없습니다.</td>
+                <td colSpan={5}>입력된 품목이 없습니다.</td>
               </tr>
             ) : (
               lines.map((row) => (
@@ -136,6 +139,7 @@ export function TransactionStatementScreenPanel({
                   <td className={styles.cellProduct}>{row.name}</td>
                   <td className={styles.cellSpec}>{row.spec}</td>
                   <td className={styles.cellQty}>{row.qty.toLocaleString("ko-KR")}</td>
+                  <td className={styles.cellUnit}>{row.unit || "개"}</td>
                   <td className={styles.cellAmount}>{row.amount.toLocaleString("ko-KR")}원</td>
                 </tr>
               ))

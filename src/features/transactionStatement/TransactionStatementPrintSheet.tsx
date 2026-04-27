@@ -17,6 +17,7 @@ export type TransactionStatementPrintLine = {
   name: string;
   spec: string;
   qty: number;
+  unit: string;
   unitPrice: number;
   amount: number;
   note: string;
@@ -189,6 +190,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
               <col className={styles.colName} />
               <col className={styles.colSpec} />
               <col className={styles.colQty} />
+              <col className={styles.colUnit} />
               <col className={styles.colUnitPrice} />
               <col className={styles.colAmount} />
               <col className={styles.colNote} />
@@ -198,6 +200,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
                 <th>품목명</th>
                 <th>규격</th>
                 <th>수량</th>
+                <th>단위</th>
                 <th>단가</th>
                 <th>금액</th>
                 <th>비고</th>
@@ -209,6 +212,7 @@ export const TransactionStatementPrintSheet = forwardRef<HTMLDivElement, Transac
                   <td className={styles.cellName}>{row.name}</td>
                   <td>{row.spec}</td>
                   <td className={styles.cellNum}>{row.qty.toLocaleString("ko-KR")}</td>
+                  <td>{row.unit || "개"}</td>
                   <td className={styles.cellNum}>{row.unitPrice.toLocaleString("ko-KR")}</td>
                   <td className={styles.cellNum}>{row.amount.toLocaleString("ko-KR")}</td>
                   <td className={styles.cellNote}>{row.note}</td>

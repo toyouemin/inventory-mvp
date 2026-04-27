@@ -6520,6 +6520,14 @@ label {
   margin: 0;
 }
 
+.size-analysis-run-card__note {
+  text-align: center;
+}
+
+.size-analysis-dup-only-hint {
+  font-size: calc(1em - 2pt);
+}
+
 .size-analysis-upload-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -7019,7 +7027,7 @@ label {
 }
 
 .size-analysis-club-members-desc {
-  font-size: 10px;
+  font-size: 8px;
 }
 
 .size-analysis-filter-row {

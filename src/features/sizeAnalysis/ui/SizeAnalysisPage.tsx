@@ -254,6 +254,7 @@ export function SizeAnalysisPage() {
   const [loading, setLoading] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [mappingSaved, setMappingSaved] = useState(false);
+  const [autoMappingNeedsReview, setAutoMappingNeedsReview] = useState(false);
   const [detailViewMode, setDetailViewMode] = useState<"all" | "club" | "duplicates" | "clubMembers">("all");
   const autoDetectedKeyRef = useRef<string>("");
 
@@ -324,6 +325,7 @@ export function SizeAnalysisPage() {
   async function uploadFile(file: File) {
     setError("");
     setMappingSaved(false);
+    setAutoMappingNeedsReview(false);
     setLoading("upload");
     try {
       const fd = new FormData();
@@ -347,6 +349,7 @@ export function SizeAnalysisPage() {
     setLoading("detect");
     setError("");
     setMappingSaved(false);
+    setAutoMappingNeedsReview(false);
     try {
       const res = await fetch("/api/size-analysis/detect-structure", {
         method: "POST",
@@ -359,9 +362,25 @@ export function SizeAnalysisPage() {
       const base = json.mapping as Mapping;
       const headerRow: string[] | undefined = json.previewRows?.[base.headerRowIndex];
       const auto = suggestFieldIndicesFromHeaderRow(headerRow);
-      setMapping({ ...base, fields: mergeAutoFieldMap(base.fields ?? {}, auto) });
+      const nextMapping = { ...base, fields: mergeAutoFieldMap(base.fields ?? {}, auto) };
+      setMapping(nextMapping);
+      if (isMappingReadyForRun(nextMapping)) {
+        const saveRes = await fetch("/api/size-analysis/save-mapping", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId, sheetName: selectedSheet, mapping: nextMapping }),
+        });
+        const saveJson = await saveRes.json();
+        if (!saveRes.ok) throw new Error(saveJson.error ?? "매핑 저장 실패");
+        setMappingSaved(true);
+        setAutoMappingNeedsReview(false);
+      } else {
+        setMappingSaved(false);
+        setAutoMappingNeedsReview(true);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "구조 분석 실패");
+      setAutoMappingNeedsReview(true);
     } finally {
       setLoading("");
     }
@@ -385,6 +404,7 @@ export function SizeAnalysisPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "매핑 저장 실패");
       setMappingSaved(true);
+      setAutoMappingNeedsReview(false);
     } catch (e) {
       setMappingSaved(false);
       setError(e instanceof Error ? e.message : "매핑 저장 실패");
@@ -557,6 +577,7 @@ export function SizeAnalysisPage() {
                 onSave={saveMappingAction}
                 loading={loading === "mapping"}
                 saved={mappingSaved}
+                showRemapGuide={autoMappingNeedsReview}
                 previewRows={detectResult?.previewRows as string[][] | undefined}
               />
             ) : (
@@ -590,7 +611,7 @@ export function SizeAnalysisPage() {
             {loading === "run" ? "분석 실행 중..." : "분석 실행"}
           </button>
           {!allSetupStepsComplete ? (
-            <p className="size-analysis-muted" role="note">
+            <p className="size-analysis-muted size-analysis-run-card__note" role="note">
               필수 매핑을 완료해주세요
             </p>
           ) : null}
@@ -611,9 +632,7 @@ export function SizeAnalysisPage() {
 
         <section className="size-analysis-card size-analysis-xlsx-export">
           <h3>엑셀 내보내기</h3>
-          <p className="size-analysis-muted size-analysis-xlsx-export__hint">
-            전체 목록과 단일 중복 집계를 기준으로, 시트(전체목록·클럽별집계·중복자·검토필요) 4개를 저장합니다.
-          </p>
+          <p className="size-analysis-muted size-analysis-xlsx-export__hint">전체목록·클럽별집계·중복자·검토필요 4개 시트 저장</p>
           <button
             type="button"
             className="btn btn-secondary"
@@ -661,7 +680,7 @@ export function SizeAnalysisUploadCard({ onUpload, loading: isUploading }: { onU
 
   return (
     <div className="size-analysis-upload-card__inner">
-      <p className="size-analysis-muted size-analysis-upload-card__hint">클럽별 이름은 통일 후 업로드</p>
+      <p className="size-analysis-muted size-analysis-upload-card__hint">실제 티셔츠 신청 클럽명으로 수정 후 업로드</p>
       <label className="size-analysis-upload-card__file-label" aria-busy={isUploading}>
         <input
           type="file"
@@ -750,6 +769,7 @@ export function FieldMappingEditor({
   onSave,
   loading,
   saved,
+  showRemapGuide,
   previewRows,
   disabled = false,
 }: {
@@ -758,6 +778,7 @@ export function FieldMappingEditor({
   onSave: () => void;
   loading: boolean;
   saved: boolean;
+  showRemapGuide?: boolean;
   previewRows?: string[][];
   disabled?: boolean;
 }) {
@@ -937,7 +958,13 @@ export function FieldMappingEditor({
         })}
       </div>
       {hasPreview ? (
-        <p className="size-analysis-muted size-analysis-map-hint-2">열 순서만 선택해 맞추면 됩니다.</p>
+        showRemapGuide ? (
+          <p className="size-analysis-muted size-analysis-map-hint-2">
+            자동 매핑에서 누락된 항목만 다시 매핑한 뒤 <strong>매핑 완료</strong>를 눌러주세요.
+          </p>
+        ) : (
+          <p className="size-analysis-muted size-analysis-map-hint-2">열 순서만 선택해 맞추면 됩니다.</p>
+        )
       ) : (
         <p className="size-analysis-muted size-analysis-map-hint-2">구조 분석을 완료한 뒤 열을 선택하세요.</p>
       )}
@@ -1066,7 +1093,7 @@ export function DuplicateMembersView({
     <section className="size-analysis-card size-analysis-dup-only-section">
       <h3>중복자 보기</h3>
       <p className="size-analysis-muted size-analysis-dup-only-hint">
-        duplicateRowIds 기준으로, 중복 키(클럽·이름·사이즈) 그룹만 표시합니다. 0/빈 수량 제외 행은 상세 목록에서 숨깁니다.
+        중복(클럽·이름·사이즈) 그룹만 표시하며, 수량 0/빈 값은 숨김
       </p>
       <div className="size-analysis-dup-only-list--mobile">
         {sections.map((sec) => (
@@ -1676,7 +1703,7 @@ export function AnalysisSummaryCards({
     <section className="size-analysis-card">
       <h3>5) 결과 요약</h3>
       <p className="size-analysis-muted size-analysis-summary-scope-hint">
-        윗줄은 파싱 상태별·제외(중복/빈 셀) 건수입니다. 6) «제외(중복)» 필터는 중복자만 표시하며(빈 수량 셀은 집계 숫자로만), 아래 수량은 norm 전체·중복 집계 기준(중복 제외 수량 = 원본 − 중복)입니다. 전체 보기 테이블에만 필터가 적용됩니다
+        상단은 파싱 상태별 및 중복·빈값 건수 요약입니다. ‘제외(중복)’ 필터는 중복자만 표시하며, 빈 수량은 개수에만 반영됩니다. 수량은 전체·중복·중복제외(전체−중복) 기준으로 계산됩니다. 필터는 전체보기 테이블에만 적용됩니다
         {filterLabel !== "all" ? ` (현재 필터: ${filterLabel})` : ""}.
       </p>
       <div className="size-analysis-summary-cards">

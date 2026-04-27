@@ -481,9 +481,10 @@
 }
 
 .estimate-form input {
-  min-height: 27px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  height: 34px;
+  min-height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 @media print {
@@ -3673,11 +3674,12 @@ label {
 
 .transaction-form-grid input {
   margin-top: 2px;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  height: 34px;
+  padding-top: 0;
+  padding-bottom: 0;
   padding-left: 3px;
   padding-right: 3px;
-  min-height: 27px;
+  min-height: 34px;
 }
 
 .transaction-form-grid__customer {
@@ -3764,7 +3766,7 @@ label {
 
 .transaction-item-row__qty-unit-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px;
+  grid-template-columns: minmax(0, 1fr) 68px;
   gap: 6px;
 }
 
@@ -3776,7 +3778,7 @@ label {
 .transaction-item-row__qty-unit-controls > select {
   text-align: center;
   padding-left: 2px;
-  padding-right: 18px;
+  padding-right: 12px;
   padding-top: 0;
   padding-bottom: 0;
   line-height: 1.1;

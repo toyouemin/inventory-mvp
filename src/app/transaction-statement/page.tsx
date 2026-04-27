@@ -17,6 +17,7 @@ type StatementItemFormRow = {
   name: string;
   spec: string;
   qty: string;
+  unit: string;
   unitPrice: string;
   note: string;
   isExtra: boolean;
@@ -44,7 +45,7 @@ type DocumentType = "statement" | "estimate";
 const DEFAULT_ESTIMATE_MANAGER_NAME = "김승민";
 const DEFAULT_ESTIMATE_MANAGER_PHONE = "010-8521-9709";
 /** 견적서 하단·견적 엑셀 입금계좌 (거래명세표 푸터 `STATEMENT_PRINT_FOOTER.bankLine`과 별도) */
-const DEFAULT_ESTIMATE_BANK_ACCOUNT = "(신한 140-009-456830 주식회사 세림통상)";
+const DEFAULT_ESTIMATE_BANK_ACCOUNT = "신한 140-009-456830 주식회사 세림통상";
 
 const FIXED_SUPPLIER = {
   name: "(주)세림통상",
@@ -63,6 +64,7 @@ const FIXED_SUPPLIER = {
 } as const;
 
 const TRANSACTION_STATEMENT_GUIDE_TEXT = "정보 입력→명세표 미리보기→JPG 저장→발송";
+const ITEM_UNIT_OPTIONS = ["개", "장", "타", "세트"] as const;
 
 /** 출력 푸터(은행·URL 등은 사업 정보에 맞게 수정) */
 const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {
@@ -81,6 +83,7 @@ function makeRow(idSuffix: number): StatementItemFormRow {
     name: "",
     spec: "",
     qty: "",
+    unit: "개",
     unitPrice: "",
     note: "",
     isExtra: false,
@@ -400,7 +403,7 @@ export default function TransactionStatementPage() {
             category: row.spec.trim(),
             name: row.name.trim(),
             quantity: row.qtyNumber,
-            unit: "개",
+            unit: row.unit || "개",
             unitPrice: row.unitPriceNumber,
             isExtra: row.isExtra,
           }));
@@ -750,11 +753,11 @@ export default function TransactionStatementPage() {
             {computedRows.map((row, index) => (
               <div key={row.id} className="transaction-item-row">
                 <div className="transaction-item-row__grid">
-                  <label>
+                  <label className="transaction-item-row__name-field">
                     품목명
                     <input value={row.name} onChange={(event) => updateItem(row.id, "name", event.target.value)} />
                   </label>
-                  <label>
+                  <label className="transaction-item-row__category-field">
                     규격
                     <input value={row.spec} onChange={(event) => updateItem(row.id, "spec", event.target.value)} />
                   </label>
@@ -766,6 +769,16 @@ export default function TransactionStatementPage() {
                       value={row.qty}
                       onChange={(event) => updateItem(row.id, "qty", event.target.value)}
                     />
+                  </label>
+                  <label className="transaction-item-row__unit-field">
+                    단위
+                    <select value={row.unit} onChange={(event) => updateItem(row.id, "unit", event.target.value)}>
+                      {ITEM_UNIT_OPTIONS.map((unitOption) => (
+                        <option key={unitOption} value={unitOption}>
+                          {unitOption}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label>
                     단가
@@ -934,7 +947,7 @@ export default function TransactionStatementPage() {
                 category: row.spec,
                 name: row.name,
                 quantity: row.qtyNumber,
-                unit: "개",
+                unit: row.unit || "개",
                 unitPrice: row.unitPriceNumber,
                 note: row.note,
                 isExtra: row.isExtra,
@@ -1006,7 +1019,7 @@ export default function TransactionStatementPage() {
                   category: row.spec,
                   name: row.name,
                   quantity: row.qtyNumber,
-                  unit: "개",
+                  unit: row.unit || "개",
                   unitPrice: row.unitPriceNumber,
                   note: row.note,
                   isExtra: row.isExtra,

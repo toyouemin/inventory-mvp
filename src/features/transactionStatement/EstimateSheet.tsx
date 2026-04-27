@@ -47,6 +47,7 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
   const extraItems = items.filter((item) => item.isExtra);
   const supplierTel = supplier.tel || "032-468-0351";
   const supplierFax = supplier.fax || "032-468-0332";
+  const hasReceiverName = data.receiverName.trim().length > 0;
 
   const totalAmount = normalItems.reduce((sum, item) => {
     const qty = Number(item.quantity || 0);
@@ -66,9 +67,15 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
           </div>
           <div className="estimate-sheet__receiver-row">
             <span className="estimate-sheet__receiver-label">수신</span>
-            <strong className="estimate-sheet__receiver-value estimate-sheet__receiver-value--name">{data.receiverName || ""}</strong>
+            <strong
+              className={`estimate-sheet__receiver-value estimate-sheet__receiver-value--name${
+                hasReceiverName ? " estimate-sheet__receiver-value--name-underlined" : ""
+              }`}
+            >
+              {data.receiverName || ""}
+            </strong>
           </div>
-          <div className="estimate-sheet__receiver-row">
+          <div className="estimate-sheet__receiver-row estimate-sheet__receiver-row--event">
             <span className="estimate-sheet__receiver-label">행사명</span>
             <span className="estimate-sheet__receiver-value">{data.eventName || ""}</span>
           </div>
@@ -188,6 +195,7 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
             <th>단위</th>
             <th>단가</th>
             <th>금액</th>
+            <th>비고</th>
           </tr>
         </thead>
         <tbody>
@@ -199,11 +207,13 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
               <td>{item.unit || "개"}</td>
               <td />
               <td />
+              <td>{item.note || ""}</td>
             </tr>
           ))}
           {Array.from({ length: Math.max(0, 3 - extraItems.length) }).map((_, index) => (
             <tr key={`extra-empty-${index}`}>
               <td>&nbsp;</td>
+              <td />
               <td />
               <td />
               <td />
@@ -233,8 +243,10 @@ export function EstimateSheet({ data, items, supplier, vatIncluded, captureFixed
 
       <div className="estimate-sheet__manager">
         <span>담당자</span>
+        <span>:</span>
         <span>{supplier.managerName || ""}</span>
         <span>연락처</span>
+        <span>:</span>
         <span>{supplier.managerPhone || ""}</span>
         <span>{supplier.email || ""}</span>
       </div>

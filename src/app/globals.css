@@ -16,7 +16,7 @@
 
 .estimate-sheet__title {
   text-align: center;
-  font-size: 32px;
+  font-size: 40px;
   font-weight: 700;
   margin-bottom: 16px;
 }
@@ -53,6 +53,10 @@
   margin-bottom: 0;
 }
 
+.estimate-sheet__receiver-row--event {
+  margin-top: 6px;
+}
+
 .estimate-sheet__receiver-label {
   flex: 0 0 70px;
   width: 70px;
@@ -76,8 +80,13 @@
 
 .estimate-sheet__receiver-value--name {
   font-weight: 700;
-  font-size: 32px;
+  font-size: 28px;
   line-height: 1.25;
+}
+
+.estimate-sheet__receiver-value--name-underlined {
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
 }
 
 .estimate-sheet__supplier {
@@ -132,6 +141,9 @@
   line-height: 1.4;
   font-weight: 700;
   letter-spacing: 0.05em;
+  min-width: 30px;
+  padding-left: 6px !important;
+  padding-right: 6px !important;
 }
 
 .estimate-sheet__supplier-business-number {
@@ -423,6 +435,10 @@
 
 .estimate-sheet__manager span:last-child {
   border-right: 0;
+}
+
+.estimate-sheet__manager span:nth-child(4) {
+  margin-left: 30px;
 }
 
 /* 견적서 내부 선 두께 1px 통일 (수신 블록은 테두리 없음) */
@@ -3717,7 +3733,7 @@ label {
 
 .transaction-item-row__grid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 100px 120px 140px 1fr;
+  grid-template-columns: 1.2fr 1fr 90px 76px 120px 140px 1fr;
   gap: 2px 6px;
 }
 
@@ -3727,11 +3743,21 @@ label {
   line-height: 1.2;
 }
 
-.transaction-item-row__grid input {
+.transaction-item-row__grid input,
+.transaction-item-row__grid select {
   margin-top: 2px;
   padding-top: 6px;
   padding-bottom: 6px;
   min-height: 34px;
+}
+
+.transaction-item-row__grid .transaction-item-row__category-field > input,
+.transaction-item-row__grid .transaction-item-row__name-field > input {
+  text-align: center !important;
+}
+
+.transaction-item-row__unit-field > select {
+  text-align: center;
 }
 
 .transaction-item-row__actions {

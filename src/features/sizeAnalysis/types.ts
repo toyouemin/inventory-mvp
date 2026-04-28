@@ -23,7 +23,7 @@ export type DetectStructureRequest = {
   sheetName: string;
 };
 
-export type HeaderRole = "club" | "name" | "gender" | "size" | "qty" | "item" | "note";
+export type HeaderRole = "club" | "name" | "gender" | "size" | "size2" | "qty" | "item" | "note";
 
 export type FieldMapping = {
   structureType: StructureType;

@@ -6,6 +6,7 @@ const ROLE_KEYWORDS: Record<HeaderRole, RegExp> = {
   name: /(이름|성명|고객명|고객|NAME)/i,
   gender: /(성별|남여|젠더|GENDER|SEX)/i,
   size: /(사이즈|SIZE|치수)/i,
+  size2: /(사이즈\s*2|SIZE\s*2|치수\s*2|사이즈2|SIZE2)/i,
   qty: /(수량|수|QTY|QUANTITY|장수)/i,
   item: /(품목|상품|ITEM)/i,
   note: /(비고|메모|NOTE|REMARK)/i,

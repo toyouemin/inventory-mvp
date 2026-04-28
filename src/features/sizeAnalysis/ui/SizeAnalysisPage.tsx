@@ -49,14 +49,16 @@ function hasField(mapping: Mapping, key: string): boolean {
 
 function hasUnknownRequiredFields(mapping: Mapping): boolean {
   const hasName = hasField(mapping, "name");
-  const hasClub = hasField(mapping, "club");
-  const hasSizeQty = hasField(mapping, "size") && hasField(mapping, "qty");
-  if (!hasName || !hasClub) return false;
-  return hasSizeQty || hasField(mapping, "item");
+  const hasSize = hasField(mapping, "size") || hasField(mapping, "size2");
+  if (!hasName) return false;
+  return hasSize || hasField(mapping, "item");
 }
 
 function isMappingReadyForRun(mapping: Mapping | null): boolean {
   if (!mapping) return false;
+  if (mapping.structureType === "unknown") {
+    return hasUnknownRequiredFields(mapping);
+  }
   const hasName = hasField(mapping, "name");
   const hasClub = hasField(mapping, "club");
   if (!hasName || !hasClub) return false;
@@ -69,9 +71,6 @@ function isMappingReadyForRun(mapping: Mapping | null): boolean {
   }
   if (mapping.structureType === "size_matrix") {
     return hasClub;
-  }
-  if (mapping.structureType === "unknown") {
-    return hasUnknownRequiredFields(mapping);
   }
   return false;
 }
@@ -89,6 +88,7 @@ const FIELD_ROLE_LABEL: Record<string, string> = {
   name: "이름",
   gender: "성별",
   size: "사이즈",
+  size2: "사이즈2",
   qty: "수량",
   item: "주문내용",
   note: "비고",
@@ -782,7 +782,7 @@ export function StructureDetectionPanel({
   );
 }
 
-const UNKNOWN_REQUIRED_BASE = ["name", "club"] as const;
+const UNKNOWN_REQUIRED_BASE = ["name"] as const;
 
 export function FieldMappingEditor({
   mapping,
@@ -817,14 +817,14 @@ export function FieldMappingEditor({
   );
   if (!mapping) return null;
   const m = mapping;
-  const roles = ["club", "name", "gender", "size", "qty", "item", "note"] as const;
+  const roles = ["club", "name", "gender", "size", "size2", "qty", "item", "note"] as const;
   const hasPreview = maxCols > 0;
   const previewLen = previewRows?.length ?? 0;
   const headerOutOfPreview = m.headerRowIndex >= previewLen;
-  const hasSizeQtyColumns = m.fields.size !== undefined && m.fields.qty !== undefined;
+  const hasSizeColumn = m.fields.size !== undefined || m.fields.size2 !== undefined;
   const unknownRequired = [
     ...UNKNOWN_REQUIRED_BASE,
-    ...(hasSizeQtyColumns ? [] : (["item"] as const)),
+    ...(hasSizeColumn ? [] : (["item"] as const)),
   ];
   const requiredUnknownSet = new Set<string>(unknownRequired);
 
@@ -899,8 +899,8 @@ export function FieldMappingEditor({
       ) : null}
       {unknownNeedsFix ? (
         <p className="size-analysis-field-warning" role="alert">
-          <strong>직접 매핑</strong>에서는 <strong>이름·클럽</strong>을 지정해 주세요.
-          {!hasSizeQtyColumns ? " 주문내용은 사이즈/수량 열이 없을 때만 필요합니다." : ""} · 미지정:{" "}
+          <strong>직접 매핑</strong>에서는 <strong>이름</strong>을 지정해 주세요.
+          {!hasSizeColumn ? " 주문내용은 사이즈 열이 없을 때만 필요합니다." : ""} · 미지정:{" "}
           {unknownUnmapped.map((k) => FIELD_ROLE_LABEL[k] ?? k).join(", ")}
         </p>
       ) : null}
@@ -996,7 +996,7 @@ export function FieldMappingEditor({
           disabled={formOff || saved}
           type="button"
         >
-          {loading ? "저장중..." : saved ? "매핑 완료됨" : "매핑 완료"}
+          {loading ? "저장중..." : saved ? "매핑 완료됨" : "매핑 시작"}
         </button>
       </div>
     </div>

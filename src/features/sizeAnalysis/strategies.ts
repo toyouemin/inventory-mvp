@@ -42,15 +42,17 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
     const clubRaw = cell(row, mapping.fields.club);
     const nameRaw = cell(row, mapping.fields.name);
     const sizeRaw = cell(row, mapping.fields.size);
+    const size2Raw = cell(row, mapping.fields.size2);
     const qtyRaw = cell(row, mapping.fields.qty);
     const genderRaw = cell(row, mapping.fields.gender);
     const itemRaw = cell(row, mapping.fields.item);
+    const firstNonEmptySize = preprocessCell(sizeRaw) ? sizeRaw : size2Raw;
     if (
       isCoreFieldsAllEmpty({
         clubRaw,
         nameRaw,
         genderRaw,
-        sizeRaw,
+        sizeRaw: firstNonEmptySize,
         qtyRaw,
       })
     ) {
@@ -58,66 +60,84 @@ export function parseSingleRowPerson(jobId: string, sheet: SheetSnapshot, mappin
       continue;
     }
 
+    const sizeCells = [sizeRaw, size2Raw];
+    const seenSizeRaw = new Set<string>();
+    const normalizedSizeCells: Array<{ raw: string | undefined; groupIndex: number }> = [];
+    sizeCells.forEach((raw, idx) => {
+      const key = preprocessCell(raw);
+      if (!key) return;
+      if (seenSizeRaw.has(key)) return;
+      seenSizeRaw.add(key);
+      normalizedSizeCells.push({ raw, groupIndex: idx });
+    });
+    const targetSizes = normalizedSizeCells.length > 0 ? normalizedSizeCells : [{ raw: firstNonEmptySize, groupIndex: 0 }];
+
     if (hasQtyColumn) {
-      const pol = normalizePersonSizePolicy(sizeRaw, genderRaw);
       const q = parseQty(qtyRaw);
       const qty = q != null && Number.isFinite(q) && q > 0 ? q : 1;
-      out.push({
-        jobId,
-        sourceSheet: sheet.name,
-        sourceRowIndex: i,
-        clubNameRaw: clubRaw,
-        memberNameRaw: nameRaw,
-        memberName: nameRaw,
-        genderRaw,
-        itemRaw: cell(row, mapping.fields.item),
-        sizeRaw,
-        qtyRaw,
-        clubNameNormalized: preprocessCell(clubRaw),
-        genderNormalized: pol.genderNormalized,
-        standardizedSize: pol.standardizedSize,
-        qtyParsed: qty,
-        parseStatus: pol.parseStatus,
-        parseConfidence: pol.parseConfidence,
-        parseReason: pol.parseReason,
-        userCorrected: false,
-        excluded: false,
+      targetSizes.forEach(({ raw, groupIndex }) => {
+        const pol = normalizePersonSizePolicy(raw, genderRaw);
+        out.push({
+          jobId,
+          sourceSheet: sheet.name,
+          sourceRowIndex: i,
+          sourceGroupIndex: groupIndex,
+          clubNameRaw: clubRaw,
+          memberNameRaw: nameRaw,
+          memberName: nameRaw,
+          genderRaw,
+          itemRaw: cell(row, mapping.fields.item),
+          sizeRaw: raw,
+          qtyRaw,
+          clubNameNormalized: preprocessCell(clubRaw),
+          genderNormalized: pol.genderNormalized,
+          standardizedSize: pol.standardizedSize,
+          qtyParsed: qty,
+          parseStatus: pol.parseStatus,
+          parseConfidence: pol.parseConfidence,
+          parseReason: pol.parseReason,
+          userCorrected: false,
+          excluded: false,
+        });
       });
     } else {
-      const full = [genderRaw, sizeRaw, itemRaw].filter((x) => preprocessCell(x)).join(" ");
-      const pol = normalizePersonWithFallback(sizeRaw, genderRaw, full);
-      const parsedFull = extractSizeGenderQty(full);
-      let q = parsedFull.qty;
-      if (isLikelySizeQtyConflation(pol.standardizedSize, q)) {
-        q = undefined;
-      }
-      if (pol.standardizedSize && /^[MW]\d{2,3}$/i.test(pol.standardizedSize) && q != null) {
-        const d = pol.standardizedSize.replace(/^[MW]/i, "");
-        if (d === String(q)) {
+      targetSizes.forEach(({ raw, groupIndex }) => {
+        const full = [genderRaw, raw, itemRaw].filter((x) => preprocessCell(x)).join(" ");
+        const pol = normalizePersonWithFallback(raw, genderRaw, full);
+        const parsedFull = extractSizeGenderQty(full);
+        let q = parsedFull.qty;
+        if (isLikelySizeQtyConflation(pol.standardizedSize, q)) {
           q = undefined;
         }
-      }
-      const qty = q != null && q > 0 ? q : 1;
-      out.push({
-        jobId,
-        sourceSheet: sheet.name,
-        sourceRowIndex: i,
-        clubNameRaw: clubRaw,
-        memberNameRaw: nameRaw,
-        memberName: nameRaw,
-        genderRaw,
-        itemRaw: cell(row, mapping.fields.item),
-        sizeRaw,
-        qtyRaw,
-        clubNameNormalized: preprocessCell(clubRaw),
-        genderNormalized: pol.genderNormalized ?? parsedFull.gender ?? normalizeGender(genderRaw),
-        standardizedSize: pol.standardizedSize,
-        qtyParsed: qty,
-        parseStatus: pol.parseStatus,
-        parseConfidence: pol.parseConfidence,
-        parseReason: pol.parseReason,
-        userCorrected: false,
-        excluded: false,
+        if (pol.standardizedSize && /^[MW]\d{2,3}$/i.test(pol.standardizedSize) && q != null) {
+          const d = pol.standardizedSize.replace(/^[MW]/i, "");
+          if (d === String(q)) {
+            q = undefined;
+          }
+        }
+        const qty = q != null && q > 0 ? q : 1;
+        out.push({
+          jobId,
+          sourceSheet: sheet.name,
+          sourceRowIndex: i,
+          sourceGroupIndex: groupIndex,
+          clubNameRaw: clubRaw,
+          memberNameRaw: nameRaw,
+          memberName: nameRaw,
+          genderRaw,
+          itemRaw: cell(row, mapping.fields.item),
+          sizeRaw: raw,
+          qtyRaw,
+          clubNameNormalized: preprocessCell(clubRaw),
+          genderNormalized: pol.genderNormalized ?? parsedFull.gender ?? normalizeGender(genderRaw),
+          standardizedSize: pol.standardizedSize,
+          qtyParsed: qty,
+          parseStatus: pol.parseStatus,
+          parseConfidence: pol.parseConfidence,
+          parseReason: pol.parseReason,
+          userCorrected: false,
+          excluded: false,
+        });
       });
     }
   }

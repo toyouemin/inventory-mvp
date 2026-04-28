@@ -2,7 +2,7 @@
  * 필드 매핑 UI 전용 (0-based index는 서버/파서와 동일하게 유지)
  */
 
-export type FieldRole = "club" | "name" | "gender" | "size" | "qty" | "item" | "note";
+export type FieldRole = "club" | "name" | "gender" | "size" | "size2" | "qty" | "item" | "note";
 
 /** 1-based 열 번호 → Excel 열 문자 (1=A, 27=AA) */
 export function excelColumnLetterFromOneBased(col1: number): string {
@@ -37,6 +37,7 @@ const ROLE_MATCH: Array<{ role: FieldRole; re: RegExp }> = [
   { role: "club", re: /클럽|소속|단체|팀|^club$/i },
   { role: "item", re: /주문내용|품목|주문|상품|^item$/i },
   { role: "gender", re: /성별|남여|^gender|^sex$/i },
+  { role: "size2", re: /사이즈\s*2|치수\s*2|^size\s*2$/i },
   { role: "size", re: /사이즈|치수|^size$/i },
   { role: "qty", re: /수량|장수|qty|quantity/i },
   { role: "note", re: /비고|메모|note|remark/i },

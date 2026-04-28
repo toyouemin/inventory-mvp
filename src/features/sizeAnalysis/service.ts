@@ -179,16 +179,16 @@ export async function runAnalysis(jobId: string) {
   } else if (mappingJson.structureType === "size_matrix") rows = parseSizeMatrix(jobId, sheet, mappingJson);
   else if (mappingJson.structureType === "unknown") {
     const f = mappingJson.fields;
-    const hasSizeQtyColumns = f.size !== undefined && f.qty !== undefined;
-    if (f.name === undefined || f.club === undefined) {
-      throw new Error("unknown 구조에서는 이름·클럽 열이 지정된 뒤 매핑을 저장해 주세요.");
+    const hasSizeColumn = f.size !== undefined || f.size2 !== undefined;
+    if (f.name === undefined) {
+      throw new Error("unknown 구조에서는 이름 열이 지정된 뒤 매핑을 저장해 주세요.");
     }
-    if (hasSizeQtyColumns) {
-      // size+qty 열이 있으면 주문내용 파싱 없이 단일행 파서로 처리 가능.
+    if (hasSizeColumn) {
+      // size 열이 있으면 qty 열이 없어도(기본 1) 주문내용 파싱 없이 단일행 파서로 처리 가능.
       rows = parseSingleRowPerson(jobId, sheet, mappingJson);
     } else {
       if (f.item === undefined) {
-        throw new Error("unknown 구조에서는 사이즈/수량 열이 없을 때 주문내용(품목) 열이 필요합니다.");
+        throw new Error("unknown 구조에서는 사이즈 열이 없을 때 주문내용(품목) 열이 필요합니다.");
       }
       rows = parseUnknownManualItem(jobId, sheet, mappingJson);
     }

@@ -128,6 +128,15 @@ function buildEstimateJpgBaseFileName(eventName: string, issueDateYmd: string): 
   return `${name}-${yyMMdd}`;
 }
 
+/** 견적서 XLSX: 수신자명-260424 */
+function buildEstimateXlsxFileName(receiverName: string, issueDateYmd: string): string {
+  const trimmed = receiverName.trim();
+  const name = trimmed ? trimmed.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_") : "수신자미입력";
+  const digits = issueDateYmd.replace(/-/g, "");
+  const yyMMdd = digits.length >= 8 ? digits.slice(2, 8) : digits;
+  return `${name}-${yyMMdd}.xlsx`;
+}
+
 /** 숨김 캡처 호스트와 동일한 가로(860+80); 세로는 긴 품목표도 클론 단계에서 잘리지 않게 여유 */
 const STATEMENT_JPG_HTML2CANVAS_VIEW = {
   scale: 3,
@@ -387,7 +396,7 @@ export default function TransactionStatementPage() {
           return;
         }
 
-        const bytes = exportEstimateExcel({
+        const bytes = await exportEstimateExcel({
           issueDate: formData.issueDate,
           receiverName: formData.customerRepresentative.trim(),
           eventName: formData.customerName.trim(),
@@ -414,7 +423,7 @@ export default function TransactionStatementPage() {
         const objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = objectUrl;
-        anchor.download = `estimate-${formData.issueDate.replace(/-/g, "").slice(2)}.xlsx`;
+        anchor.download = buildEstimateXlsxFileName(formData.customerRepresentative, formData.issueDate);
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();

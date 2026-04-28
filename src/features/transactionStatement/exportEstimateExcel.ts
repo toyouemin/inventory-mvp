@@ -67,7 +67,7 @@ function setWorksheetPage(ws: ExcelJS.Worksheet): void {
   ws.pageSetup.printArea = `A1:${LAST_COL_LETTER}${LAST_ROW}`;
 
   // A:B 좁게, C:D 넓게, G:H/I는 금액 가독성을 위해 넓게
-  const widths = [8, 5, 8, 8, 7, 5, 8, 12, 7, 6, 6];
+  const widths = [8, 5, 8, 8, 7, 5, 8, 12, 8, 6, 6];
   for (let i = 0; i < widths.length; i += 1) {
     ws.getColumn(i + 1).width = widths[i];
   }
@@ -171,7 +171,7 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
 
   ws.getCell("A2").value = "견적일";
   ws.getCell("A2").font = { name: FONT_FAMILY, size: 10 };
-  ws.getCell("A2").alignment = { horizontal: "left", vertical: "middle", wrapText: false };
+  ws.getCell("A2").alignment = { horizontal: "center", vertical: "middle", wrapText: false };
   ws.mergeCells("B2:E2");
   ws.getCell("B2").value = input.issueDate || "";
   ws.getCell("B2").font = { name: FONT_FAMILY, size: 10 };
@@ -179,7 +179,7 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
 
   ws.getCell("A3").value = "수신";
   ws.getCell("A3").font = { name: FONT_FAMILY, size: 10 };
-  ws.getCell("A3").alignment = { horizontal: "left", vertical: "middle", wrapText: false };
+  ws.getCell("A3").alignment = { horizontal: "center", vertical: "middle", wrapText: false };
   ws.mergeCells("B3:E3");
   ws.getCell("B3").value = input.receiverName || "";
   ws.getCell("B3").font = { name: FONT_FAMILY, size: 12, bold: true, underline: true };
@@ -187,7 +187,7 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
 
   ws.getCell("A4").value = "행사명";
   ws.getCell("A4").font = { name: FONT_FAMILY, size: 10 };
-  ws.getCell("A4").alignment = { horizontal: "left", vertical: "middle", wrapText: false };
+  ws.getCell("A4").alignment = { horizontal: "center", vertical: "middle", wrapText: false };
   ws.mergeCells("B4:E4");
   ws.getCell("B4").value = input.eventName || "";
   ws.getCell("B4").font = { name: FONT_FAMILY, size: 10 };
@@ -227,6 +227,38 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
   ws.getCell("J3").value = `${input.supplier.ceoName || ""} (인)`;
   ws.getCell("J3").font = { name: FONT_FAMILY, size: 10 };
   ws.getCell("J3").alignment = { horizontal: "center", vertical: "middle", wrapText: false };
+  ws.getRow(2).height = 23;
+  ws.getRow(3).height = 23;
+  ws.getRow(4).height = 23;
+  ws.getRow(5).height = 23;
+
+  const wj = toNumber(ws.getColumn(10).width) || 6;
+  const wk = toNumber(ws.getColumn(11).width) || 6;
+  const PX_PER_WIDTH_UNIT = 7;
+  const mergeJpKpx = (wj + wk) * PX_PER_WIDTH_UNIT;
+  const stampExt = { width: 52, height: 52 };
+  const stampLeftColFrac =
+    mergeJpKpx > stampExt.width ? (mergeJpKpx - stampExt.width) / mergeJpKpx : 0;
+  /** 열 단위로 오른쪽 미세 이동 (~1px 수준은 0.02~0.05) */
+  const STAMP_COL_OFFSET_RIGHT = 0.07;
+
+  try {
+    const stampResponse = await fetch("/stamp.png");
+    if (stampResponse.ok) {
+      const stampBuffer = new Uint8Array(await stampResponse.arrayBuffer());
+      const stampImageId = wb.addImage({
+        buffer: stampBuffer as any,
+        extension: "png",
+      });
+      const tlCol = 9 + stampLeftColFrac + STAMP_COL_OFFSET_RIGHT;
+      ws.addImage(stampImageId, {
+        tl: { col: tlCol, row: 2.06 },
+        ext: stampExt,
+      });
+    }
+  } catch {
+    /* 이미지 로드 실패 또는 drawing 오류 시 무시 */
+  }
 
   ws.getCell("G4").value = "주소";
   ws.getCell("G4").font = { name: FONT_FAMILY, size: 10 };
@@ -252,10 +284,6 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
   ws.getCell("J5").value = supplierFax;
   ws.getCell("J5").font = { name: FONT_FAMILY, size: 10 };
   ws.getCell("J5").alignment = { horizontal: "center", vertical: "middle", wrapText: false };
-  ws.getRow(2).height = 23;
-  ws.getRow(3).height = 23;
-  ws.getRow(4).height = 23;
-  ws.getRow(5).height = 23;
 
   ws.mergeCells("A6:K6");
   const noticeLine = ws.getCell("A6");
@@ -273,13 +301,21 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
   am1.alignment = { horizontal: "center", vertical: "middle" };
   ws.mergeCells("C7:G7");
   const am2 = ws.getCell("C7");
-  am2.value = `${korean} |`;
-  am2.font = { name: FONT_FAMILY, size: korean.length >= 22 ? 10 : 11, bold: true };
+  am2.value = korean;
+  am2.font = { name: FONT_FAMILY, size: 14, bold: true };
   am2.alignment = { horizontal: "right", vertical: "middle", wrapText: false };
   ws.mergeCells("H7:K7");
   const am3 = ws.getCell("H7");
-  am3.value = `₩${totalAmount.toLocaleString("ko-KR")} | ${input.vatIncluded ? "부가세포함" : "부가세별도"}`;
-  am3.font = { name: FONT_FAMILY, size: 14, bold: true };
+  const vatLabel = input.vatIncluded ? "부가세포함" : "부가세별도";
+  am3.value = {
+    richText: [
+      {
+        font: { name: FONT_FAMILY, size: 14, bold: true },
+        text: `₩${totalAmount.toLocaleString("ko-KR")} `,
+      },
+      { font: { name: FONT_FAMILY, size: 10, bold: true }, text: vatLabel },
+    ],
+  };
   am3.alignment = { horizontal: "right", vertical: "middle", wrapText: false };
   ws.getRow(7).height = 28;
   edgeMedium(am1);
@@ -335,7 +371,7 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
     "* 문의사항은 홈페이지를 참고하시거나 본사로 연락 바랍니다.",
   ].join("\n");
   footTxt.font = { name: FONT_FAMILY, size: 10 };
-  footTxt.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+  footTxt.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
 
   ws.mergeCells("I26:K30");
   const lg = ws.getCell("I26");
@@ -378,6 +414,8 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
     }
   }
   setOuterBorderMedium(ws);
+
+  ws.getCell("A26").alignment = { horizontal: "left", vertical: "middle", wrapText: true };
 
   const buf = await wb.xlsx.writeBuffer();
   return new Uint8Array(buf);

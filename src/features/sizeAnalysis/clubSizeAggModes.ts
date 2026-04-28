@@ -4,7 +4,7 @@
  */
 
 import { buildColumnSizesForClub } from "./clubAggMatrixColumns";
-import { duplicateGroupKeyFromRow, duplicateGroupKeyFromRowWithSize } from "./duplicateKeyNormalize";
+import { duplicateGroupKeyFromRow } from "./duplicateKeyNormalize";
 import { matrixDisplayFromSizeFields } from "./matrixSizeDisplay";
 import type { StructureType } from "./types";
 
@@ -330,9 +330,11 @@ export type DuplicateAnalysis = {
 };
 
 /**
- * 중복 기준 (`structureType` 또는 행 `metaJson.structureType` — 없으면 **클럽+이름** 레거시와 동일):
- * - **size_matrix**: 클럽 + 이름 + 표시 사이즈 / 0·빈 수량 제외 행은 중복 판정 제외
- * - **그 외**: 클럽 + 이름만 (기존과 동일)
+ * 중복 기준은 구조 타입과 무관하게 항상 클럽+이름입니다.
+ * (중복자 보기에서 "같은 사람이 여러 번 신청" 여부를 확인하기 위한 정책)
+ *
+ * 참고:
+ * - 0/빈 수량 제외, needs_review 제외 등 기존 필터 정책은 그대로 유지됩니다.
  */
 export function analyzeDuplicateRows(rows: any[], structureType?: StructureType): DuplicateAnalysis {
   const st =
@@ -340,7 +342,7 @@ export function analyzeDuplicateRows(rows: any[], structureType?: StructureType)
   const isMatrix = st === "size_matrix";
 
   function keyForRow(r: any): string | null {
-    return isMatrix ? duplicateGroupKeyFromRowWithSize(r) : duplicateGroupKeyFromRow(r);
+    return duplicateGroupKeyFromRow(r);
   }
 
   const byPerson = new Map<string, { r: any; i: number }[]>();

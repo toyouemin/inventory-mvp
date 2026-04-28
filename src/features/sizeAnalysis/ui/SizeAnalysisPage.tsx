@@ -2141,6 +2141,7 @@ export function ClubSizeSummaryTable({
           <ClubAggMatrixTableDesktop
             key={b.club}
             headline={b.headline}
+            isDuplicateMatrix={aggMode === "duplicate"}
             sizes={b.sizes}
             rowKeys={b.rowKeys}
             qtyMap={b.qtyMap}

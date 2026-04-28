@@ -91,6 +91,18 @@ export function rowIncludedInFinalAggregation(r: any): boolean {
 }
 
 /**
+ * 중복 수량/중복 매트릭스 표시용 포함 조건.
+ * - 최종 집계(total/deduped) 조건과 분리: 중복으로 제외된 행(parseStatus=excluded)도 집계 대상
+ * - 기존 정책 유지: needs_review/unresolved 제외, 0/빈 수량 제외
+ */
+function rowIncludedInDuplicateAggregation(r: any): boolean {
+  const st = String(r?.parseStatus ?? "").trim();
+  if (st === "needs_review" || st === "unresolved") return false;
+  if (rowExcludedByEmptyQuantity(r)) return false;
+  return rowQtyParsed(r) > 0;
+}
+
+/**
  * 정규화 행 배열에서 행을 유일히 가리킬 키(DB id 우선, 없으면 배열 인덱스).
  * (과거 `src:sourceRow`는 한 원본 행→여러 norm 행이 같은 키로 묶이는 오류가 있음)
  */
@@ -258,7 +270,7 @@ export function buildAggRowsDuplicate(rows: any[], duplicateRowIds: Set<string>)
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
     if (!duplicateRowIds.has(stableRowId(r, i))) continue;
-    if (!rowIncludedInFinalAggregation(r)) continue;
+    if (!rowIncludedInDuplicateAggregation(r)) continue;
     const club = normClubFromNormRow(r);
     const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);
@@ -334,7 +346,9 @@ export type DuplicateAnalysis = {
  * (중복자 보기에서 "같은 사람이 여러 번 신청" 여부를 확인하기 위한 정책)
  *
  * 참고:
- * - 0/빈 수량 제외, needs_review 제외 등 기존 필터 정책은 그대로 유지됩니다.
+ * - 0/빈 수량 제외(size_matrix) 정책은 유지합니다.
+ * - needs_review 제외 정책은 유지합니다.
+ * - 사이즈 표시 가능 여부(미분류 포함)는 중복 키 산출에서 더 이상 조건으로 쓰지 않습니다.
  */
 export function analyzeDuplicateRows(rows: any[], structureType?: StructureType): DuplicateAnalysis {
   const st =
@@ -351,7 +365,8 @@ export function analyzeDuplicateRows(rows: any[], structureType?: StructureType)
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
     if (isMatrix && rowExcludedByEmptyQuantity(r)) continue;
-    if (!rowEligibleForDuplicatePersonGroup(r)) continue;
+    const stRow = String(r?.parseStatus ?? "").trim();
+    if (stRow === "needs_review") continue;
     const pk = keyForRow(r);
     if (!pk) continue;
     if (!byPerson.has(pk)) byPerson.set(pk, []);
@@ -380,6 +395,7 @@ export function analyzeDuplicateRows(rows: any[], structureType?: StructureType)
   for (let i = 0; i < rows.length; i += 1) {
     const r = rows[i]!;
     if (!duplicateRowIds.has(stableRowId(r, i))) continue;
+    if (!rowIncludedInDuplicateAggregation(r)) continue;
     const q = rowQtyParsed(r);
     duplicateQtyTotal += q;
     const club = normClubFromNormRow(r);

@@ -1,7 +1,11 @@
 import { rowEligibleForDuplicatePersonGroup, rowExcludedByEmptyQuantity } from "./clubSizeAggModes";
 import { labelExcludeForDisplay } from "./excludeReasonLabels";
 import type { NormalizedRow, StructureType } from "./types";
-import { duplicateGroupKeyFromRow, duplicateGroupKeyFromRowWithSize } from "./duplicateKeyNormalize";
+import {
+  duplicateGroupKeyFromRow,
+  duplicateGroupKeyFromRowWithItemAndSize,
+  duplicateGroupKeyFromRowWithSize,
+} from "./duplicateKeyNormalize";
 import { extractSizeGenderQty, normalizeGender, normalizeGenderFromColumn, normalizeSize } from "./normalize";
 
 const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115", "120"]);
@@ -247,15 +251,19 @@ function pickKeepIndex(indices: number[], rows: NormalizedRow[]): number {
 /**
  * 중복 기준:
  * - **size_matrix**: 클럽 + 이름 + 표시 사이즈 — 0/빈 수량 제외 행은 맵에 넣지 않음
+ * - **multi_item_personal_order**: 클럽 + 이름 + 상품 + 사이즈
  * - **그 외 구조**: 클럽 + 이름만(기존과 동일)
  * - 유지행 선택: 성별(남/여)에 맞는 M/W 계열 우선, 없으면 입력 첫 행
  * - 검토필요(needs_review) 및 사이즈 없음·미분류 행은 중복 처리하지 않음(검토 우선, analyzeDuplicateRows와 동일)
  */
 export function applyDuplicateSizePolicy(rows: NormalizedRow[], structureType: StructureType): NormalizedRow[] {
   const isMatrix = structureType === "size_matrix";
+  const isMultiItem = structureType === "multi_item_personal_order";
 
   function keyForRow(r: NormalizedRow): string | null {
-    return isMatrix ? duplicateGroupKeyFromRowWithSize(r) : duplicateGroupKeyFromRow(r);
+    if (isMatrix) return duplicateGroupKeyFromRowWithSize(r);
+    if (isMultiItem) return duplicateGroupKeyFromRowWithItemAndSize(r);
+    return duplicateGroupKeyFromRow(r);
   }
 
   const result = rows.map((r) => ({ ...r }));
@@ -288,7 +296,9 @@ export function applyDuplicateSizePolicy(rows: NormalizedRow[], structureType: S
     const excludeReason = "duplicate_person_group";
     const excludeDetail = isMatrix
       ? "same_club_same_name_same_size_keep_one"
-      : "same_club_same_name_keep_one";
+      : isMultiItem
+        ? "same_club_same_name_same_item_same_size_keep_one"
+        : "same_club_same_name_keep_one";
     const display = labelExcludeForDisplay({
       excluded: true,
       parseStatus: "excluded",

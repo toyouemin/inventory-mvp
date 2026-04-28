@@ -4,7 +4,7 @@
  */
 
 import { buildColumnSizesForClub } from "./clubAggMatrixColumns";
-import { duplicateGroupKeyFromRow } from "./duplicateKeyNormalize";
+import { duplicateGroupKeyFromRow, duplicateGroupKeyFromRowWithItemAndSize } from "./duplicateKeyNormalize";
 import { matrixDisplayFromSizeFields } from "./matrixSizeDisplay";
 import type { StructureType } from "./types";
 
@@ -95,7 +95,7 @@ export function rowIncludedInFinalAggregation(r: any): boolean {
  * - 최종 집계(total/deduped) 조건과 분리: 중복으로 제외된 행(parseStatus=excluded)도 집계 대상
  * - 기존 정책 유지: needs_review/unresolved 제외, 0/빈 수량 제외
  */
-function rowIncludedInDuplicateAggregation(r: any): boolean {
+export function rowIncludedInDuplicateAggregation(r: any): boolean {
   const st = String(r?.parseStatus ?? "").trim();
   if (st === "needs_review" || st === "unresolved") return false;
   if (rowExcludedByEmptyQuantity(r)) return false;
@@ -177,13 +177,41 @@ export type ClubDisplaySummaryStats = {
 /**
  * 클럽별 보기 상단 문구용. 집계/duplicateRowIds 로직과 무관하게 표시만 계산합니다.
  */
-export function computeClubDisplaySummaryStats(rows: any[], club: string): ClubDisplaySummaryStats {
+export function computeClubDisplaySummaryStats(
+  rows: any[],
+  club: string,
+  structureType?: StructureType
+): ClubDisplaySummaryStats {
+  const isMultiItem = structureType === "multi_item_personal_order";
+  if (!isMultiItem) {
+    let totalPersons = 0;
+    let sizedQtySum = 0;
+    let missingSizePersons = 0;
+    for (const r of rows) {
+      if (normClubFromNormRow(r) !== club) continue;
+      totalPersons += 1;
+      const qty = rowQtyParsed(r);
+      if (rowHasDisplayableSizeForSummary(r)) {
+        sizedQtySum += qty;
+      } else {
+        missingSizePersons += 1;
+      }
+    }
+    return { totalPersons, sizedQtySum, missingSizePersons };
+  }
+
+  const personKeySet = new Set<string>();
   let totalPersons = 0;
   let sizedQtySum = 0;
   let missingSizePersons = 0;
   for (const r of rows) {
     if (normClubFromNormRow(r) !== club) continue;
-    totalPersons += 1;
+    const name = String(r?.memberNameRaw ?? r?.memberName ?? "").trim();
+    const personKey =
+      name.length > 0
+        ? `${club}\0${name}`
+        : `${club}\0#row:${String(r?.sourceRowIndex ?? "")}:${String(r?.sourceGroupIndex ?? "")}`;
+    personKeySet.add(personKey);
     const qty = rowQtyParsed(r);
     if (rowHasDisplayableSizeForSummary(r)) {
       sizedQtySum += qty;
@@ -191,6 +219,7 @@ export function computeClubDisplaySummaryStats(rows: any[], club: string): ClubD
       missingSizePersons += 1;
     }
   }
+  totalPersons = personKeySet.size;
   return { totalPersons, sizedQtySum, missingSizePersons };
 }
 
@@ -342,8 +371,9 @@ export type DuplicateAnalysis = {
 };
 
 /**
- * 중복 기준은 구조 타입과 무관하게 항상 클럽+이름입니다.
- * (중복자 보기에서 "같은 사람이 여러 번 신청" 여부를 확인하기 위한 정책)
+ * 중복 기준:
+ * - 기본: 클럽+이름
+ * - multi_item_personal_order: 클럽+이름+상품+사이즈
  *
  * 참고:
  * - 0/빈 수량 제외(size_matrix) 정책은 유지합니다.
@@ -354,8 +384,10 @@ export function analyzeDuplicateRows(rows: any[], structureType?: StructureType)
   const st =
     structureType ?? (rows[0]?.metaJson?.structureType as StructureType | undefined);
   const isMatrix = st === "size_matrix";
+  const isMultiItem = st === "multi_item_personal_order";
 
   function keyForRow(r: any): string | null {
+    if (isMultiItem) return duplicateGroupKeyFromRowWithItemAndSize(r);
     return duplicateGroupKeyFromRow(r);
   }
 

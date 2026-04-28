@@ -51,6 +51,9 @@ export function tryParseSizeTextForMatrix(s0: string): SizeParseForMatrix | null
   m = /^여(?:자|성)?\s*(\d{2,3})$/u.exec(s);
   if (m && isSizeNum(m[1]!)) return { kind: "mw_num", line: "여", num: m[1]! };
 
+  m = /^공용\s*(\d{2,3})$/u.exec(s);
+  if (m && isSizeNum(m[1]!)) return { kind: "num_only", num: m[1]! };
+
   m = /^(\d{2,3})\s*남(?:자|성)?(?:티|용|벨트|핏|줄|하의|상의)?$/u.exec(s);
   if (m && isSizeNum(m[1]!)) return { kind: "mw_num", line: "남", num: m[1]! };
   m = /^(\d{2,3})\s*여(?:자|성)?(?:티|용|벨트|핏|줄|하의|상의)?$/u.exec(s);
@@ -65,6 +68,9 @@ export function tryParseSizeTextForMatrix(s0: string): SizeParseForMatrix | null
   if (m && isSizeNum(m[1]!)) return { kind: "mw_num", line: "남", num: m[1]! };
   m = /^(\d{2,3})\s*여(?:자|성)?$/u.exec(s);
   if (m && isSizeNum(m[1]!)) return { kind: "mw_num", line: "여", num: m[1]! };
+
+  m = /^(\d{2,3})\s*공용$/u.exec(s);
+  if (m && isSizeNum(m[1]!)) return { kind: "num_only", num: m[1]! };
 
   m = /^(\d{2,3})\s*\(([^)]+)\)$/.exec(s);
   if (m) {

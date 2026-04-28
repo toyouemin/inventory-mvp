@@ -17,6 +17,7 @@ import {
   normClubFromNormRow,
   rowKeyGenderForAgg,
   rowIncludedInFinalAggregation,
+  rowIncludedInDuplicateAggregation,
   stableRowKeyForDup,
   unionClubsOrdered,
   type ClubDisplaySummaryStats,
@@ -37,9 +38,10 @@ import {
 } from "@/features/sizeAnalysis/fieldMappingUi";
 
 type Mapping = {
-  structureType: "single_row_person" | "repeated_slots" | "size_matrix" | "unknown";
+  structureType: "single_row_person" | "repeated_slots" | "size_matrix" | "multi_item_personal_order" | "unknown";
   headerRowIndex: number;
   fields: Record<string, number | undefined>;
+  productColumns?: number[];
   slotGroups?: Array<Record<string, number | undefined>>;
 };
 
@@ -58,6 +60,11 @@ function isMappingReadyForRun(mapping: Mapping | null): boolean {
   if (!mapping) return false;
   if (mapping.structureType === "unknown") {
     return hasUnknownRequiredFields(mapping);
+  }
+  if (mapping.structureType === "multi_item_personal_order") {
+    const hasName = hasField(mapping, "name");
+    const productColumns = Array.isArray(mapping.productColumns) ? mapping.productColumns : [];
+    return hasName && productColumns.length > 0;
   }
   const hasName = hasField(mapping, "name");
   const hasClub = hasField(mapping, "club");
@@ -80,6 +87,7 @@ const STRUCTURE_TYPE_LABEL: Record<Mapping["structureType"], string> = {
   single_row_person: "사람별 1행",
   repeated_slots: "반복 슬롯형",
   size_matrix: "사이즈표형",
+  multi_item_personal_order: "다품목 개인주문형",
   unknown: "직접 매핑",
 };
 
@@ -92,6 +100,7 @@ const FIELD_ROLE_LABEL: Record<string, string> = {
   qty: "수량",
   item: "주문내용",
   note: "비고",
+  productColumns: "상품 컬럼",
 };
 
 const STATUS_FILTER_OPTIONS = ["all", "auto_confirmed", "needs_review", "unresolved", "corrected", "excluded"] as const;
@@ -320,7 +329,7 @@ export function SizeAnalysisPage() {
 
     return Array.from(byClub.values())
       .map((club) => {
-        const displaySummary = computeClubDisplaySummaryStats(allRows, club.club);
+        const displaySummary = computeClubDisplaySummaryStats(allRows, club.club, structureTypeForDup);
         return {
           ...club,
           displaySummary,
@@ -644,6 +653,7 @@ export function SizeAnalysisPage() {
             duplicateAnalysis={duplicateAnalysis}
             allRows={allRows}
             statusFilter={statusFilter}
+            structureType={structureTypeForDup}
           />
         </div>
 
@@ -653,27 +663,35 @@ export function SizeAnalysisPage() {
 
         <section className="size-analysis-card size-analysis-xlsx-export">
           <h3>엑셀 내보내기</h3>
-          <p className="size-analysis-muted size-analysis-xlsx-export__hint">전체목록·클럽별집계·중복자·검토필요 4개 시트 저장</p>
+          <p className="size-analysis-muted size-analysis-xlsx-export__hint">
+            전체목록·클럽별집계·중복자·검토필요 저장 (다품목 개인주문형은 상품별 시트 추가)
+          </p>
           <button
             type="button"
             className="btn btn-secondary"
             disabled={allRows.length === 0}
-            onClick={() => downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis)}
+            onClick={() =>
+              downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis, { structureType: structureTypeForDup })
+            }
           >
             엑셀 다운로드 (.xlsx)
           </button>
         </section>
 
         <div className="size-analysis-result-region">
-          <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} />
+          <DetailViewSwitch mode={detailViewMode} onChange={setDetailViewMode} structureType={structureTypeForDup} />
           {detailViewMode === "all" ? (
             <>
               <AnalysisRowsTable
                 rows={rows}
                 duplicateRowIds={duplicateAnalysis.duplicateRowIds}
                 onToggleIncludeNameMissingRow={toggleIncludeNameMissingRow}
+                showItemColumn={structureTypeForDup === "multi_item_personal_order"}
               />
               <ClubSizeSummaryTable duplicateRowIds={duplicateAnalysis.duplicateRowIds} normRows={allRows} />
+              {structureTypeForDup === "multi_item_personal_order" ? (
+                <ProductSizeSummaryTable duplicateRowIds={duplicateAnalysis.duplicateRowIds} normRows={allRows} />
+              ) : null}
             </>
           ) : detailViewMode === "club" ? (
             <ClubGroupedView
@@ -681,12 +699,17 @@ export function SizeAnalysisPage() {
               dupByClub={duplicateAnalysis.dupByClub}
               duplicateRowIds={duplicateAnalysis.duplicateRowIds}
               normRows={allRows}
+              structureType={structureTypeForDup}
               rows={clubGroupedRows}
             />
           ) : detailViewMode === "duplicates" ? (
             <DuplicateMembersView allRows={allRows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
           ) : (
-            <ClubMembersView allRows={allRows} duplicateRowIds={duplicateAnalysis.duplicateRowIds} />
+            <ClubMembersView
+              allRows={allRows}
+              duplicateRowIds={duplicateAnalysis.duplicateRowIds}
+              structureType={structureTypeForDup}
+            />
           )}
         </div>
       </div>
@@ -803,6 +826,7 @@ export function FieldMappingEditor({
   previewRows?: string[][];
   disabled?: boolean;
 }) {
+  const [autoFillMessage, setAutoFillMessage] = useState<string>("");
   const maxCols = useMemo(
     () => (previewRows?.length ? maxColumnCountInPreview(previewRows, mapping?.headerRowIndex ?? 0) : 0),
     [previewRows, mapping?.headerRowIndex]
@@ -822,6 +846,22 @@ export function FieldMappingEditor({
   const previewLen = previewRows?.length ?? 0;
   const headerOutOfPreview = m.headerRowIndex >= previewLen;
   const hasSizeColumn = m.fields.size !== undefined || m.fields.size2 !== undefined;
+  const isMultiItem = m.structureType === "multi_item_personal_order";
+  const selectedProductColumns = useMemo(
+    () =>
+      Array.from(new Set((m.productColumns ?? []).filter((x): x is number => Number.isInteger(x) && x >= 0))).sort(
+        (a, b) => a - b
+      ),
+    [m.productColumns]
+  );
+  const coreFieldSet = useMemo(
+    () =>
+      new Set<number>(
+        [m.fields.club, m.fields.name, m.fields.gender, m.fields.note]
+          .filter((x): x is number => typeof x === "number" && x >= 0)
+      ),
+    [m.fields.club, m.fields.name, m.fields.gender, m.fields.note]
+  );
   const unknownRequired = [
     ...UNKNOWN_REQUIRED_BASE,
     ...(hasSizeColumn ? [] : (["item"] as const)),
@@ -835,13 +875,38 @@ export function FieldMappingEditor({
     return `${h} (${L}열 = ${u})`;
   }
 
+  function toggleProductColumn(zeroIdx: number) {
+    const current = new Set(selectedProductColumns);
+    if (current.has(zeroIdx)) current.delete(zeroIdx);
+    else current.add(zeroIdx);
+    const next = Array.from(current).sort((a, b) => a - b);
+    onChange({ ...m, productColumns: next });
+  }
+
+  function productChipLabel(zeroIdx: number): string {
+    const header = String(headerCells[zeroIdx] ?? "").trim() || "제목 없음";
+    const col = excelColumnLetterFromOneBased(zeroIdx + 1);
+    return `${header} · ${col}열`;
+  }
+
   function applyHeaderAuto() {
     const next = mergeAutoFieldMap(m.fields, suggestFieldIndicesFromHeaderRow(headerCells));
+    let addedCount = 0;
+    const keys = new Set<string>([...Object.keys(m.fields ?? {}), ...Object.keys(next ?? {})]);
+    keys.forEach((k) => {
+      const before = m.fields?.[k];
+      const after = next?.[k];
+      if (before === undefined && after !== undefined) addedCount += 1;
+    });
+    setAutoFillMessage(
+      addedCount > 0 ? `자동 매핑 적용됨 (${addedCount}개)` : "추가로 매핑된 항목 없음"
+    );
     onChange({ ...m, fields: next });
   }
 
   const unknownUnmapped = unknownRequired.filter((k) => m.fields[k] === undefined);
   const unknownNeedsFix = m.structureType === "unknown" && unknownUnmapped.length > 0;
+  const multiItemNeedsFix = isMultiItem && (m.fields.name === undefined || selectedProductColumns.length === 0);
   const formOff = disabled || loading;
 
   return (
@@ -861,6 +926,7 @@ export function FieldMappingEditor({
             <option value="single_row_person">{STRUCTURE_TYPE_LABEL.single_row_person}</option>
             <option value="repeated_slots">{STRUCTURE_TYPE_LABEL.repeated_slots}</option>
             <option value="size_matrix">{STRUCTURE_TYPE_LABEL.size_matrix}</option>
+            <option value="multi_item_personal_order">{STRUCTURE_TYPE_LABEL.multi_item_personal_order}</option>
             <option value="unknown">{STRUCTURE_TYPE_LABEL.unknown}</option>
           </select>
         </label>
@@ -895,6 +961,11 @@ export function FieldMappingEditor({
           >
             헤더 이름으로 자동 채우기
           </button>
+          {autoFillMessage ? (
+            <span className="size-analysis-map-autofill-feedback size-analysis-muted" role="status">
+              {autoFillMessage}
+            </span>
+          ) : null}
         </div>
       ) : null}
       {unknownNeedsFix ? (
@@ -903,6 +974,45 @@ export function FieldMappingEditor({
           {!hasSizeColumn ? " 주문내용은 사이즈 열이 없을 때만 필요합니다." : ""} · 미지정:{" "}
           {unknownUnmapped.map((k) => FIELD_ROLE_LABEL[k] ?? k).join(", ")}
         </p>
+      ) : null}
+      {multiItemNeedsFix ? (
+        <p className="size-analysis-field-warning" role="alert">
+          <strong>다품목 개인주문형</strong>에서는 <strong>이름</strong>과 <strong>상품 컬럼 1개 이상</strong>을 지정해 주세요.
+        </p>
+      ) : null}
+      {isMultiItem && hasPreview ? (
+        <div className="size-analysis-field-row size-analysis-field-row--role-item size-analysis-product-cols-card">
+          <span className="size-analysis-field-row__label">
+            상품 컬럼(복수 선택)
+            <span className="size-analysis-product-cols-note">공용 사이즈는 상품 헤더에 (공용) 표시</span>
+          </span>
+          <div className="size-analysis-product-cols-grid" role="group" aria-label="상품 컬럼 복수 선택">
+            {Array.from({ length: maxCols }, (_, i) => {
+              const checked = selectedProductColumns.includes(i);
+              const disabledByCore = coreFieldSet.has(i);
+              return (
+                <button
+                  key={`prod-col-${i}`}
+                  type="button"
+                  className={[
+                    "size-analysis-product-chip",
+                    checked && "size-analysis-product-chip--selected",
+                    disabledByCore && "size-analysis-product-chip--disabled",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-pressed={checked}
+                  title={productChipLabel(i)}
+                    disabled={formOff || disabledByCore}
+                  onClick={() => toggleProductColumn(i)}
+                >
+                  <span className="size-analysis-product-chip__text">{productChipLabel(i)}</span>
+                  {checked ? <span className="size-analysis-product-chip__check">✓</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       ) : null}
       {duplicateCols.length > 0 ? (
         <p className="size-analysis-field-warning" role="alert">
@@ -1006,9 +1116,11 @@ export function FieldMappingEditor({
 export function DetailViewSwitch({
   mode,
   onChange,
+  structureType,
 }: {
   mode: "all" | "club" | "duplicates" | "clubMembers";
   onChange: (mode: "all" | "club" | "duplicates" | "clubMembers") => void;
+  structureType?: StructureType;
 }) {
   return (
     <section className="size-analysis-card size-analysis-view-switch-card">
@@ -1026,7 +1138,7 @@ export function DetailViewSwitch({
           className={`btn ${mode === "club" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => onChange("club")}
         >
-          클럽별 보기
+          {structureType === "multi_item_personal_order" ? "상품별 집계" : "클럽별 보기"}
         </button>
         <button
           type="button"
@@ -1040,7 +1152,7 @@ export function DetailViewSwitch({
           className={`btn ${mode === "clubMembers" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => onChange("clubMembers")}
         >
-          클럽별 명단
+          {structureType === "multi_item_personal_order" ? "주문 명단" : "클럽별 명단"}
         </button>
       </div>
     </section>
@@ -1206,11 +1318,14 @@ export function DuplicateMembersView({
 export function ClubMembersView({
   allRows,
   duplicateRowIds,
+  structureType,
 }: {
   allRows: any[];
   duplicateRowIds: Set<string>;
+  structureType?: StructureType;
 }) {
-  type MemberAggRow = { name: string; gender: string; size: string; qty: number; hasDup: boolean };
+  const isMultiItem = structureType === "multi_item_personal_order";
+  type MemberAggRow = { name: string; item: string; gender: string; size: string; qty: number; hasDup: boolean };
   const [includeDuplicates, setIncludeDuplicates] = useState(true);
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
 
@@ -1231,13 +1346,15 @@ export function ClubMembersView({
       if (!includeByFinal && !includeByDupToggle) continue;
       const club = normClubFromNormRow(r);
       const name = String(r?.memberNameRaw ?? r?.memberName ?? "").trim() || "(이름 없음)";
-      const gender = String(r?.genderNormalized ?? r?.genderRaw ?? "").trim() || "미분류";
-      const size = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim() || "미분류";
+      const item = isMultiItem ? String(r?.itemRaw ?? "").trim() || "미지정 상품" : "";
+      const parsed = isMultiItem ? productAggGenderAndSizeFromRow(r) : matrixAggGenderAndSizeFromRow(r);
+      const gender = String(parsed.gender ?? "").trim() || "미분류";
+      const size = String(parsed.size ?? "").trim() || "미분류";
       const qty = rowQtyParsed(r);
-      const key = `${name}\0${gender}\0${size}`;
+      const key = isMultiItem ? `${name}\0${item}\0${gender}\0${size}` : `${name}\0${gender}\0${size}`;
       if (!byClub.has(club)) byClub.set(club, new Map());
       const rowMap = byClub.get(club)!;
-      const cur = rowMap.get(key) ?? { name, gender, size, qty: 0, hasDup: false };
+      const cur = rowMap.get(key) ?? { name, item, gender, size, qty: 0, hasDup: false };
       cur.qty += qty;
       if (isDup) cur.hasDup = true;
       rowMap.set(key, cur);
@@ -1258,18 +1375,23 @@ export function ClubMembersView({
     .map(([club, rowMap]) => ({
       club,
       totalQty: Array.from(rowMap.values()).reduce((sum, row) => sum + row.qty, 0),
-      displaySummary: computeClubDisplaySummaryStats(allRows, club),
+      displaySummary: computeClubDisplaySummaryStats(
+        allRows,
+        club,
+        allRows[0]?.metaJson?.structureType as StructureType | undefined
+      ),
       dupSummary: dupByClub.get(club) ?? { persons: 0, sheets: 0 },
       rows: Array.from(rowMap.values()).sort(
         (a, b) =>
           a.name.localeCompare(b.name, "ko") ||
+          a.item.localeCompare(b.item, "ko") ||
           compareGenderForClubSize(a.gender, b.gender) ||
           compareSizeLabel(a.size, b.size)
       ),
     }))
     .filter((sec) => sec.rows.length > 0)
     .sort((a, b) => a.club.localeCompare(b.club, "ko"));
-  }, [allRows, duplicateRowIds, includeDuplicates]);
+  }, [allRows, duplicateRowIds, includeDuplicates, isMultiItem]);
 
   function toggleClub(club: string) {
     setExpandedClubs((prev) => {
@@ -1283,7 +1405,7 @@ export function ClubMembersView({
   if (sections.length === 0) {
     return (
       <section className="size-analysis-card">
-        <h3>클럽별 명단</h3>
+        <h3>{isMultiItem ? "주문 명단" : "클럽별 명단"}</h3>
         <p className="size-analysis-muted">표시할 명단이 없습니다.</p>
       </section>
     );
@@ -1291,9 +1413,11 @@ export function ClubMembersView({
 
   return (
     <section className="size-analysis-card size-analysis-club-members-section">
-      <h3>클럽별 명단</h3>
+      <h3>{isMultiItem ? "주문 명단" : "클럽별 명단"}</h3>
       <p className="size-analysis-muted size-analysis-club-members-desc">
-        클럽별로 같은 이름·성별·사이즈 수량을 합산해 표시합니다.
+        {isMultiItem
+          ? "클럽별로 같은 이름·상품명·성별·사이즈 수량을 합산해 표시합니다."
+          : "클럽별로 같은 이름·성별·사이즈 수량을 합산해 표시합니다."}
       </p>
       <label className="size-analysis-muted size-analysis-include-toggle">
         <input
@@ -1343,17 +1467,34 @@ export function ClubMembersView({
               </span>
             </button>
             {expandedClubs.has(sec.club) ? (
-              <div className="size-analysis-dup-pc-table-scroll">
-                <table className="size-analysis-dup-pc-table">
-                  <colgroup>
-                    <col className="size-analysis-club-members-col-name" />
-                    <col className="size-analysis-club-members-col-gender" />
-                    <col className="size-analysis-club-members-col-size" />
-                    <col className="size-analysis-club-members-col-qty" />
-                  </colgroup>
+              <div
+                className={[
+                  "size-analysis-dup-pc-table-scroll",
+                  isMultiItem && "size-analysis-order-list-scroll",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <table
+                  className={[
+                    "size-analysis-dup-pc-table",
+                    isMultiItem && "size-analysis-order-list-table",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  {!isMultiItem ? (
+                    <colgroup>
+                      <col className="size-analysis-club-members-col-name" />
+                      <col className="size-analysis-club-members-col-gender" />
+                      <col className="size-analysis-club-members-col-size" />
+                      <col className="size-analysis-club-members-col-qty" />
+                    </colgroup>
+                  ) : null}
                   <thead>
                     <tr>
                       <th scope="col">이름</th>
+                      {isMultiItem ? <th scope="col">상품명</th> : null}
                       <th scope="col">성별</th>
                       <th scope="col">사이즈</th>
                       <th scope="col">수량</th>
@@ -1362,13 +1503,20 @@ export function ClubMembersView({
                   <tbody>
                     {sec.rows.map((row) => (
                       <tr
-                        key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}
+                        key={`${sec.club}\0${row.name}\0${row.item}\0${row.gender}\0${row.size}`}
                         className={row.hasDup ? "size-analysis-club-members-row--dup" : ""}
                       >
                         <td>
                           {row.name}{" "}
                           {row.hasDup ? <span className="size-analysis-dup-line-tag--dup">중복</span> : null}
                         </td>
+                        {isMultiItem ? (
+                          <td>
+                            <span className="size-analysis-order-item-text" title={row.item}>
+                              {row.item}
+                            </span>
+                          </td>
+                        ) : null}
                         <td>{row.gender}</td>
                         <td>{row.size}</td>
                         <td>{row.qty}</td>
@@ -1386,27 +1534,47 @@ export function ClubMembersView({
         {sections.map((sec) => (
           <div key={`${sec.club}-pc`} className="size-analysis-dup-pc-club">
             <h4 className="size-analysis-dup-pc-club__title">{sec.club} ({sec.totalQty}개)</h4>
-            <div className="size-analysis-dup-pc-table-scroll">
-              <table className="size-analysis-dup-pc-table">
+            <div
+              className={[
+                "size-analysis-dup-pc-table-scroll",
+                isMultiItem && "size-analysis-order-list-scroll",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <table
+                className={[
+                  "size-analysis-dup-pc-table",
+                  isMultiItem && "size-analysis-order-list-table",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 <thead>
                   <tr>
-                    <th scope="col">클럽</th>
                     <th scope="col">이름</th>
+                    {isMultiItem ? <th scope="col">상품명</th> : null}
                     <th scope="col">성별</th>
                     <th scope="col">사이즈</th>
                     <th scope="col">수량</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sec.rows.map((row, idx) => (
+                  {sec.rows.map((row) => (
                     <tr
-                      key={`${sec.club}\0${row.name}\0${row.gender}\0${row.size}`}
+                      key={`${sec.club}\0${row.name}\0${row.item}\0${row.gender}\0${row.size}`}
                       className={row.hasDup ? "size-analysis-club-members-row--dup" : ""}
                     >
-                      <td>{idx === 0 ? sec.club : ""}</td>
                       <td>
                         {row.name} {row.hasDup ? <span className="size-analysis-dup-line-tag--dup">중복</span> : null}
                       </td>
+                      {isMultiItem ? (
+                        <td>
+                          <span className="size-analysis-order-item-text" title={row.item}>
+                            {row.item}
+                          </span>
+                        </td>
+                      ) : null}
                       <td>{row.gender}</td>
                       <td>{row.size}</td>
                       <td>{row.qty}</td>
@@ -1433,10 +1601,12 @@ export function ClubGroupedView({
   dupByClub,
   normRows,
   duplicateRowIds,
+  structureType,
 }: {
   dupByClub?: Map<string, { persons: number; sheets: number }>;
   duplicateRowIds: Set<string>;
   normRows: any[];
+  structureType?: StructureType;
   rows: Array<{
     club: string;
     totalQty: number;
@@ -1444,6 +1614,7 @@ export function ClubGroupedView({
     rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }>;
   }>;
 }) {
+  const isMultiItem = structureType === "multi_item_personal_order";
   const [expanded, setExpanded] = useState(() => defaultExpandedClubSet(rows));
   const [overallExpanded, setOverallExpanded] = useState(true);
 
@@ -1543,6 +1714,90 @@ export function ClubGroupedView({
     });
   }, [rows, normRows, duplicateRowIds]);
 
+  const mobileClubProductMatrices = useMemo(() => {
+    if (!isMultiItem) return [];
+    const statusByProductCell = new Map<string, ClubAggCellMeta>();
+    for (const r of normRows ?? []) {
+      if (r.excluded) continue;
+      const club = normClubFromNormRow(r);
+      const product = String(r?.itemRaw ?? "").trim();
+      if (!product) continue;
+      const { gender: gDisp, size: sDisp } = productAggGenderAndSizeFromRow(r);
+      const gk = rowKeyGenderForAgg(gDisp);
+      const size = sDisp || "미분류";
+      const key = `${club}\0${product}\0${gk}\0${size}`;
+      const st = String(r.parseStatus ?? "");
+      const cur = statusByProductCell.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false };
+      if (st === "needs_review") cur.hasReview = true;
+      if (st === "unresolved") cur.hasUnres = true;
+      if (st === "corrected") cur.hasCorrected = true;
+      statusByProductCell.set(key, cur);
+    }
+
+    const clubNames = rows.map((r) => r.club);
+    return clubNames.map((clubName) => {
+      const byProduct = new Map<string, Array<{ club: string; gender: string; size: string; qty: number }>>();
+      for (let i = 0; i < normRows.length; i += 1) {
+        const r = normRows[i]!;
+        if (normClubFromNormRow(r) !== clubName) continue;
+        if (!rowIncludedInFinalAggregation(r)) continue;
+        const product = String(r?.itemRaw ?? "").trim();
+        if (!product) continue;
+        const { gender, size } = productAggGenderAndSizeFromRow(r);
+        const list = byProduct.get(product) ?? [];
+        list.push({ club: clubName, gender, size, qty: rowQtyParsed(r) });
+        byProduct.set(product, list);
+      }
+      const productOrder = new Map<string, number>();
+      for (const r of normRows) {
+        if (normClubFromNormRow(r) !== clubName) continue;
+        const product = String(r?.itemRaw ?? "").trim();
+        if (!product) continue;
+        const rawIdx =
+          typeof r?.metaJson?.productColumnIndex === "number"
+            ? Number(r.metaJson.productColumnIndex)
+            : Number(r?.sourceGroupIndex);
+        if (!Number.isFinite(rawIdx)) continue;
+        const prev = productOrder.get(product);
+        if (prev === undefined || rawIdx < prev) {
+          productOrder.set(product, rawIdx);
+        }
+      }
+
+      return Array.from(byProduct.entries())
+        .sort((a, b) => {
+          const ai = productOrder.get(a[0]);
+          const bi = productOrder.get(b[0]);
+          if (ai !== undefined && bi !== undefined) return ai - bi;
+          if (ai !== undefined) return -1;
+          if (bi !== undefined) return 1;
+          return a[0].localeCompare(b[0], "ko");
+        })
+        .map(([product, productRows]) => {
+          const sizes = buildColumnSizesForClub(productRows);
+          const rowKeys = matrixRowKeysForProductRows(productRows);
+          const qtyMap = new Map<string, number>();
+          for (const r of productRows) {
+            const gk = rowKeyGenderForAgg(r.gender);
+            const key = `${gk}\0${r.size}`;
+            qtyMap.set(key, (qtyMap.get(key) ?? 0) + r.qty);
+          }
+          const totalQty = productRows.reduce((sum, row) => sum + row.qty, 0);
+          return {
+            modeKey: `product-${product}`,
+            shortLabel: `${product} 매트릭스 (${totalQty}개)`,
+            headlineAriaLabel: `${clubName} · ${product}`,
+            isDuplicateMatrix: false,
+            sizes,
+            rowKeys,
+            qtyMap,
+            resolveMeta: (gk: "여" | "남" | "공용", sz: string) =>
+              statusByProductCell.get(`${clubName}\0${product}\0${gk}\0${sz}`) ?? EMPTY_CLUB_AGG_META,
+          };
+        });
+    });
+  }, [rows, normRows, isMultiItem]);
+
   if (rows.length === 0) return null;
 
   function toggleClub(name: string) {
@@ -1558,67 +1813,71 @@ export function ClubGroupedView({
     <section className="size-analysis-card size-analysis-club-group-view">
       <h3>클럽별 보기</h3>
       <p className="size-analysis-muted size-analysis-club-group-hint">
-        클럽·성별·사이즈별 수량을 8) 집계와 같은 매트릭스로 확인할 수 있습니다.
+        {isMultiItem
+          ? "클럽을 펼치면 상품별(상의/하의/바람막이 등) 매트릭스가 세로로 모두 표시됩니다."
+          : "클럽·성별·사이즈별 수량을 8) 집계와 같은 매트릭스로 확인할 수 있습니다."}
       </p>
-      <div className="size-analysis-club-group-list">
-        <article className="size-analysis-club-group-card">
-          <button
-            type="button"
-            className="size-analysis-club-group-head"
-            onClick={() => setOverallExpanded((v) => !v)}
-            aria-expanded={overallExpanded}
-            aria-controls="size-analysis-club-overall-panel"
-            aria-label={`전체 상세 ${overallExpanded ? "접기" : "펼치기"}`}
-          >
-            <span className="size-analysis-club-group-head__name">
-              <span className="size-analysis-club-group-head__clubtitle">전체</span>
-            </span>
-            <span className="size-analysis-club-group-head__right">
-              <span className="size-analysis-club-group-chevron" aria-hidden>
-                <svg
-                  className={
-                    overallExpanded
-                      ? "size-analysis-club-group-chevron__svg is-open"
-                      : "size-analysis-club-group-chevron__svg"
-                  }
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
+      {!isMultiItem ? (
+        <div className="size-analysis-club-group-list">
+          <article className="size-analysis-club-group-card">
+            <button
+              type="button"
+              className="size-analysis-club-group-head"
+              onClick={() => setOverallExpanded((v) => !v)}
+              aria-expanded={overallExpanded}
+              aria-controls="size-analysis-club-overall-panel"
+              aria-label={`전체 상세 ${overallExpanded ? "접기" : "펼치기"}`}
+            >
+              <span className="size-analysis-club-group-head__name">
+                <span className="size-analysis-club-group-head__clubtitle">전체</span>
               </span>
-            </span>
-          </button>
-          <div
-            id="size-analysis-club-overall-panel"
-            className={[
-              "size-analysis-club-group-rows",
-              !overallExpanded ? "size-analysis-club-group-rows--collapsed-mobile" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <div className="size-analysis-club-group-mtx-wrap size-analysis-club-group-mobile-agg-stack">
-              {overallTripleMatrices.map((blk) => (
-                <ClubAggMatrixTableDesktop
-                  key={`overall-${blk.modeKey}`}
-                  headline={blk.headline}
-                  headlineAriaLabel={blk.headlineAriaLabel}
-                  isDuplicateMatrix={blk.isDuplicateMatrix}
-                  sizes={blk.sizes}
-                  rowKeys={blk.rowKeys}
-                  qtyMap={blk.qtyMap}
-                  resolveMeta={blk.resolveMeta}
-                />
-              ))}
+              <span className="size-analysis-club-group-head__right">
+                <span className="size-analysis-club-group-chevron" aria-hidden>
+                  <svg
+                    className={
+                      overallExpanded
+                        ? "size-analysis-club-group-chevron__svg is-open"
+                        : "size-analysis-club-group-chevron__svg"
+                    }
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+              </span>
+            </button>
+            <div
+              id="size-analysis-club-overall-panel"
+              className={[
+                "size-analysis-club-group-rows",
+                !overallExpanded ? "size-analysis-club-group-rows--collapsed-mobile" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <div className="size-analysis-club-group-mtx-wrap size-analysis-club-group-mobile-agg-stack">
+                {overallTripleMatrices.map((blk) => (
+                  <ClubAggMatrixTableDesktop
+                    key={`overall-${blk.modeKey}`}
+                    headline={blk.headline}
+                    headlineAriaLabel={blk.headlineAriaLabel}
+                    isDuplicateMatrix={blk.isDuplicateMatrix}
+                    sizes={blk.sizes}
+                    rowKeys={blk.rowKeys}
+                    qtyMap={blk.qtyMap}
+                    resolveMeta={blk.resolveMeta}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        </article>
-      </div>
+          </article>
+        </div>
+      ) : null}
       <div className="size-analysis-club-group-accordion--mobile">
         <div className="size-analysis-club-group-list">
           {rows.map((club, idx) => {
@@ -1675,7 +1934,7 @@ export function ClubGroupedView({
                     .join(" ")}
                 >
                   <div className="size-analysis-club-group-mtx-wrap size-analysis-club-group-mobile-agg-stack">
-                    {mobileClubTripleMatrices[idx]!.map((blk) => (
+                    {(isMultiItem ? mobileClubProductMatrices[idx] : mobileClubTripleMatrices[idx])!.map((blk) => (
                       <ClubAggMatrixTableDesktop
                         key={blk.modeKey}
                         headline={blk.shortLabel}
@@ -1704,11 +1963,13 @@ export function AnalysisSummaryCards({
   duplicateAnalysis,
   allRows,
   statusFilter,
+  structureType,
 }: {
   summary: any;
   duplicateAnalysis: DuplicateAnalysis;
   allRows: any[];
   statusFilter: string;
+  structureType?: StructureType;
 }) {
   if (!summary) return null;
   const totalQty = duplicateAnalysis.totalQty;
@@ -1727,6 +1988,17 @@ export function AnalysisSummaryCards({
     ["중복 주문(건)", duplicateAnalysis.duplicatePersonCount],
     ["중복 수량", duplicateAnalysis.duplicateQtyTotal],
   ];
+  if (structureType === "multi_item_personal_order") {
+    const byProduct = new Map<string, number>();
+    for (const r of allRows) {
+      if (!rowIncludedInFinalAggregation(r)) continue;
+      const product = String(r?.itemRaw ?? "").trim() || "미지정 상품";
+      byProduct.set(product, (byProduct.get(product) ?? 0) + rowQtyParsed(r));
+    }
+    for (const [product, qty] of [...byProduct.entries()].sort((a, b) => a[0].localeCompare(b[0], "ko"))) {
+      cards.push([`상품 합계 · ${product}`, qty]);
+    }
+  }
   return (
     <section className="size-analysis-card">
       <h3>5) 결과 요약</h3>
@@ -1771,6 +2043,7 @@ function normalizedRowLine1(r: any): string {
   const name = String(r.memberNameRaw ?? "").trim();
   const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
   const size = displaySizeWithWarning(r);
+  const item = String(r.itemRaw ?? "").trim();
   const q = r.qtyParsed ?? r.qtyRaw;
   let qtyStr = "";
   if (q !== "" && q != null) {
@@ -1787,6 +2060,7 @@ function normalizedRowLine1(r: any): string {
   } else if (gender) {
     parts.push(gender);
   }
+  if (item) parts.push(item);
   if (qtyStr) parts.push(qtyStr);
   return parts.join(" · ");
 }
@@ -1832,15 +2106,35 @@ export function AnalysisRowsTable({
   rows,
   duplicateRowIds,
   onToggleIncludeNameMissingRow,
+  showItemColumn = false,
 }: {
   rows: any[];
   duplicateRowIds: Set<string>;
   onToggleIncludeNameMissingRow?: (row: any, include: boolean) => Promise<void>;
+  showItemColumn?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(true);
   return (
     <section className="size-analysis-card size-analysis-norm-section">
-      <h3>7) 정규화 행</h3>
-      <div className="size-analysis-norm-compact-list size-analysis-norm-compact-list--mobile" aria-label="정규화 행(요약)">
+      <div className="size-analysis-collapsible-head">
+        <h3>7) 정규화 행</h3>
+        <button
+          type="button"
+          className="btn btn-secondary size-analysis-collapsible-toggle"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-controls="size-analysis-normalized-rows-panel"
+        >
+          {expanded ? "접기" : "펼치기"}
+        </button>
+      </div>
+      <div
+        id="size-analysis-normalized-rows-panel"
+        className={["size-analysis-collapsible-body", !expanded && "size-analysis-collapsible-body--collapsed"]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <div className="size-analysis-norm-compact-list size-analysis-norm-compact-list--mobile" aria-label="정규화 행(요약)">
         {rows.map((r, i) => {
           const { subline, pill } = normalizedRowLine2Parts(r);
           const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
@@ -1873,15 +2167,16 @@ export function AnalysisRowsTable({
             </article>
           );
         })}
-      </div>
-      <div className="size-analysis-table-wrap size-analysis-norm-table-wrap--desktop">
-        <table className="size-analysis-table size-analysis-table--normalized">
+        </div>
+        <div className="size-analysis-table-wrap size-analysis-norm-table-wrap--desktop">
+          <table className="size-analysis-table size-analysis-table--normalized">
           <thead>
             <tr>
               <th>원본행</th>
               <th>클럽</th>
               <th>이름</th>
               <th>성별</th>
+              {showItemColumn ? <th>상품명</th> : null}
               <th>사이즈</th>
               <th>수량</th>
               <th>상태</th>
@@ -1904,6 +2199,7 @@ export function AnalysisRowsTable({
                     </span>
                   </td>
                   <td data-label="성별">{r.genderNormalized ?? r.genderRaw ?? ""}</td>
+                  {showItemColumn ? <td data-label="상품명">{r.itemRaw ?? ""}</td> : null}
                   <td data-label="사이즈">{displaySizeWithWarning(r)}</td>
                   <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
                   <td data-label="상태">{labelSizeAnalysisParseStatusForRow(r)}</td>
@@ -1927,7 +2223,8 @@ export function AnalysisRowsTable({
               );
             })}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </section>
   );
@@ -1985,6 +2282,32 @@ function groupClubAggRows(rows: Array<{ club: string; gender: string; size: stri
     by.get(c)!.push(r);
   }
   return by;
+}
+
+function normalizeUnisexSizeLabel(raw: string): string {
+  const t = String(raw ?? "").trim();
+  if (!t) return "미분류";
+  const mw = t.match(/^[MW]\s*(\d{2,3})$/i);
+  if (mw?.[1]) return mw[1];
+  const num = t.match(/(?:^|[^0-9])(80|85|90|95|100|105|110|115|120)(?![0-9])/);
+  if (num?.[1]) return num[1];
+  return "미분류";
+}
+
+function productAggGenderAndSizeFromRow(r: any): { gender: string; size: string } {
+  const productName = String(r?.itemRaw ?? "").trim();
+  if (/공용/i.test(productName)) {
+    const size = normalizeUnisexSizeLabel(String(r?.standardizedSize ?? r?.sizeRaw ?? ""));
+    return { gender: "공용", size };
+  }
+  return matrixAggGenderAndSizeFromRow(r);
+}
+
+function matrixRowKeysForProductRows(rows: Array<{ gender: string }>): Array<"여" | "남" | "공용"> {
+  if (rows.length > 0 && rows.every((r) => rowKeyGenderForAgg(r.gender) === "공용")) {
+    return ["공용"];
+  }
+  return matrixGenderRowKeys(rows);
 }
 
 type ClubAggCellMeta = { hasReview: boolean; hasUnres: boolean; hasCorrected: boolean };
@@ -2176,6 +2499,153 @@ export function ClubSizeSummaryTable({
             resolveMeta={(gk, sz) => statusByCell.get(`${b.club}\0${gk}\0${sz}`) ?? EMPTY_CLUB_AGG_META}
           />
         ))}
+      </div>
+    </section>
+  );
+}
+
+export function ProductSizeSummaryTable({
+  normRows,
+  duplicateRowIds,
+}: {
+  normRows: any[];
+  duplicateRowIds: Set<string>;
+}) {
+  const [aggMode, setAggMode] = useState<ClubSizeAggMode>("total");
+
+  const products = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (normRows ?? [])
+            .map((r) => String(r?.itemRaw ?? "").trim())
+            .filter((x) => x.length > 0)
+        )
+      ).sort((a, b) => a.localeCompare(b, "ko")),
+    [normRows]
+  );
+  const [activeProduct, setActiveProduct] = useState<string>("");
+
+  useEffect(() => {
+    if (products.length === 0) {
+      setActiveProduct("");
+      return;
+    }
+    if (!activeProduct || !products.includes(activeProduct)) {
+      setActiveProduct(products[0]!);
+    }
+  }, [products, activeProduct]);
+
+  const statusByCell = useMemo(() => {
+    const map = new Map<string, ClubAggCellMeta>();
+    for (const r of normRows ?? []) {
+      if (r.excluded) continue;
+      const product = String(r?.itemRaw ?? "").trim();
+      if (!product) continue;
+      const { gender: gDisp, size: sDisp } = productAggGenderAndSizeFromRow(r);
+      const gk = rowKeyGenderForAgg(gDisp);
+      const size = sDisp || "미분류";
+      const key = `${product}\0${gk}\0${size}`;
+      const st = String(r.parseStatus ?? "");
+      const cur = map.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false };
+      if (st === "needs_review") cur.hasReview = true;
+      if (st === "unresolved") cur.hasUnres = true;
+      if (st === "corrected") cur.hasCorrected = true;
+      map.set(key, cur);
+    }
+    return map;
+  }, [normRows]);
+
+  const blocks = useMemo(() => {
+    return products.map((product) => {
+      const flatRows: Array<{ club: string; gender: string; size: string; qty: number }> = [];
+      for (let i = 0; i < normRows.length; i += 1) {
+        const r = normRows[i]!;
+        const item = String(r?.itemRaw ?? "").trim();
+        if (item !== product) continue;
+        const key = stableRowKeyForDup(r, i);
+        const isDup = duplicateRowIds.has(key);
+        if (aggMode === "duplicate") {
+          if (!isDup) continue;
+        } else if (aggMode === "deduped") {
+          if (isDup) continue;
+        }
+        if (aggMode === "total" || aggMode === "deduped") {
+          if (!rowIncludedInFinalAggregation(r)) continue;
+        } else {
+          if (!rowIncludedInDuplicateAggregation(r)) continue;
+        }
+        const { gender, size } = productAggGenderAndSizeFromRow(r);
+        flatRows.push({ club: normClubFromNormRow(r), gender, size, qty: rowQtyParsed(r) });
+      }
+
+      const totalQty = flatRows.reduce((s, r) => s + r.qty, 0);
+      const sizes = buildColumnSizesForClub(flatRows);
+      const rowKeys = matrixRowKeysForProductRows(flatRows);
+      const qtyMap = new Map<string, number>();
+      for (const r of flatRows) {
+        const gk = rowKeyGenderForAgg(r.gender);
+        const k = `${gk}\0${r.size}`;
+        qtyMap.set(k, (qtyMap.get(k) ?? 0) + r.qty);
+      }
+      return { product, totalQty, sizes, rowKeys, qtyMap };
+    });
+  }, [normRows, products, aggMode, duplicateRowIds]);
+
+  if (products.length === 0) return null;
+  const active = blocks.find((b) => b.product === activeProduct) ?? blocks[0]!;
+
+  return (
+    <section className="size-analysis-card size-analysis-club-size-card size-analysis-club-agg-section">
+      <h3>9) 상품별 집계</h3>
+      <div className="size-analysis-agg-mode-tabs" role="tablist" aria-label="상품별 집계 기준">
+        {(["total", "deduped", "duplicate"] as const).map((m) => (
+          <button
+            key={`prod-mode-${m}`}
+            type="button"
+            role="tab"
+            aria-selected={aggMode === m}
+            className={`size-analysis-agg-mode-tab${aggMode === m ? " size-analysis-agg-mode-tab--active" : ""}`}
+            onClick={() => setAggMode(m)}
+          >
+            {CLUB_AGG_MODE_LABEL[m]}
+          </button>
+        ))}
+      </div>
+      <div className="size-analysis-agg-mode-tabs" role="tablist" aria-label="상품 선택">
+        {products.map((product) => (
+          <button
+            key={`prod-tab-${product}`}
+            type="button"
+            role="tab"
+            aria-selected={activeProduct === product}
+            className={`size-analysis-agg-mode-tab${activeProduct === product ? " size-analysis-agg-mode-tab--active" : ""}`}
+            onClick={() => setActiveProduct(product)}
+          >
+            {product}
+          </button>
+        ))}
+      </div>
+      <p className="size-analysis-muted size-analysis-club-size-hint size-analysis-club-agg-hint">
+        선택한 상품의 성별/사이즈별 수량 매트릭스입니다. (총/중복 제외/중복)
+      </p>
+      <div className="size-analysis-summary-cards">
+        {blocks.map((b) => (
+          <article key={`prod-card-${b.product}`} className="size-analysis-summary-card">
+            <div className="size-analysis-summary-card__label">{b.product}</div>
+            <strong>{b.totalQty}</strong>
+          </article>
+        ))}
+      </div>
+      <div className="size-analysis-club-agg-mtx-host" aria-label="집계(상품별 매트릭스)">
+        <ClubAggMatrixTableDesktop
+          headline={`${active.product} · ${CLUB_AGG_MODE_LABEL[aggMode]} ${active.totalQty}개`}
+          isDuplicateMatrix={aggMode === "duplicate"}
+          sizes={active.sizes}
+          rowKeys={active.rowKeys}
+          qtyMap={active.qtyMap}
+          resolveMeta={(gk, sz) => statusByCell.get(`${active.product}\0${gk}\0${sz}`) ?? EMPTY_CLUB_AGG_META}
+        />
       </div>
     </section>
   );

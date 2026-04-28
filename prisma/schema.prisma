@@ -166,6 +166,7 @@ enum SizeAnalysisStructureType {
   single_row_person
   repeated_slots
   size_matrix
+  multi_item_personal_order
   unknown
 }
 

@@ -1,4 +1,9 @@
-export type StructureType = "single_row_person" | "repeated_slots" | "size_matrix" | "unknown";
+export type StructureType =
+  | "single_row_person"
+  | "repeated_slots"
+  | "size_matrix"
+  | "multi_item_personal_order"
+  | "unknown";
 export type ParseStatus = "auto_confirmed" | "needs_review" | "unresolved" | "corrected" | "excluded";
 
 export type SheetSnapshot = {
@@ -29,6 +34,7 @@ export type FieldMapping = {
   structureType: StructureType;
   headerRowIndex: number;
   fields: Partial<Record<HeaderRole, number>>;
+  productColumns?: number[];
   slotGroups?: Array<Partial<Record<HeaderRole, number>>>;
 };
 

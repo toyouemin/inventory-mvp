@@ -4,6 +4,7 @@
  *
  * - `duplicateGroupKeyFromRow` — **single_row / repeated / unknown** 등: 클럽 + 이름만(기존과 동일)
  * - `duplicateGroupKeyFromRowWithSize` — **size_matrix** 전용: 클럽 + 이름 + 표시 사이즈
+ * - `duplicateGroupKeyFromRowWithItemAndSize` — **multi_item_personal_order** 전용: 클럽 + 이름 + 상품 + 사이즈
  */
 
 import { matrixDisplayFromSizeFields } from "./matrixSizeDisplay";
@@ -73,4 +74,28 @@ export function duplicateGroupKeyFromRowWithSize(r: RowForDupKeyWithSize): strin
   const sizeKey = normalizeSizeForDuplicateKey(sz);
   if (!sizeKey) return null;
   return `${club}::${name}::${sizeKey}`;
+}
+
+type RowForDupKeyWithItemAndSize = RowForDupKeyWithSize & {
+  itemRaw?: string | null;
+};
+
+export function duplicateGroupKeyFromRowWithItemAndSize(r: RowForDupKeyWithItemAndSize): string | null {
+  const name = normalizeNameForDuplicate(String(r.memberNameRaw ?? r.memberName ?? ""));
+  if (!name) return null;
+  const club = normalizeClubForDuplicate(String(r.clubNameRaw ?? r.clubNameNormalized ?? ""));
+  const item = normalizeNameForDuplicate(String(r.itemRaw ?? ""));
+  if (!item) return null;
+
+  const gCol = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
+  const { size: displaySize } = matrixDisplayFromSizeFields(
+    r.standardizedSize,
+    r.sizeRaw,
+    gCol || undefined
+  );
+  const sz = String(displaySize ?? "").trim();
+  if (!sz || sz === "미분류") return null;
+  const sizeKey = normalizeSizeForDuplicateKey(sz);
+  if (!sizeKey) return null;
+  return `${club}::${name}::${item}::${sizeKey}`;
 }

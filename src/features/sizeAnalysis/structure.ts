@@ -21,6 +21,20 @@ const PERSON_HEADER_ALIASES: Record<"club" | "name" | "gender" | "size", string[
   size: ["사이즈", "size", "치수"],
 };
 
+const MULTI_ITEM_PRODUCT_HEADER_HINTS = [
+  /상의|티셔츠|유니폼/i,
+  /하의|바지|반바지|긴바지/i,
+  /반팔|긴팔/i,
+  /맨투맨/i,
+  /후드티|후드\s*집업|후드|집업/i,
+  /바람막이|아노락/i,
+  /조끼/i,
+  /롱\s*패딩|패딩/i,
+  /트랙\s*탑/i,
+  /트레이닝\s*복|트레이닝\s*팬츠|트레이닝|츄리닝/i,
+  /자켓|점퍼/i,
+];
+
 function normalizeHeaderText(value: string | undefined): string {
   return String(value ?? "")
     .replace(/\r?\n/g, "")
@@ -75,6 +89,34 @@ function scoreHeaderRow(row: string[]): number {
   return groups.length * 100 + uniqueRoleCount * 10 + personRoles.length * 3 + fallbackHits;
 }
 
+function detectMultiItemProductColumns(rawHeader: string[]): number[] {
+  const normalizedHeader = rawHeader.map(preprocessCell);
+  const coreRoleIndices = new Set<number>();
+  normalizedHeader.forEach((h, idx) => {
+    if (
+      ROLE_KEYWORDS.club.test(h) ||
+      ROLE_KEYWORDS.name.test(h) ||
+      ROLE_KEYWORDS.gender.test(h) ||
+      ROLE_KEYWORDS.note.test(h) ||
+      ROLE_KEYWORDS.qty.test(h)
+    ) {
+      coreRoleIndices.add(idx);
+    }
+  });
+  const out: number[] = [];
+  for (let i = 0; i < rawHeader.length; i += 1) {
+    if (coreRoleIndices.has(i)) continue;
+    const raw = String(rawHeader[i] ?? "").trim();
+    const norm = preprocessCell(raw);
+    if (!norm) continue;
+    if (ROLE_KEYWORDS.size.test(norm) || ROLE_KEYWORDS.size2.test(norm)) continue;
+    if (MULTI_ITEM_PRODUCT_HEADER_HINTS.some((re) => re.test(raw))) {
+      out.push(i);
+    }
+  }
+  return out;
+}
+
 export function detectHeaderRow(rows: string[][]): number {
   const max = Math.min(rows.length, 30);
   let bestIdx = 0;
@@ -107,6 +149,9 @@ export function detectStructureType(rows: string[][], headerRowIndex: number): S
   const hasPersonCore =
     header.some((h) => ROLE_KEYWORDS.name.test(h)) &&
     (header.some((h) => ROLE_KEYWORDS.size.test(h)) || header.some((h) => ROLE_KEYWORDS.qty.test(h)));
+  const hasNameHeader = header.some((h) => ROLE_KEYWORDS.name.test(h));
+  const multiItemProductCols = detectMultiItemProductColumns(rawHeader);
+  if (hasNameHeader && multiItemProductCols.length >= 2) return "multi_item_personal_order";
   if (hasPersonCore) return "single_row_person";
 
   return "unknown";
@@ -142,6 +187,11 @@ export function suggestFieldMapping(rows: string[][], structureType: StructureTy
       fields,
       slotGroups: repeatedGroups.map((g) => ({ ...g })),
     };
+  }
+
+  if (structureType === "multi_item_personal_order") {
+    const productColumns = detectMultiItemProductColumns(header);
+    return { structureType, headerRowIndex, fields, productColumns };
   }
 
   if (structureType !== "repeated_slots") {

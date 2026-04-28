@@ -14,6 +14,7 @@ import {
   unionClubsOrdered,
 } from "./clubSizeAggModes";
 import { labelSizeAnalysisParseStatusForRow, labelSizeAnalysisReasonForRow } from "./excludeReasonLabels";
+import type { StructureType } from "./types";
 
 type DupInput = { duplicateRowIds: Set<string>; dupByClub: Map<string, { persons: number; sheets: number }> };
 
@@ -210,13 +211,18 @@ function buildStyledAoaSheet(
 /**
  * 사이즈 분석 결과 `rows`·중복 집계를 기준으로 4시트 xlsx를 만들어 브라우저에 저장합니다.
  */
-export function downloadSizeAnalysisResultXlsx(rows: any[], duplicateAnalysis: DupInput): void {
-  const aoa1 = buildSheetAll(rows, duplicateAnalysis.duplicateRowIds);
+export function downloadSizeAnalysisResultXlsx(
+  rows: any[],
+  duplicateAnalysis: DupInput,
+  opts?: { structureType?: StructureType }
+): void {
+  const isMultiItem = opts?.structureType === "multi_item_personal_order";
+  const aoa1 = buildSheetAll(rows, duplicateAnalysis.duplicateRowIds, isMultiItem);
   const aoa3 = buildSheetDupMembers(rows, duplicateAnalysis.duplicateRowIds);
   const aoa4 = buildSheetReview(rows);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, buildSheetAllStyled(aoa1), "전체목록");
+  XLSX.utils.book_append_sheet(wb, buildSheetAllStyled(aoa1, isMultiItem), "전체목록");
   XLSX.utils.book_append_sheet(
     wb,
     buildClubAggregateStyledSheet(rows, duplicateAnalysis.duplicateRowIds),
@@ -224,45 +230,148 @@ export function downloadSizeAnalysisResultXlsx(rows: any[], duplicateAnalysis: D
   );
   XLSX.utils.book_append_sheet(wb, buildSheetDupStyled(aoa3), "중복자");
   XLSX.utils.book_append_sheet(wb, buildSheetReviewStyled(aoa4), "검토필요");
+  if (isMultiItem) {
+    const productSheets = buildProductSheets(rows, duplicateAnalysis.duplicateRowIds);
+    for (const s of productSheets) {
+      XLSX.utils.book_append_sheet(wb, s.ws, s.name);
+    }
+  }
 
   const ymd = formatDownloadFileNameDateYymmdd();
   const fileName = `size-analysis-${ymd}.xlsx`;
   XLSX.writeFile(wb, fileName, { bookType: "xlsx", cellStyles: true });
 }
 
-function buildSheetAll(rows: any[], duplicateRowIds: Set<string>) {
-  const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "사유", "신뢰도", "중복여부"];
-  const body = rows.map((r, i) => {
-    return [
-    r.sourceRowIndex ?? "",
-    r.clubNameRaw ?? r.clubNameNormalized ?? "",
-    r.memberNameRaw ?? "",
-    r.genderNormalized ?? r.genderRaw ?? "",
-    r.standardizedSize ?? r.sizeRaw ?? "",
-    r.qtyParsed ?? r.qtyRaw ?? "",
-    labelSizeAnalysisParseStatusForRow(r),
-    labelSizeAnalysisReasonForRow(r),
-    Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
-    duplicateRowIds.has(stableRowKeyForDup(r, i)) ? "예" : "아니오",
-  ];
+function genderOrderForMultiItem(raw: unknown): number {
+  const t = String(raw ?? "").trim();
+  if (t === "여") return 0;
+  if (t === "남") return 1;
+  if (t === "공용") return 2;
+  return 3;
+}
+
+function sizeOrderForMultiItem(raw: unknown): { kind: 0 | 1; num: number; text: string } {
+  const t = String(raw ?? "").trim();
+  const m = t.match(/(?:^|[^0-9])(80|85|90|95|100|105|110|115|120)(?![0-9])/);
+  if (m?.[1]) return { kind: 0, num: Number(m[1]), text: t };
+  return { kind: 1, num: Number.POSITIVE_INFINITY, text: t };
+}
+
+function compareSizeForMultiItem(a: unknown, b: unknown): number {
+  const aa = sizeOrderForMultiItem(a);
+  const bb = sizeOrderForMultiItem(b);
+  if (aa.kind !== bb.kind) return aa.kind - bb.kind;
+  if (aa.kind === 0) return aa.num - bb.num;
+  return aa.text.localeCompare(bb.text, "ko");
+}
+
+function buildSheetAll(rows: any[], duplicateRowIds: Set<string>, includeItemColumn: boolean) {
+  const sourceRows =
+    includeItemColumn
+      ? [...rows].sort((a, b) => {
+          const ga = String(a?.genderNormalized ?? a?.genderRaw ?? "").trim();
+          const gb = String(b?.genderNormalized ?? b?.genderRaw ?? "").trim();
+          const gCmp = genderOrderForMultiItem(ga) - genderOrderForMultiItem(gb);
+          if (gCmp !== 0) return gCmp;
+          const sa = String(a?.standardizedSize ?? a?.sizeRaw ?? "").trim();
+          const sb = String(b?.standardizedSize ?? b?.sizeRaw ?? "").trim();
+          const sCmp = compareSizeForMultiItem(sa, sb);
+          if (sCmp !== 0) return sCmp;
+          const na = String(a?.memberNameRaw ?? "").trim();
+          const nb = String(b?.memberNameRaw ?? "").trim();
+          return na.localeCompare(nb, "ko");
+        })
+      : rows;
+  const header = includeItemColumn
+    ? ["원본행", "클럽", "이름", "성별", "상품명", "사이즈", "수량", "상태", "사유", "신뢰도", "중복여부"]
+    : ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "사유", "신뢰도", "중복여부"];
+  const body = sourceRows.map((r, i) => {
+    const base = [
+      r.sourceRowIndex ?? "",
+      r.clubNameRaw ?? r.clubNameNormalized ?? "",
+      r.memberNameRaw ?? "",
+      r.genderNormalized ?? r.genderRaw ?? "",
+    ];
+    const tail = [
+      r.standardizedSize ?? r.sizeRaw ?? "",
+      r.qtyParsed ?? r.qtyRaw ?? "",
+      labelSizeAnalysisParseStatusForRow(r),
+      labelSizeAnalysisReasonForRow(r),
+      Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
+      duplicateRowIds.has(stableRowKeyForDup(r, i)) ? "예" : "아니오",
+    ];
+    if (includeItemColumn) return [...base, r.itemRaw ?? "", ...tail];
+    return [...base, ...tail];
   });
   return [header, ...body];
 }
 
-function buildSheetAllStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet {
+function buildProductSheets(rows: any[], duplicateRowIds: Set<string>): Array<{ name: string; ws: XLSX.WorkSheet }> {
+  const items = Array.from(
+    new Set(
+      rows
+        .map((r) => String(r?.itemRaw ?? "").trim())
+        .filter((x) => x.length > 0)
+    )
+  ).sort((a, b) => a.localeCompare(b, "ko"));
+  const out: Array<{ name: string; ws: XLSX.WorkSheet }> = [];
+  for (const item of items) {
+    const sub = rows.filter((r, i) => {
+      const sameItem = String(r?.itemRaw ?? "").trim() === item;
+      if (!sameItem) return false;
+      const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
+      if (isDup) return false;
+      const st = String(r?.parseStatus ?? "");
+      if (st !== "auto_confirmed" && st !== "corrected") return false;
+      if (r?.excluded) return false;
+      return true;
+    });
+    const by = new Map<string, number>();
+    for (const r of sub) {
+      const g = String(r.genderNormalized ?? r.genderRaw ?? "").trim() || "공용";
+      const s = String(r.standardizedSize ?? r.sizeRaw ?? "").trim() || "미분류";
+      const q = Number.isFinite(Number(r.qtyParsed)) ? Number(r.qtyParsed) : 0;
+      const key = `${g}\0${s}`;
+      by.set(key, (by.get(key) ?? 0) + q);
+    }
+    const body = Array.from(by.entries())
+      .map(([k, qty]) => {
+        const [gender, size] = k.split("\0");
+        return [gender, size, qty] as Array<string | number>;
+      })
+      .sort(
+        (a, b) =>
+          genderOrderForMultiItem(a[0]) - genderOrderForMultiItem(b[0]) ||
+          compareSizeForMultiItem(a[1], b[1])
+      );
+    const aoa = [["성별", "사이즈", "수량"], ...body];
+    const ws = buildStyledAoaSheet(aoa, {
+      centerCols: new Set([0, 1, 2]),
+      freezeHeader: true,
+      emptyMessage: "(집계할 데이터가 없습니다)",
+    });
+    out.push({ name: item.slice(0, 31), ws });
+  }
+  return out;
+}
+
+function buildSheetAllStyled(aoa: Array<Array<string | number>>, includeItemColumn: boolean): XLSX.WorkSheet {
+  const dupCol = includeItemColumn ? 10 : 9;
+  const statusCol = includeItemColumn ? 7 : 6;
+  const centerCols = includeItemColumn ? new Set([0, 3, 5, 6, 7, 8, 9, 10]) : new Set([0, 3, 4, 5, 6, 7, 8, 9]);
   return buildStyledAoaSheet(aoa, {
-    centerCols: new Set([0, 3, 4, 5, 6, 7, 8, 9]),
+    centerCols,
     freezeHeader: true,
     emptyMessage: "(전체목록 데이터가 없습니다)",
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
-      if (c === 9 && String(row[9] ?? "") === "예") {
+      if (c === dupCol && String(row[dupCol] ?? "") === "예") {
         return { fill: EMPH_DUP_FILL, font: { bold: true } };
       }
-      if (c === 6 && String(row[6] ?? "") === "검토필요") {
+      if (c === statusCol && String(row[statusCol] ?? "") === "검토필요") {
         return { fill: EMPH_REVIEW_FILL, font: { bold: true } };
       }
-      if (c === 6 && String(row[6] ?? "") === "미분류") {
+      if (c === statusCol && String(row[statusCol] ?? "") === "미분류") {
         return { fill: EMPH_UNRES_FILL, font: { bold: true } };
       }
       return null;

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { sanitizeForPrismaJson } from "@/lib/sanitizeForPrismaJson";
 import { detectHeaderRow, detectStructureType, extractPeopleFromRows, suggestFieldMapping } from "./structure";
 import { parseRepeatedSlots, parseSingleRowPerson, parseSizeMatrix, parseUnknownManualItem } from "./strategies";
+import { parseMultiItemPersonalOrder } from "./multiItemPersonalOrder";
 import { preprocessCell } from "./normalize";
 import { applyDuplicateSizePolicy, normalizePersonSizePolicy } from "./personSizePolicy";
 import type { FieldMapping, NormalizedRow, PersonRecord, StructureType, WorkbookSnapshot } from "./types";
@@ -177,6 +178,17 @@ export async function runAnalysis(jobId: string) {
   } else if (mappingJson.structureType === "repeated_slots") {
     rows = people.length > 0 ? normalizedRowsFromPeople(jobId, sheet.name, people) : parseRepeatedSlots(jobId, sheet, mappingJson);
   } else if (mappingJson.structureType === "size_matrix") rows = parseSizeMatrix(jobId, sheet, mappingJson);
+  else if (mappingJson.structureType === "multi_item_personal_order") {
+    const f = mappingJson.fields;
+    const productCols = Array.isArray(mappingJson.productColumns) ? mappingJson.productColumns : [];
+    if (f.name === undefined) {
+      throw new Error("다품목 개인주문형에서는 이름 열이 지정된 뒤 매핑을 저장해 주세요.");
+    }
+    if (productCols.length === 0) {
+      throw new Error("다품목 개인주문형에서는 상품 컬럼(상의/하의 등)을 1개 이상 선택해 주세요.");
+    }
+    rows = parseMultiItemPersonalOrder(jobId, sheet, mappingJson, { requestedClubName: job.fileName });
+  }
   else if (mappingJson.structureType === "unknown") {
     const f = mappingJson.fields;
     const hasSizeColumn = f.size !== undefined || f.size2 !== undefined;

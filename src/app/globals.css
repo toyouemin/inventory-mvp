@@ -6935,6 +6935,68 @@ label {
   overflow: hidden;
 }
 
+.size-analysis-order-list-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.size-analysis-order-list-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
+
+.size-analysis-order-list-table th,
+.size-analysis-order-list-table td {
+  width: auto;
+  white-space: nowrap;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+/* 다품목 주문 명단 전용 컬럼 폭 힌트 (이름/상품명/성별/사이즈/수량) */
+.size-analysis-order-list-table th:nth-child(1),
+.size-analysis-order-list-table td:nth-child(1) {
+  width: 72px;
+}
+
+.size-analysis-order-list-table th:nth-child(2),
+.size-analysis-order-list-table td:nth-child(2) {
+  width: auto;
+}
+
+.size-analysis-order-list-table th:nth-child(3),
+.size-analysis-order-list-table td:nth-child(3) {
+  width: 42px;
+  text-align: center;
+}
+
+.size-analysis-order-list-table th:nth-child(4),
+.size-analysis-order-list-table td:nth-child(4) {
+  width: 48px;
+  text-align: center;
+}
+
+.size-analysis-order-list-table th:nth-child(5),
+.size-analysis-order-list-table td:nth-child(5) {
+  width: 36px;
+  text-align: center;
+}
+
+.size-analysis-order-item-text {
+  display: inline;
+  white-space: nowrap;
+  font-size: inherit;
+}
+
+@media (max-width: 768px) {
+  .size-analysis-order-list-table th,
+  .size-analysis-order-list-table td {
+    font-size: 11px;
+    padding: 3px 5px;
+  }
+}
+
 .size-analysis-dup-pc-table {
   width: 100%;
   max-width: 100%;
@@ -7148,6 +7210,12 @@ label {
   margin-bottom: 8px;
 }
 
+.size-analysis-map-autofill-feedback {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.8rem;
+}
+
 .size-analysis-btn-auto {
   font-size: 0.88rem;
 }
@@ -7230,6 +7298,72 @@ label {
   color: #374151;
 }
 
+.size-analysis-product-cols-note {
+  margin-left: 6px;
+  font-size: 8px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.size-analysis-product-cols-card {
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.size-analysis-product-cols-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.size-analysis-product-chip {
+  min-width: 0;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #374151;
+  cursor: pointer;
+}
+
+.size-analysis-product-chip:hover {
+  border-color: #9ca3af;
+}
+
+.size-analysis-product-chip--selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.size-analysis-product-chip--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.size-analysis-product-chip__text {
+  min-width: 0;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  text-align: left;
+  word-break: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.size-analysis-product-chip__check {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
 .size-analysis-field-select--has-value {
   border-color: #3b82f6;
   background: #f8fafc;
@@ -7269,6 +7403,81 @@ label {
 .size-analysis-norm-table-wrap--desktop {
   display: block;
   width: 100%;
+}
+
+.size-analysis-norm-section .size-analysis-collapsible-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.size-analysis-norm-section .size-analysis-collapsible-head > h3 {
+  margin: 0;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  flex: 0 1 auto;
+}
+
+.size-analysis-norm-section .size-analysis-collapsible-head .size-analysis-collapsible-toggle {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  width: auto;
+  min-width: fit-content;
+  max-width: max-content;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  margin-left: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #f3f4f6;
+  color: #4b5563;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+}
+
+.size-analysis-norm-section .size-analysis-collapsible-head .size-analysis-collapsible-toggle[aria-expanded="true"] {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.size-analysis-norm-section .size-analysis-collapsible-head .size-analysis-collapsible-toggle[aria-expanded="false"] {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #374151;
+}
+
+.size-analysis-norm-section .size-analysis-collapsible-body {
+  margin-top: 6px;
+}
+
+.size-analysis-norm-section .size-analysis-collapsible-body--collapsed {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .size-analysis-norm-section .size-analysis-collapsible-head {
+    align-items: center;
+  }
+
+  .size-analysis-norm-section .size-analysis-collapsible-head .size-analysis-collapsible-toggle {
+    min-height: 29px;
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1.2;
+    border-radius: 6px;
+    width: auto;
+    min-width: fit-content;
+    max-width: max-content;
+    flex: 0 0 auto;
+  }
 }
 
 /* 8) 집계: 모바일·PC 공통 매트릭스 컨테이너 */
@@ -7852,6 +8061,20 @@ label {
 
   .size-analysis-field-row__label {
     font-size: 0.8rem;
+  }
+
+  .size-analysis-product-cols-grid {
+    gap: 4px;
+  }
+
+  .size-analysis-product-chip {
+    min-height: 30px;
+    padding: 4px 6px;
+    border-radius: 7px;
+  }
+
+  .size-analysis-product-chip__text {
+    font-size: 0.76rem;
   }
 
   .size-analysis-field-select,

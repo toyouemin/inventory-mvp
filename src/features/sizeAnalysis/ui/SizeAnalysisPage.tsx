@@ -233,12 +233,33 @@ function isNameMissingRow(r: any): boolean {
   return String(r?.memberNameRaw ?? r?.memberName ?? "").trim() === "";
 }
 
+function isMaleOutOfRange90Row(r: any): boolean {
+  const gender = String(r?.genderNormalized ?? r?.genderRaw ?? "")
+    .trim()
+    .toLowerCase();
+  const isMale = gender === "남" || gender === "남자" || gender === "m";
+  if (!isMale) return false;
+  const size = String(r?.standardizedSize ?? r?.sizeRaw ?? "")
+    .trim()
+    .toUpperCase();
+  return size === "90" || size === "M90" || size === "90M";
+}
+
+function displaySizeWithWarning(r: any): string {
+  const base = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim();
+  if (!base) return "";
+  return isMaleOutOfRange90Row(r) ? `${base}(확인)` : base;
+}
+
 function displayReasonForNormalizedRow(r: any): string {
+  const warningReason = isMaleOutOfRange90Row(r) ? "남성 기준 외 사이즈" : "";
   if (isNameMissingRow(r)) {
     const hasSize = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim() !== "";
-    return hasSize ? "이름 없음" : "이름 없음 / 사이즈 없음";
+    const baseReason = hasSize ? "이름 없음" : "이름 없음 / 사이즈 없음";
+    return warningReason ? `${baseReason} / ${warningReason}` : baseReason;
   }
-  return labelSizeAnalysisReasonForRow(r);
+  const baseReason = labelSizeAnalysisReasonForRow(r);
+  return warningReason ? (baseReason ? `${baseReason} / ${warningReason}` : warningReason) : baseReason;
 }
 
 export function SizeAnalysisPage() {
@@ -608,7 +629,7 @@ export function SizeAnalysisPage() {
                 : "필수 매핑을 완료해주세요"
             }
           >
-            {loading === "run" ? "분석 실행 중..." : "분석 실행"}
+            {loading === "run" ? "분석 실행 중..." : allSetupStepsComplete ? "분석실행(클릭)" : "분석실행"}
           </button>
           {!allSetupStepsComplete ? (
             <p className="size-analysis-muted size-analysis-run-card__note" role="note">
@@ -1198,8 +1219,15 @@ export function ClubMembersView({
     for (let i = 0; i < allRows.length; i += 1) {
       const r = allRows[i]!;
       const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
-      const includeByFinal = rowIncludedInFinalAggregation(r);
-      const includeByDupToggle = includeDuplicates && isDup;
+      const st = String(r?.parseStatus ?? "").trim();
+      const excludeReason = String(r?.excludeReason ?? "").trim();
+      const isDuplicateExcludedRow =
+        (Boolean(r?.excluded) || st === "excluded") &&
+        (excludeReason.startsWith("duplicate_") || excludeReason === "duplicate_person_group");
+      const includeByFinal =
+        !Boolean(r?.excluded) &&
+        (st === "auto_confirmed" || st === "corrected" || st === "unresolved");
+      const includeByDupToggle = includeDuplicates && (isDup || isDuplicateExcludedRow);
       if (!includeByFinal && !includeByDupToggle) continue;
       const club = normClubFromNormRow(r);
       const name = String(r?.memberNameRaw ?? r?.memberName ?? "").trim() || "(이름 없음)";
@@ -1742,7 +1770,7 @@ function normalizedRowLine1(r: any): string {
   const club = String(r.clubNameRaw ?? "").trim();
   const name = String(r.memberNameRaw ?? "").trim();
   const gender = String(r.genderNormalized ?? r.genderRaw ?? "").trim();
-  const size = String(r.standardizedSize ?? r.sizeRaw ?? "").trim();
+  const size = displaySizeWithWarning(r);
   const q = r.qtyParsed ?? r.qtyRaw;
   let qtyStr = "";
   if (q !== "" && q != null) {
@@ -1876,7 +1904,7 @@ export function AnalysisRowsTable({
                     </span>
                   </td>
                   <td data-label="성별">{r.genderNormalized ?? r.genderRaw ?? ""}</td>
-                  <td data-label="사이즈">{r.standardizedSize ?? r.sizeRaw ?? ""}</td>
+                  <td data-label="사이즈">{displaySizeWithWarning(r)}</td>
                   <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
                   <td data-label="상태">{labelSizeAnalysisParseStatusForRow(r)}</td>
                   <td data-label="사유">{displayReasonForNormalizedRow(r)}</td>

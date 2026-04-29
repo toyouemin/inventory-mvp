@@ -2472,7 +2472,7 @@ export function ClubSizeSummaryTable({
     <section className="size-analysis-card size-analysis-club-size-card size-analysis-club-agg-section">
       <h3>8) 클럽/성별/사이즈 집계</h3>
       <div
-        className="size-analysis-agg-mode-tabs"
+        className="size-analysis-agg-mode-tabs size-analysis-agg-mode-tabs--triple"
         role="tablist"
         aria-label="집계 기준"
       >
@@ -2603,7 +2603,11 @@ export function ProductSizeSummaryTable({
   return (
     <section className="size-analysis-card size-analysis-club-size-card size-analysis-club-agg-section">
       <h3>9) 상품별 집계</h3>
-      <div className="size-analysis-agg-mode-tabs" role="tablist" aria-label="상품별 집계 기준">
+      <div
+        className="size-analysis-agg-mode-tabs size-analysis-agg-mode-tabs--triple"
+        role="tablist"
+        aria-label="상품별 집계 기준"
+      >
         {(["total", "deduped", "duplicate"] as const).map((m) => (
           <button
             key={`prod-mode-${m}`}

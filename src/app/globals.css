@@ -7205,6 +7205,13 @@ label {
   margin: 0 0 8px 0;
 }
 
+.size-analysis-agg-mode-tabs--triple {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
 .size-analysis-agg-mode-tab {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -7215,6 +7222,24 @@ label {
   font-weight: 600;
   padding: 8px 12px;
   cursor: pointer;
+  text-align: center;
+}
+
+.size-analysis-agg-mode-tabs--triple .size-analysis-agg-mode-tab {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .size-analysis-agg-mode-tabs--triple {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .size-analysis-agg-mode-tabs--triple {
+    grid-template-columns: 1fr;
+  }
 }
 
 .size-analysis-agg-mode-tab--active {

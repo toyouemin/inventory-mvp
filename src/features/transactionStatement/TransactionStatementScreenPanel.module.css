@@ -357,3 +357,58 @@
     font-size: 14px;
   }
 }
+
+@media (min-width: 1024px) {
+  .panelTitle {
+    font-size: 19px;
+    line-height: 1.45;
+  }
+
+  .vatToggleLabel {
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+
+  .summaryStack {
+    font-size: 13.5px;
+    line-height: 1.45;
+  }
+
+  .summaryItem strong {
+    font-size: 12.5px;
+  }
+
+  .summaryPartyTitle {
+    font-size: 12px;
+  }
+
+  .itemsTable {
+    font-size: 14px;
+  }
+
+  .itemsTable th {
+    font-size: 12px;
+  }
+
+  .totalsAmount {
+    font-size: 17px;
+    line-height: 1.4;
+  }
+
+  .totalsMeta {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .totalsAmountKorean {
+    font-size: 13px;
+  }
+
+  .totalsVat {
+    font-size: 12px;
+  }
+
+  .previewBtn {
+    font-size: 15px;
+  }
+}

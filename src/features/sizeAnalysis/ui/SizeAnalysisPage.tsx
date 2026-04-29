@@ -841,7 +841,8 @@ export function FieldMappingEditor({
   );
   if (!mapping) return null;
   const m = mapping;
-  const roles = ["club", "name", "gender", "size", "size2", "qty", "item", "note"] as const;
+  const FIELD_ROLES = ["club", "name", "gender", "size", "size2", "qty"] as const;
+  const FIELD_ROLES_ITEM_NOTE = ["item", "note"] as const;
   const hasPreview = maxCols > 0;
   const previewLen = previewRows?.length ?? 0;
   const headerOutOfPreview = m.headerRowIndex >= previewLen;
@@ -908,6 +909,75 @@ export function FieldMappingEditor({
   const unknownNeedsFix = m.structureType === "unknown" && unknownUnmapped.length > 0;
   const multiItemNeedsFix = isMultiItem && (m.fields.name === undefined || selectedProductColumns.length === 0);
   const formOff = disabled || loading;
+
+  type MappedFieldRole = (typeof FIELD_ROLES)[number] | (typeof FIELD_ROLES_ITEM_NOTE)[number];
+  function renderMappedFieldRow(role: MappedFieldRole): ReactNode {
+    const idx0 = m.fields[role];
+    const dup = idx0 !== undefined && duplicateCols.includes(idx0);
+    const reqUnknown = m.structureType === "unknown" && requiredUnknownSet.has(role) && idx0 === undefined;
+    const unmapped = idx0 === undefined;
+    return (
+      <div
+        key={role}
+        className={[
+          "size-analysis-field-row",
+          `size-analysis-field-row--role-${role}`,
+          unmapped && "size-analysis-field-row--unmapped",
+          reqUnknown && "size-analysis-field-row--required",
+          dup && "size-analysis-field-row--dup",
+          idx0 !== undefined && "size-analysis-field-row--filled",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
+        <span className="size-analysis-field-row__label">{FIELD_ROLE_LABEL[role] ?? role}</span>
+        {hasPreview ? (
+          <select
+            className={["size-analysis-field-select", idx0 !== undefined && "size-analysis-field-select--has-value"]
+              .filter(Boolean)
+              .join(" ")}
+            value={idx0 === undefined ? "" : String(idx0)}
+            disabled={formOff}
+            onChange={(e) => {
+              const v = e.target.value;
+              onChange({
+                ...m,
+                fields: { ...m.fields, [role]: v === "" ? undefined : parseInt(v, 10) },
+              });
+            }}
+          >
+            <option value="">— 열 선택 —</option>
+            {Array.from({ length: maxCols }, (_, i) => (
+              <option key={i} value={i}>
+                {columnLabelForIndex(i)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="size-analysis-fallback-cols">
+            <input
+              type="number"
+              className="size-analysis-field-input"
+              min={1}
+              placeholder="열 번호 (1=첫 열)"
+              value={idx0 === undefined ? "" : idx0 + 1}
+              disabled={formOff}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onChange({
+                  ...m,
+                  fields: {
+                    ...m.fields,
+                    [role]: raw === "" ? undefined : Math.max(0, (parseInt(raw, 10) || 1) - 1),
+                  },
+                });
+              }}
+            />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="size-analysis-field-mapping-inner">
@@ -1020,73 +1090,10 @@ export function FieldMappingEditor({
         </p>
       ) : null}
       <div className="size-analysis-map-fields">
-        {roles.map((role) => {
-          const idx0 = m.fields[role];
-          const dup = idx0 !== undefined && duplicateCols.includes(idx0);
-          const reqUnknown = m.structureType === "unknown" && requiredUnknownSet.has(role) && idx0 === undefined;
-          const unmapped = idx0 === undefined;
-          return (
-            <div
-              key={role}
-              className={[
-                "size-analysis-field-row",
-                `size-analysis-field-row--role-${role}`,
-                unmapped && "size-analysis-field-row--unmapped",
-                reqUnknown && "size-analysis-field-row--required",
-                dup && "size-analysis-field-row--dup",
-                idx0 !== undefined && "size-analysis-field-row--filled",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <span className="size-analysis-field-row__label">{FIELD_ROLE_LABEL[role] ?? role}</span>
-              {hasPreview ? (
-                <select
-                  className={["size-analysis-field-select", idx0 !== undefined && "size-analysis-field-select--has-value"]
-                    .filter(Boolean)
-                    .join(" ")}
-                  value={idx0 === undefined ? "" : String(idx0)}
-                  disabled={formOff}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    onChange({
-                      ...m,
-                      fields: { ...m.fields, [role]: v === "" ? undefined : parseInt(v, 10) },
-                    });
-                  }}
-                >
-                  <option value="">— 열 선택 —</option>
-                  {Array.from({ length: maxCols }, (_, i) => (
-                    <option key={i} value={i}>
-                      {columnLabelForIndex(i)}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div className="size-analysis-fallback-cols">
-                  <input
-                    type="number"
-                    className="size-analysis-field-input"
-                    min={1}
-                    placeholder="열 번호 (1=첫 열)"
-                    value={idx0 === undefined ? "" : idx0 + 1}
-                    disabled={formOff}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      onChange({
-                        ...m,
-                        fields: {
-                          ...m.fields,
-                          [role]: raw === "" ? undefined : Math.max(0, (parseInt(raw, 10) || 1) - 1),
-                        },
-                      });
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {FIELD_ROLES.map((role) => renderMappedFieldRow(role))}
+        <div className="size-analysis-map-fields__item-note-pair">
+          {FIELD_ROLES_ITEM_NOTE.map((role) => renderMappedFieldRow(role))}
+        </div>
       </div>
       {hasPreview ? (
         showRemapGuide ? (
@@ -1785,7 +1792,7 @@ export function ClubGroupedView({
           const totalQty = productRows.reduce((sum, row) => sum + row.qty, 0);
           return {
             modeKey: `product-${product}`,
-            shortLabel: `${product} 매트릭스 (${totalQty}개)`,
+            shortLabel: `${product} (${totalQty}개)`,
             headlineAriaLabel: `${clubName} · ${product}`,
             isDuplicateMatrix: false,
             sizes,
@@ -1975,18 +1982,19 @@ export function AnalysisSummaryCards({
   const totalQty = duplicateAnalysis.totalQty;
   const finalQty = duplicateAnalysis.normalQty;
   const filterLabel = STATUS_FILTER_LABEL[statusFilter as (typeof STATUS_FILTER_OPTIONS)[number]] ?? statusFilter;
+  /** 가독성: 전체 현황 → 처리 상태 → 제외/중복 → (다품목) 상품별 합계 순 */
   const cards: Array<[string, string | number]> = [
     ["총 정규화 행 수", summary.totalRows],
+    ["원본 총수량", totalQty],
     ["자동확정", summary.auto_confirmed],
+    ["수정완료", summary.corrected],
     ["검토필요", summary.needs_review],
     ["미분류", summary.unresolved],
-    ["수정완료", summary.corrected],
     ["제외(중복자)", summary.excludedDuplicateCount ?? 0],
-    ["빈 수량 제외", summary.excludedEmptyQtyCount ?? 0],
-    ["원본 총수량", totalQty],
-    ["중복 제외 수량", finalQty],
     ["중복 주문(건)", duplicateAnalysis.duplicatePersonCount],
     ["중복 수량", duplicateAnalysis.duplicateQtyTotal],
+    ["중복 제외 수량", finalQty],
+    ["빈 수량 제외", summary.excludedEmptyQtyCount ?? 0],
   ];
   if (structureType === "multi_item_personal_order") {
     const byProduct = new Map<string, number>();

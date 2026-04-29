@@ -2517,7 +2517,8 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  /* sticky 헤더·메인 네비(z-index:1000) 위에 표시 */
+  z-index: 1100;
   padding: 16px;
 }
 
@@ -2851,7 +2852,6 @@ label {
   justify-content: center;
   padding: 24px 16px;
   background: rgba(0, 0, 0, 0.58);
-  z-index: 220;
 }
 
 .modal.product-delete-confirm-modal {
@@ -2893,7 +2893,6 @@ label {
   justify-content: center;
   padding: 24px 16px;
   background: rgba(0, 0, 0, 0.58);
-  z-index: 225;
 }
 
 .modal.csv-upload-error-modal {
@@ -3001,7 +3000,13 @@ label {
 
 .modal-overlay.add-product-modal-overlay {
   align-items: flex-start;
-  padding: 35px 14px 12px;
+  padding: 48px 14px 12px;
+}
+
+@media (max-width: 768px) {
+  .modal-overlay.add-product-modal-overlay {
+    padding-top: max(52px, env(safe-area-inset-top, 0px));
+  }
 }
 
 /* VariantEditor: ??????????, ??? ????? ?? */
@@ -4264,6 +4269,78 @@ label {
   .transaction-page__desc {
     margin-top: 0;
     margin-bottom: 7px;
+  }
+}
+
+/* 거래명세표 작성: PC만 본문·입력·버튼 가독성 (모바일/≤1023 변경 없음) */
+@media (min-width: 1024px) {
+  .transaction-page {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .transaction-page__card > h1 {
+    font-size: 20px;
+    line-height: 1.45;
+  }
+
+  .transaction-page__desc {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .transaction-form-grid label,
+  .transaction-page .estimate-form label {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .transaction-form-grid input,
+  .transaction-page .estimate-form input {
+    font-size: 15px;
+  }
+
+  .transaction-items__header h2 {
+    font-size: 19px;
+    line-height: 1.4;
+  }
+
+  .transaction-item-row__grid label {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .transaction-item-row__grid input,
+  .transaction-item-row__grid select {
+    font-size: 15px;
+  }
+
+  .transaction-items__estimate-memo label {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .transaction-items__estimate-memo textarea {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .transaction-summary {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .transaction-error {
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  .transaction-page .btn-compact {
+    font-size: 15px;
+  }
+
+  .transaction-page .transaction-actions > .btn {
+    font-size: 15px;
   }
 }
 
@@ -7235,27 +7312,49 @@ label {
   margin: 0 0 8px 0;
 }
 
-/* 필드 매핑: 모바일 2열 → PC 4열, 비고만 전체 폭 (DOM 순서 자동 배치) */
-.size-analysis-map-fields {
+/* 필드 매핑: 모바일 2열 → PC 4열 (주문내용·비고는 같은 행 묶음으로 좌우 배치) */
+.size-analysis-field-mapping .size-analysis-map-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: 6px;
   margin-top: 4px;
   align-items: stretch;
 }
 
-.size-analysis-map-fields > .size-analysis-field-row {
+.size-analysis-field-mapping .size-analysis-map-fields > .size-analysis-field-row {
   width: auto;
   min-width: 0;
   max-width: 100%;
 }
 
-.size-analysis-map-fields > .size-analysis-field-row--role-note {
+/* 주문내용 · 비고: 항상 한 행 두 칸(PC·모바일 동일 · 사이즈2/수량과 동일 패턴) */
+.size-analysis-field-mapping .size-analysis-map-fields__item-note-pair {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.size-analysis-field-mapping .size-analysis-map-fields__item-note-pair > .size-analysis-field-row {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .size-analysis-field-mapping .size-analysis-map-fields,
+  .size-analysis-field-mapping .size-analysis-map-fields__item-note-pair {
+    gap: 8px;
+  }
 }
 
 @media (min-width: 768px) {
-  .size-analysis-map-fields {
+  .size-analysis-field-mapping .size-analysis-map-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -7270,6 +7369,13 @@ label {
   border: 1px solid #e5e7eb;
   background: #fff;
   transition: border-color 0.15s, background 0.15s;
+}
+
+/* 매핑 열 선택 카드만 카드 테두리·라벨-입력 간격 축소 (select/input 안쪽 패딩은 그대로) */
+.size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-row,
+.size-analysis-field-mapping .size-analysis-map-fields__item-note-pair > .size-analysis-field-row {
+  padding: 5px 6px;
+  gap: 6px 8px;
 }
 
 .size-analysis-field-row--unmapped {
@@ -7300,7 +7406,8 @@ label {
 
 .size-analysis-product-cols-note {
   margin-left: 6px;
-  font-size: 8px;
+  font-size: 12px;
+  line-height: 1.35;
   font-weight: 400;
   color: #6b7280;
 }
@@ -8462,18 +8569,25 @@ label {
     gap: 14px;
   }
 
-  /* 4) 필드 매핑: PC 4열 */
+  /* 4) 필드 매핑: PC 4열 — 열 선택 카드 간격만 축소(상품 컬럼 카드는 아래에서 유지) */
   .size-analysis-field-mapping .size-analysis-map-fields {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 6px;
+    gap: 8px;
+    margin-top: 4px;
   }
 
-  .size-analysis-field-mapping .size-analysis-field-row {
+  .size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-row,
+  .size-analysis-field-mapping .size-analysis-map-fields__item-note-pair > .size-analysis-field-row {
     grid-template-columns: 1fr;
     align-items: start;
+    gap: 5px;
+    min-height: 76px;
+    padding: 6px 8px;
+  }
+
+  .size-analysis-field-mapping .size-analysis-field-row.size-analysis-product-cols-card {
     gap: 6px;
-    min-height: 88px;
+    min-height: auto;
     padding: 8px 10px;
   }
 

@@ -841,8 +841,8 @@ export function FieldMappingEditor({
   );
   if (!mapping) return null;
   const m = mapping;
-  const FIELD_ROLES = ["club", "name", "gender", "size", "size2", "qty"] as const;
-  const FIELD_ROLES_ITEM_NOTE = ["item", "note"] as const;
+  /** 한 그리드에 8칸 — PC 4열이면 (클럽·이름·성별·사이즈) / (사이즈2·수량·주문내용·비고) */
+  const FIELD_ROLES_MAP = ["club", "name", "gender", "size", "size2", "qty", "item", "note"] as const;
   const hasPreview = maxCols > 0;
   const previewLen = previewRows?.length ?? 0;
   const headerOutOfPreview = m.headerRowIndex >= previewLen;
@@ -910,7 +910,7 @@ export function FieldMappingEditor({
   const multiItemNeedsFix = isMultiItem && (m.fields.name === undefined || selectedProductColumns.length === 0);
   const formOff = disabled || loading;
 
-  type MappedFieldRole = (typeof FIELD_ROLES)[number] | (typeof FIELD_ROLES_ITEM_NOTE)[number];
+  type MappedFieldRole = (typeof FIELD_ROLES_MAP)[number];
   function renderMappedFieldRow(role: MappedFieldRole): ReactNode {
     const idx0 = m.fields[role];
     const dup = idx0 !== undefined && duplicateCols.includes(idx0);
@@ -1090,10 +1090,7 @@ export function FieldMappingEditor({
         </p>
       ) : null}
       <div className="size-analysis-map-fields">
-        {FIELD_ROLES.map((role) => renderMappedFieldRow(role))}
-        <div className="size-analysis-map-fields__item-note-pair">
-          {FIELD_ROLES_ITEM_NOTE.map((role) => renderMappedFieldRow(role))}
-        </div>
+        {FIELD_ROLES_MAP.map((role) => renderMappedFieldRow(role))}
       </div>
       {hasPreview ? (
         showRemapGuide ? (

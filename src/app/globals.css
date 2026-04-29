@@ -7312,7 +7312,7 @@ label {
   margin: 0 0 8px 0;
 }
 
-/* 필드 매핑: 모바일 2열 → PC 4열 (주문내용·비고는 같은 행 묶음으로 좌우 배치) */
+/* 필드 매핑: 동일 부모 그리드 — 좁게 1열 → 기본 2열 → PC(1024px+) 4열(1행 클럽~사이즈, 2행 사이즈2~비고) */
 .size-analysis-field-mapping .size-analysis-map-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7327,35 +7327,15 @@ label {
   max-width: 100%;
 }
 
-/* 주문내용 · 비고: 항상 한 행 두 칸(PC·모바일 동일 · 사이즈2/수량과 동일 패턴) */
-.size-analysis-field-mapping .size-analysis-map-fields__item-note-pair {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  align-items: stretch;
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.size-analysis-field-mapping .size-analysis-map-fields__item-note-pair > .size-analysis-field-row {
-  min-width: 0;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-@media (max-width: 768px) {
-  .size-analysis-field-mapping .size-analysis-map-fields,
-  .size-analysis-field-mapping .size-analysis-map-fields__item-note-pair {
-    gap: 8px;
+@media (max-width: 480px) {
+  .size-analysis-field-mapping .size-analysis-map-fields {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (min-width: 768px) {
+@media (max-width: 768px) {
   .size-analysis-field-mapping .size-analysis-map-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 }
 
@@ -7372,8 +7352,7 @@ label {
 }
 
 /* 매핑 열 선택 카드만 카드 테두리·라벨-입력 간격 축소 (select/input 안쪽 패딩은 그대로) */
-.size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-row,
-.size-analysis-field-mapping .size-analysis-map-fields__item-note-pair > .size-analysis-field-row {
+.size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-row {
   padding: 5px 6px;
   gap: 6px 8px;
 }
@@ -8576,8 +8555,7 @@ label {
     margin-top: 4px;
   }
 
-  .size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-row,
-  .size-analysis-field-mapping .size-analysis-map-fields__item-note-pair > .size-analysis-field-row {
+  .size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-row {
     grid-template-columns: 1fr;
     align-items: start;
     gap: 5px;
@@ -8601,5 +8579,114 @@ label {
   .size-analysis-field-mapping .size-analysis-btn-auto,
   .size-analysis-field-mapping .size-analysis-map-actions .btn {
     width: 100%;
+  }
+
+  /* 사이즈분석 페이지 PC 전용 폰트 (항목 라벨 / 입력 / 버튼 / placeholder) */
+  .size-analysis-page .size-analysis-field-row__label {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .size-analysis-page .size-analysis-grid label,
+  .size-analysis-page .size-analysis-grid--map-tools label,
+  .size-analysis-page .size-analysis-field-mapping .size-analysis-field-mapping-inner label {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .size-analysis-page .size-analysis-upload-card__file-text {
+    font-size: 15px;
+  }
+
+  .size-analysis-page .size-analysis-sheet-select {
+    font-size: 16px;
+  }
+
+  .size-analysis-page .size-analysis-field-select,
+  .size-analysis-page .size-analysis-field-input {
+    font-size: 16px;
+  }
+
+  .size-analysis-page .size-analysis-card input:not([type="checkbox"]):not([type="radio"]),
+  .size-analysis-page .size-analysis-card select,
+  .size-analysis-page .size-analysis-card textarea {
+    font-size: 16px;
+  }
+
+  .size-analysis-page input::placeholder,
+  .size-analysis-page textarea::placeholder {
+    font-size: 16px;
+  }
+
+  .size-analysis-page button,
+  .size-analysis-page .btn {
+    font-size: 17px;
+  }
+
+  /* 필드 매핑 PC 블록: 위 패턴보다 구체 규칙으로 덮음 */
+  .size-analysis-field-mapping .size-analysis-field-select,
+  .size-analysis-field-mapping .size-analysis-field-input {
+    font-size: 16px;
+  }
+
+  .size-analysis-field-mapping .size-analysis-btn-auto,
+  .size-analysis-field-mapping .size-analysis-map-actions .btn {
+    font-size: 17px;
+  }
+
+  .size-analysis-page .size-analysis-product-chip__text {
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .size-analysis-page .size-analysis-product-cols-note {
+    font-size: 14px;
+  }
+
+  .size-analysis-page .size-analysis-run-card .btn {
+    font-size: 17px;
+  }
+
+  /* 섹션·카드 제목 (h3) */
+  .size-analysis-page .size-analysis-card h3 {
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  /* 결과 요약 / 상품별 요약 카드 */
+  .size-analysis-page .size-analysis-summary-card__label {
+    font-size: 15px;
+  }
+
+  .size-analysis-page .size-analysis-summary-card strong {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  /* 설명·보조 문단 (기존 13px대 → 14~15px) */
+  .size-analysis-page .size-analysis-muted,
+  .size-analysis-page .size-analysis-page__title-tag,
+  .size-analysis-page .size-analysis-summary-scope-hint,
+  .size-analysis-page .size-analysis-field-note,
+  .size-analysis-page .size-analysis-map-hint,
+  .size-analysis-page .size-analysis-map-hint-2,
+  .size-analysis-page .size-analysis-upload-card__hint,
+  .size-analysis-page .size-analysis-xlsx-export__hint,
+  .size-analysis-page .size-analysis-run-card__note,
+  .size-analysis-page .size-analysis-dup-only-hint,
+  .size-analysis-page .size-analysis-club-members-desc,
+  .size-analysis-page .size-analysis-club-group-hint,
+  .size-analysis-page .size-analysis-club-size-hint,
+  .size-analysis-page .size-analysis-detect-outcome {
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .size-analysis-page .size-analysis-field-mapping .size-analysis-map-hint,
+  .size-analysis-page .size-analysis-field-mapping .size-analysis-map-hint-2 {
+    font-size: 15px;
+    line-height: 1.45;
   }
 }

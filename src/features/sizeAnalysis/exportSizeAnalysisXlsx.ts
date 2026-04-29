@@ -40,6 +40,8 @@ const EMPH_DUP_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFFF4CC
 const EMPH_REVIEW_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFFF1E6" } };
 const EMPH_UNRES_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFF3F4F6" } };
 const EMPH_GROUP_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFF8FAFC" } };
+const SUBTOTAL_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFF5F5F5" } };
+const GRAND_TOTAL_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFFF2CC" } };
 
 function styleTitle(): import("xlsx-js-style").CellStyle {
   return {
@@ -334,7 +336,7 @@ function buildProductSheets(rows: any[], duplicateRowIds: Set<string>): Array<{ 
       const key = `${g}\0${s}`;
       by.set(key, (by.get(key) ?? 0) + q);
     }
-    const body = Array.from(by.entries())
+    const groupedBody = Array.from(by.entries())
       .map(([k, qty]) => {
         const [gender, size] = k.split("\0");
         return [gender, size, qty] as Array<string | number>;
@@ -344,11 +346,52 @@ function buildProductSheets(rows: any[], duplicateRowIds: Set<string>): Array<{ 
           genderOrderForMultiItem(a[0]) - genderOrderForMultiItem(b[0]) ||
           compareSizeForMultiItem(a[1], b[1])
       );
+    const body: Array<Array<string | number>> = [];
+    let grandTotal = 0;
+    for (let i = 0; i < groupedBody.length; ) {
+      const gender = String(groupedBody[i]?.[0] ?? "");
+      let genderTotal = 0;
+      while (i < groupedBody.length && String(groupedBody[i]?.[0] ?? "") === gender) {
+        const row = groupedBody[i]!;
+        body.push(row);
+        const qty = Number(row[2]);
+        if (Number.isFinite(qty)) {
+          genderTotal += qty;
+          grandTotal += qty;
+        }
+        i += 1;
+      }
+      body.push([`${gender} 합계`, "", genderTotal]);
+      body.push(["", "", ""]);
+    }
+    if (body.length > 0 && body[body.length - 1]?.every((v) => v === "")) {
+      body.pop();
+    }
+    body.push(["총합계", "", grandTotal]);
+
     const aoa = [["성별", "사이즈", "수량"], ...body];
     const ws = buildStyledAoaSheet(aoa, {
       centerCols: new Set([0, 1, 2]),
       freezeHeader: true,
       emptyMessage: "(집계할 데이터가 없습니다)",
+      highlightCell: (row, _r, _c) => {
+        const label = String(row[0] ?? "").trim();
+        if (label === "총합계") {
+          return {
+            font: { bold: true, sz: 13 },
+            fill: GRAND_TOTAL_FILL,
+            border: { top: thin },
+          };
+        }
+        if (label.endsWith(" 합계")) {
+          return {
+            font: { bold: true },
+            fill: SUBTOTAL_FILL,
+            border: { top: thin },
+          };
+        }
+        return null;
+      },
     });
     out.push({ name: item.slice(0, 31), ws });
   }

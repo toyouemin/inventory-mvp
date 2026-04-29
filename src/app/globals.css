@@ -7207,8 +7207,8 @@ label {
 
 .size-analysis-agg-mode-tabs--triple {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
   align-items: stretch;
 }
 
@@ -7230,16 +7230,17 @@ label {
   min-width: 0;
 }
 
-@media (max-width: 768px) {
-  .size-analysis-agg-mode-tabs--triple {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.size-analysis-agg-mode-tabs--double {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: stretch;
 }
 
-@media (max-width: 480px) {
-  .size-analysis-agg-mode-tabs--triple {
-    grid-template-columns: 1fr;
-  }
+.size-analysis-agg-mode-tabs--double .size-analysis-agg-mode-tab {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
 }
 
 .size-analysis-agg-mode-tab--active {

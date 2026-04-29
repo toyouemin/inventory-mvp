@@ -2621,7 +2621,7 @@ export function ProductSizeSummaryTable({
           </button>
         ))}
       </div>
-      <div className="size-analysis-agg-mode-tabs" role="tablist" aria-label="상품 선택">
+      <div className="size-analysis-agg-mode-tabs size-analysis-agg-mode-tabs--double" role="tablist" aria-label="상품 선택">
         {products.map((product) => (
           <button
             key={`prod-tab-${product}`}

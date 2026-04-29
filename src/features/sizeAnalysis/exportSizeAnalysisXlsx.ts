@@ -510,7 +510,7 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
   const enc = XLSX.utils.encode_cell;
 
   const modes = [
-    { kind: "total" as const, label: "총 수량", flat: buildAggRowsTotal(rows) },
+    { kind: "total" as const, label: "총 수량", flat: buildAggRowsTotal(rows, duplicateRowIds) },
     { kind: "deduped" as const, label: "중복 제외 수량", flat: buildAggRowsDedupedFirst(rows, duplicateRowIds) },
     { kind: "duplicate" as const, label: "중복자 수량", flat: buildAggRowsDuplicate(rows, duplicateRowIds) },
   ] as const;
@@ -528,7 +528,7 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
 
   // 상단 전체 메트릭스 3블록
   const overallModes = [
-    { kind: "total" as const, label: "전체 합계", flat: buildAggRowsTotal(rows) },
+    { kind: "total" as const, label: "전체 합계", flat: buildAggRowsTotal(rows, duplicateRowIds) },
     { kind: "deduped" as const, label: "전체 일반 수량", flat: buildAggRowsDedupedFirst(rows, duplicateRowIds) },
     { kind: "duplicate" as const, label: "전체 중복수량", flat: buildAggRowsDuplicate(rows, duplicateRowIds) },
   ] as const;

@@ -1630,7 +1630,7 @@ export function ClubGroupedView({
       return sum + rowQtyParsed(r);
     }, 0);
     const modeDefs = [
-      { modeKey: "total" as const, label: "전체 합계", flat: buildAggRowsTotal(normRows) },
+      { modeKey: "total" as const, label: "전체 합계", flat: buildAggRowsTotal(normRows, duplicateRowIds) },
       { modeKey: "deduped" as const, label: "전체 일반 수량", flat: buildAggRowsDedupedFirst(normRows, duplicateRowIds) },
       { modeKey: "duplicate" as const, label: "전체 중복수량", flat: buildAggRowsDuplicate(normRows, duplicateRowIds) },
     ];
@@ -1678,7 +1678,7 @@ export function ClubGroupedView({
   /** 모바일 아코디언: 엑셀 클럽별집계와 동일 총/제외/중복 3블록(집계 함수 재사용) */
   const mobileClubTripleMatrices = useMemo(() => {
     const statusByCell = buildCellStatusMap(normRows);
-    const flatTotal = buildAggRowsTotal(normRows);
+    const flatTotal = buildAggRowsTotal(normRows, duplicateRowIds);
     const flatDeduped = buildAggRowsDedupedFirst(normRows, duplicateRowIds);
     const flatDup = buildAggRowsDuplicate(normRows, duplicateRowIds);
 
@@ -2427,7 +2427,7 @@ export function ClubSizeSummaryTable({
   const [aggMode, setAggMode] = useState<ClubSizeAggMode>("total");
 
   const aggFlat = useMemo(() => {
-    if (aggMode === "total") return buildAggRowsTotal(normRows);
+    if (aggMode === "total") return buildAggRowsTotal(normRows, duplicateRowIds);
     if (aggMode === "duplicate") return buildAggRowsDuplicate(normRows, duplicateRowIds);
     return buildAggRowsDedupedFirst(normRows, duplicateRowIds);
   }, [normRows, aggMode, duplicateRowIds]);

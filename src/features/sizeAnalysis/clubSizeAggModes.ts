@@ -280,11 +280,17 @@ function sortedAggRowsFromDetailMap(detailMap: Map<string, AggRow>): AggRow[] {
     );
 }
 
-/** 총 수량: 현재 rows 전체 */
-export function buildAggRowsTotal(rows: any[]): AggRow[] {
+/** 총 수량: 일반 수량 + 중복자 수량 */
+export function buildAggRowsTotal(rows: any[], duplicateRowIds?: Set<string>): AggRow[] {
   const detailMap = new Map<string, AggRow>();
-  for (const r of rows) {
-    if (!rowIncludedInFinalAggregation(r)) continue;
+  for (let i = 0; i < rows.length; i += 1) {
+    const r = rows[i]!;
+    const inFinal = rowIncludedInFinalAggregation(r);
+    const inDup =
+      !!duplicateRowIds &&
+      duplicateRowIds.has(stableRowId(r, i)) &&
+      rowIncludedInDuplicateAggregation(r);
+    if (!inFinal && !inDup) continue;
     const club = normClubFromNormRow(r);
     const { gender, size } = matrixAggGenderAndSizeFromRow(r);
     const qty = rowQtyParsed(r);

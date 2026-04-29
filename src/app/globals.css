@@ -7312,7 +7312,7 @@ label {
   margin: 0 0 8px 0;
 }
 
-/* 필드 매핑: 동일 부모 그리드 — 좁게 1열 → 기본 2열 → PC(1024px+) 4열(1행 클럽~사이즈, 2행 사이즈2~비고) */
+/* 필드 매핑: 모바일 기본 2열 → PC(1024px+) 4열(1행 클럽~사이즈, 2행 사이즈2~비고) */
 .size-analysis-field-mapping .size-analysis-map-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -7327,16 +7327,16 @@ label {
   max-width: 100%;
 }
 
-@media (max-width: 480px) {
-  .size-analysis-field-mapping .size-analysis-map-fields {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 768px) {
   .size-analysis-field-mapping .size-analysis-map-fields {
     gap: 8px;
   }
+}
+
+.size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-select,
+.size-analysis-field-mapping .size-analysis-map-fields .size-analysis-field-input {
+  min-width: 0;
+  width: 100%;
 }
 
 .size-analysis-field-row {

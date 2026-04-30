@@ -821,7 +821,7 @@ body {
   justify-content: center;
   text-decoration: none;
   background: transparent;
-  color: rgba(15, 23, 42, 0.42);
+  color: rgba(15, 23, 42, 0.26);
   border: none;
   font-size: 18px;
   line-height: 1;
@@ -853,7 +853,7 @@ body {
   border: none;
   cursor: pointer;
   line-height: 1;
-  color: #b79cff;
+  color: rgba(15, 23, 42, 0.26);
   font: inherit;
   appearance: none;
   -webkit-appearance: none;
@@ -868,7 +868,7 @@ body {
 .dev-source-icon-button:hover {
   background: rgba(0, 0, 0, 0.05);
   opacity: 1;
-  color: #a78bfa;
+  color: rgba(15, 23, 42, 0.26);
 }
 
 .dev-source-icon-glyph {
@@ -9138,6 +9138,11 @@ label {
   .size-analysis-grid-item--filter .size-analysis-filter-row .btn {
     width: 100%;
     min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 15px;
+    line-height: 1.2;
+    white-space: nowrap;
   }
 
   .size-analysis-result-region {

@@ -513,8 +513,22 @@ export function SizeAnalysisPage() {
   }
 
   async function onStatusChange(next: string) {
+    setOutsideSizesAssistActive(false);
     setStatusFilter(next);
     if (jobId) await refreshResult(jobId, next);
+  }
+
+  /** 범위외 필터와 상태 버튼은 동시 활성(primary)처럼 보이지 않게 상호 배타적 */
+  async function handleOutsideAssistChange(next: boolean) {
+    if (!next) {
+      setOutsideSizesAssistActive(false);
+      return;
+    }
+    setOutsideSizesAssistActive(true);
+    if (jobId && statusFilter !== "all") {
+      setStatusFilter("all");
+      await refreshResult(jobId, "all");
+    }
   }
 
   async function toggleIncludeNameMissingRow(row: any, include: boolean) {
@@ -674,7 +688,7 @@ export function SizeAnalysisPage() {
             statusFilter={statusFilter}
             outsideSizesAssistActive={outsideSizesAssistActive}
             outsideAssistEligibleCount={outsideAssistEligibleCount}
-            onOutsideSizesAssistToggle={() => setOutsideSizesAssistActive((v) => !v)}
+            onOutsideSizesAssistToggle={() => void handleOutsideAssistChange(!outsideSizesAssistActive)}
             structureType={structureTypeForDup}
           />
         </div>
@@ -684,7 +698,7 @@ export function SizeAnalysisPage() {
             value={statusFilter}
             onChange={onStatusChange}
             outsideSizesAssistActive={outsideSizesAssistActive}
-            onOutsideSizesAssistChange={setOutsideSizesAssistActive}
+            onOutsideSizesAssistChange={(next) => void handleOutsideAssistChange(next)}
             outsideAssistEligibleCount={outsideAssistEligibleCount}
           />
         </div>
@@ -2122,20 +2136,24 @@ export function AnalysisStatusFilter({
   return (
     <section className="size-analysis-card">
       <h3>6) 상태 필터</h3>
-      <div className="size-analysis-filter-row">
-        {STATUS_FILTER_OPTIONS.map((opt, idx) => (
-          <button
-            key={opt}
-            className={`btn ${value === opt ? "btn-primary" : "btn-secondary"} ${idx === 0 ? "size-analysis-filter-btn--all" : ""}`}
-            onClick={() => void onChange(opt)}
-            type="button"
-          >
-            {STATUS_FILTER_LABEL[opt]}
-          </button>
-        ))}
+      <div className="size-analysis-filter-row size-analysis-filter-row--status-radio" role="group" aria-label="상태·범위외 표시 필터">
+        {STATUS_FILTER_OPTIONS.map((opt, idx) => {
+          const active = opt === value && !outsideSizesAssistActive;
+          return (
+            <button
+              key={opt}
+              className={`btn ${active ? "btn-primary" : "btn-secondary"} ${idx === 0 ? "size-analysis-filter-btn--all" : ""}`}
+              onClick={() => void onChange(opt)}
+              type="button"
+              aria-pressed={active}
+            >
+              {STATUS_FILTER_LABEL[opt]}
+            </button>
+          );
+        })}
         <button
           type="button"
-          className={`btn ${outsideSizesAssistActive ? "btn-primary" : "btn-secondary"} size-analysis-filter-btn--outside-sizes`}
+          className={`btn ${outsideSizesAssistActive ? "btn-primary" : "btn-secondary"}`}
           aria-pressed={outsideSizesAssistActive}
           onClick={() => onOutsideSizesAssistChange(!outsideSizesAssistActive)}
         >

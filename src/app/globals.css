@@ -6975,6 +6975,14 @@ button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle {
   text-align: left;
   appearance: none;
   width: auto;
+  /* 전역 `button { color: white }` 상속 방지 — article 요약 카드와 동일 톤 */
+  color: #111827;
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle .size-analysis-summary-card__value {
+  color: #111827;
 }
 
 button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle:hover {
@@ -6985,6 +6993,11 @@ button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle:hove
 button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle-active {
   background: #eff6ff;
   border-color: #93c5fd;
+  color: #111827;
+}
+
+button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle-active .size-analysis-summary-card__value {
+  color: #111827;
 }
 
 .size-analysis-summary-scope-hint {

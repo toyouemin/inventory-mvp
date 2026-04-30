@@ -8,13 +8,16 @@ import {
   buildAggRowsTotal,
   buildClubAggBlock,
   compareRowsBySourceThenIndex,
+  matrixAggGenderAndSizeFromRow,
   normClubFromNormRow,
+  rowKeyGenderForAgg,
   rowQtyParsed,
   stableRowKeyForDup,
   unionClubsOrdered,
 } from "./clubSizeAggModes";
 import { labelSizeAnalysisParseStatusForRow, labelSizeAnalysisReasonForRow } from "./excludeReasonLabels";
 import type { StructureType } from "./types";
+import { shouldPrioritizeSizeCheckUiDisplay } from "./uiOutsideAllowedSizes";
 
 type DupInput = { duplicateRowIds: Set<string>; dupByClub: Map<string, { persons: number; sheets: number }> };
 
@@ -42,6 +45,11 @@ const EMPH_UNRES_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFF3F4
 const EMPH_GROUP_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFF8FAFC" } };
 const SUBTOTAL_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFF5F5F5" } };
 const GRAND_TOTAL_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFFF2CC" } };
+const EMPH_SIZE_CHECK_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFEFCE8" } }; // #FEFCE8
+const EMPH_SIZE_CHECK_HEADER_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFEF3C7" } };
+const SIZE_CHECK_BOTTOM_BORDER = { style: "thin" as const, color: { rgb: "FFCA8A04" } }; // #CA8A04
+const CLUB_TINT_ODD_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFF0FDF4" } }; // 연녹색
+const CLUB_TINT_EVEN_FILL = { patternType: "solid" as const, fgColor: { rgb: "FFFDF2F8" } }; // 연핑크
 
 function styleTitle(): import("xlsx-js-style").CellStyle {
   return {
@@ -288,8 +296,17 @@ function buildSheetAll(rows: any[], duplicateRowIds: Set<string>, includeItemCol
     ? ["원본행", "클럽", "이름", "성별", "상품명", "사이즈", "수량", "상태", "사유", "신뢰도", "중복여부"]
     : ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "사유", "신뢰도", "중복여부"];
   const body = sourceRows.map((r, i) => {
+    const isSizeCheck = shouldPrioritizeSizeCheckUiDisplay(r);
+    const srcRaw = r.sourceRowIndex;
+    const srcNum = Number(srcRaw);
+    const srcDisplay =
+      srcRaw === "" || srcRaw == null
+        ? ""
+        : Number.isFinite(srcNum)
+          ? String(srcNum + 1)
+          : srcRaw;
     const base = [
-      r.sourceRowIndex ?? "",
+      srcDisplay,
       r.clubNameRaw ?? r.clubNameNormalized ?? "",
       r.memberNameRaw ?? "",
       r.genderNormalized ?? r.genderRaw ?? "",
@@ -297,8 +314,12 @@ function buildSheetAll(rows: any[], duplicateRowIds: Set<string>, includeItemCol
     const tail = [
       r.standardizedSize ?? r.sizeRaw ?? "",
       r.qtyParsed ?? r.qtyRaw ?? "",
-      labelSizeAnalysisParseStatusForRow(r),
-      labelSizeAnalysisReasonForRow(r),
+      isSizeCheck ? "사이즈" : labelSizeAnalysisParseStatusForRow(r),
+      isSizeCheck
+        ? labelSizeAnalysisReasonForRow(r)
+          ? `${labelSizeAnalysisReasonForRow(r)} · 범위외 사이즈`
+          : "범위외 사이즈"
+        : labelSizeAnalysisReasonForRow(r),
       Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
       duplicateRowIds.has(stableRowKeyForDup(r, i)) ? "예" : "아니오",
     ];
@@ -408,8 +429,15 @@ function buildSheetAllStyled(aoa: Array<Array<string | number>>, includeItemColu
     emptyMessage: "(전체목록 데이터가 없습니다)",
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
-      if (c === dupCol && String(row[dupCol] ?? "") === "예") {
+      const isDup = String(row[dupCol] ?? "") === "예";
+      if (c === dupCol && isDup) {
         return { fill: EMPH_DUP_FILL, font: { bold: true } };
+      }
+      if (c === statusCol && isDup) {
+        return { fill: EMPH_DUP_FILL, font: { bold: true } };
+      }
+      if (c === statusCol && String(row[statusCol] ?? "") === "사이즈") {
+        return { fill: EMPH_SIZE_CHECK_FILL, font: { bold: true } };
       }
       if (c === statusCol && String(row[statusCol] ?? "") === "검토필요") {
         return { fill: EMPH_REVIEW_FILL, font: { bold: true } };
@@ -430,7 +458,13 @@ function appendClubMatrixSection(
   b: ReturnType<typeof buildClubAggBlock>,
   titleText: string,
   titleStyle: import("xlsx-js-style").CellStyle,
-  clubBlockTopSeparator: boolean
+  clubBlockTopSeparator: boolean,
+  opts?: {
+    modeKind?: "total" | "deduped" | "duplicate";
+    hasSizeCheckInCell?: (gk: "여" | "남" | "공용", sz: string) => boolean;
+    hasSizeCheckInColumn?: (sz: string) => boolean;
+    clubTintFill?: import("xlsx-js-style").CellStyle["fill"];
+  }
 ): { r: number; cMax: number } {
   let r = rIn;
   const colSizes = b.columnSizes;
@@ -440,9 +474,10 @@ function appendClubMatrixSection(
   const lastSumCol = 1 + L;
   let cMax = colCount - 1;
 
+  const titleWithTint = opts?.clubTintFill ? mergeStyle(titleStyle, { fill: opts.clubTintFill }) : titleStyle;
   const titleRowStyle = clubBlockTopSeparator
-    ? mergeStyle(titleStyle, { border: { top: CLUB_BLOCK_SEP_TOP } })
-    : titleStyle;
+    ? mergeStyle(titleWithTint, { border: { top: CLUB_BLOCK_SEP_TOP } })
+    : titleWithTint;
 
   const titleR = r;
   ws[enc({ r: titleR, c: 0 })] = { v: titleText, t: "s", s: titleRowStyle };
@@ -456,7 +491,18 @@ function appendClubMatrixSection(
   const headerRow: (string | number)[] = ["성별", ...colSizes, "합계", "종합계"];
   for (let c = 0; c < colCount; c += 1) {
     const v = headerRow[c]!;
-    ws[enc({ r: headerR, c })] = { v, t: typeof v === "number" ? "n" : "s", s: styleHeader() };
+    let headStyle = styleHeader();
+    if (opts?.clubTintFill) headStyle = mergeStyle(headStyle, { fill: opts.clubTintFill });
+    if (c >= 1 && c <= L) {
+      const sz = colSizes[c - 1]!;
+      if (opts?.hasSizeCheckInColumn?.(sz)) {
+        headStyle = mergeStyle(headStyle, {
+          fill: EMPH_SIZE_CHECK_HEADER_FILL,
+          font: { bold: true, color: { rgb: "FF713F12" } },
+        });
+      }
+    }
+    ws[enc({ r: headerR, c })] = { v, t: typeof v === "number" ? "n" : "s", s: headStyle };
   }
 
   r += 1;
@@ -467,31 +513,51 @@ function appendClubMatrixSection(
   for (let gi = 0; gi < genders.length; gi += 1) {
     const gk = genders[gi]!;
     const rowIdx = r;
-    ws[enc({ r: rowIdx, c: 0 })] = { v: gk, t: "s", s: styleDataCenter() };
+    let firstColStyle = styleDataCenter();
+    if (opts?.clubTintFill) firstColStyle = mergeStyle(firstColStyle, { fill: opts.clubTintFill });
+    ws[enc({ r: rowIdx, c: 0 })] = { v: gk, t: "s", s: firstColStyle };
     let rowSum = 0;
     for (let i = 0; i < L; i += 1) {
       const sz = colSizes[i]!;
       const q = b.qtyMap.get(`${gk}\0${sz}`) ?? 0;
       rowSum += q;
+      const hasSizeCheck = Boolean(opts?.hasSizeCheckInCell?.(gk, sz));
+      let cellStyle = styleDataCenter();
+      if (opts?.clubTintFill) cellStyle = mergeStyle(cellStyle, { fill: opts.clubTintFill });
+      if (hasSizeCheck) {
+        if (opts?.modeKind === "duplicate" && q > 0) {
+          cellStyle = mergeStyle(cellStyle, { border: { bottom: SIZE_CHECK_BOTTOM_BORDER } });
+        } else {
+          cellStyle = mergeStyle(cellStyle, { fill: EMPH_SIZE_CHECK_FILL });
+        }
+      }
       if (q === 0) {
-        ws[enc({ r: rowIdx, c: 1 + i })] = { t: "s", v: "", s: styleDataCenter() };
+        ws[enc({ r: rowIdx, c: 1 + i })] = { t: "s", v: "", s: cellStyle };
       } else {
-        ws[enc({ r: rowIdx, c: 1 + i })] = { t: "n", v: q, s: styleDataCenter() };
+        ws[enc({ r: rowIdx, c: 1 + i })] = { t: "n", v: q, s: cellStyle };
       }
     }
     if (rowSum === 0) {
-      ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "s", v: "", s: styleDataCenter() };
+      let sumStyle = styleDataCenter();
+      if (opts?.clubTintFill) sumStyle = mergeStyle(sumStyle, { fill: opts.clubTintFill });
+      ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "s", v: "", s: sumStyle };
     } else {
-      ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "n", v: rowSum, s: styleDataCenter() };
+      let sumStyle = styleDataCenter();
+      if (opts?.clubTintFill) sumStyle = mergeStyle(sumStyle, { fill: opts.clubTintFill });
+      ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "n", v: rowSum, s: sumStyle };
     }
     if (gi === 0) {
+      let zStyle = { ...styleDataCenter(), font: { bold: true } } as import("xlsx-js-style").CellStyle;
+      if (opts?.clubTintFill) zStyle = mergeStyle(zStyle, { fill: opts.clubTintFill });
       ws[enc({ r: rowIdx, c: lastCol })] = {
         v: zongV,
         t: zongV === "" ? "s" : "n",
-        s: { ...styleDataCenter(), font: { bold: true } },
+        s: zStyle,
       };
     } else {
-      ws[enc({ r: rowIdx, c: lastCol })] = { t: "s", v: "", s: styleDataCenter() };
+      let zStyle = styleDataCenter();
+      if (opts?.clubTintFill) zStyle = mergeStyle(zStyle, { fill: opts.clubTintFill });
+      ws[enc({ r: rowIdx, c: lastCol })] = { t: "s", v: "", s: zStyle };
     }
     r += 1;
   }
@@ -525,6 +591,19 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
   const merges: import("xlsx").Range[] = [];
   let cMax = 0;
   let r = 0;
+  const sizeCheckCellKeys = new Set<string>();
+  const sizeCheckColumnKeys = new Set<string>();
+  for (const row of rows) {
+    if (!shouldPrioritizeSizeCheckUiDisplay(row)) continue;
+    const club = normClubFromNormRow(row);
+    const { gender, size } = matrixAggGenderAndSizeFromRow(row);
+    const gk = rowKeyGenderForAgg(gender);
+    const sz = String(size ?? "").trim() || "미분류";
+    sizeCheckCellKeys.add(`${club}\0${gk}\0${sz}`);
+    sizeCheckCellKeys.add(`전체\0${gk}\0${sz}`);
+    sizeCheckColumnKeys.add(`${club}\0${sz}`);
+    sizeCheckColumnKeys.add(`전체\0${sz}`);
+  }
 
   // 상단 전체 메트릭스 3블록
   const overallModes = [
@@ -545,7 +624,12 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
       b,
       titleText,
       styleClubAggBlockTitle(mode.kind),
-      false
+      false,
+      {
+        modeKind: mode.kind,
+        hasSizeCheckInCell: (gk, sz) => sizeCheckCellKeys.has(`전체\0${gk}\0${sz}`),
+        hasSizeCheckInColumn: (sz) => sizeCheckColumnKeys.has(`전체\0${sz}`),
+      }
     );
     r = out.r;
     cMax = Math.max(cMax, out.cMax);
@@ -562,6 +646,7 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
       const clubRows = mode.flat.filter((x) => x.club === club);
       const b = buildClubAggBlock(club, clubRows);
       const titleText = `${bi + 1}. ${b.club} · ${mode.label} ${b.totalQty}개`;
+      const clubTintFill = bi % 2 === 0 ? CLUB_TINT_ODD_FILL : CLUB_TINT_EVEN_FILL;
       const out = appendClubMatrixSection(
         ws,
         enc,
@@ -570,7 +655,13 @@ function buildClubAggregateStyledSheet(rows: any[], duplicateRowIds: Set<string>
         b,
         titleText,
         styleClubAggBlockTitle(mode.kind),
-        bi > 0 && mi === 0
+        bi > 0 && mi === 0,
+        {
+          modeKind: mode.kind,
+          hasSizeCheckInCell: (gk, sz) => sizeCheckCellKeys.has(`${club}\0${gk}\0${sz}`),
+          hasSizeCheckInColumn: (sz) => sizeCheckColumnKeys.has(`${club}\0${sz}`),
+          clubTintFill,
+        }
       );
       r = out.r;
       cMax = Math.max(cMax, out.cMax);
@@ -648,22 +739,31 @@ function buildSheetReview(rows: any[]) {
   const header = ["원본행", "클럽", "이름", "성별", "사이즈", "수량", "상태", "사유", "신뢰도"];
   const sub = rows.filter((r) => {
     const st = String(r.parseStatus ?? "");
-    return st === "needs_review" || st === "unresolved";
+    return st === "needs_review" || st === "unresolved" || shouldPrioritizeSizeCheckUiDisplay(r);
   });
   if (sub.length === 0) {
     return [header, ["(검토필요·미분류에 해당하는 행이 없습니다)"]];
   }
-  const body = sub.map((r) => [
-    r.sourceRowIndex ?? "",
-    r.clubNameRaw ?? r.clubNameNormalized ?? "",
-    r.memberNameRaw ?? "",
-    r.genderNormalized ?? r.genderRaw ?? "",
-    r.standardizedSize ?? r.sizeRaw ?? "",
-    r.qtyParsed ?? r.qtyRaw ?? "",
-    labelSizeAnalysisParseStatusForRow(r),
-    labelSizeAnalysisReasonForRow(r),
-    Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
-  ]);
+  const body = sub.map((r) => {
+    const baseReason = labelSizeAnalysisReasonForRow(r);
+    const isOutsideSize = shouldPrioritizeSizeCheckUiDisplay(r);
+    const reason = isOutsideSize
+      ? baseReason
+        ? `${baseReason} · 범위외 사이즈`
+        : "범위외 사이즈"
+      : baseReason;
+    return [
+      r.sourceRowIndex ?? "",
+      r.clubNameRaw ?? r.clubNameNormalized ?? "",
+      r.memberNameRaw ?? "",
+      r.genderNormalized ?? r.genderRaw ?? "",
+      r.standardizedSize ?? r.sizeRaw ?? "",
+      r.qtyParsed ?? r.qtyRaw ?? "",
+      labelSizeAnalysisParseStatusForRow(r),
+      reason,
+      Number.isFinite(Number(r.parseConfidence)) ? Number(r.parseConfidence).toFixed(2) : "",
+    ];
+  });
   return [header, ...body];
 }
 

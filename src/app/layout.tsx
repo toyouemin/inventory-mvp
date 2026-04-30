@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <a href="/status">재고현황</a>
             <AdaptiveHomepageLink />
             <a href="/transaction-statement">거래명세서</a>
-            <a href="/order-quantity-match">수량매치</a>
+            <a href="/order-quantity-match">주문수량매칭</a>
             <a href="/size-analysis">사이즈분석</a>
             {/*href="/moves">재고 변동</a>*/}
           </nav>

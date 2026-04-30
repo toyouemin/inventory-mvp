@@ -1257,6 +1257,18 @@ export function DuplicateMembersView({
     groups.sort((a, b) => a.name.localeCompare(b.name, "ko"));
     if (groups.length) sections.push({ club, groups });
   }
+  const [expandedClubs, setExpandedClubs] = useState<Set<string>>(
+    () => new Set(sections.length > 0 ? [sections[0]!.club] : [])
+  );
+
+  function toggleClub(club: string) {
+    setExpandedClubs((prev) => {
+      const next = new Set(prev);
+      if (next.has(club)) next.delete(club);
+      else next.add(club);
+      return next;
+    });
+  }
 
   if (sections.length === 0) {
     return (
@@ -1275,34 +1287,65 @@ export function DuplicateMembersView({
       </p>
       <div className="size-analysis-dup-only-list--mobile">
         {sections.map((sec) => (
-          <div key={sec.club} className="size-analysis-dup-club">
-            <h4 className="size-analysis-dup-club__title">{sec.club}</h4>
-            {sec.groups.map((g) => {
-              const total = g.list.reduce((s, { r }) => s + rowQtyParsed(r), 0);
-              const dupQty = g.list.slice(1).reduce((s, { r }) => s + rowQtyParsed(r), 0);
-              return (
-                <div key={`${sec.club}\0${g.name}`} className="size-analysis-dup-person">
-                  <p className="size-analysis-dup-person__name">
-                    {g.name} · 전체 {total}개 (중복분 {dupQty}개)
-                  </p>
-                  <ul className="size-analysis-dup-person__lines">
-                    {g.list.map(({ r, i }, j) => {
-                      const isDup = j > 0;
-                      return (
-                      <li key={stableRowKeyForDup(r, i)}>
-                        –{" "}
-                        <span className={isDup ? "size-analysis-dup-line-tag--dup" : "size-analysis-dup-line-tag--ok"}>
-                          {isDup ? "중복" : "정상"}
-                        </span>{" "}
-                        {lineGenderSizeQtyRow(r, j)}
-                      </li>
-                    );
-                    })}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
+          <article key={sec.club} className="size-analysis-club-group-card">
+            <button
+              type="button"
+              className="size-analysis-club-group-head"
+              onClick={() => toggleClub(sec.club)}
+              aria-expanded={expandedClubs.has(sec.club)}
+              aria-label={`${sec.club} 중복자 ${expandedClubs.has(sec.club) ? "접기" : "펼치기"}`}
+            >
+              <span className="size-analysis-club-group-head__name">
+                <span className="size-analysis-club-group-head__clubtitle">{sec.club}</span>
+              </span>
+              <span className="size-analysis-club-group-head__right">
+                <span className="size-analysis-club-group-chevron" aria-hidden>
+                  <svg
+                    className={
+                      expandedClubs.has(sec.club)
+                        ? "size-analysis-club-group-chevron__svg is-open"
+                        : "size-analysis-club-group-chevron__svg"
+                    }
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </span>
+              </span>
+            </button>
+            {expandedClubs.has(sec.club)
+              ? sec.groups.map((g) => {
+                  const total = g.list.reduce((s, { r }) => s + rowQtyParsed(r), 0);
+                  const dupQty = g.list.slice(1).reduce((s, { r }) => s + rowQtyParsed(r), 0);
+                  return (
+                    <div key={`${sec.club}\0${g.name}`} className="size-analysis-dup-person">
+                      <p className="size-analysis-dup-person__name">
+                        {g.name} · 전체 {total}개 (중복분 {dupQty}개)
+                      </p>
+                      <ul className="size-analysis-dup-person__lines">
+                        {g.list.map(({ r, i }, j) => {
+                          const isDup = j > 0;
+                          return (
+                          <li key={stableRowKeyForDup(r, i)}>
+                            –{" "}
+                            <span className={isDup ? "size-analysis-dup-line-tag--dup" : "size-analysis-dup-line-tag--ok"}>
+                              {isDup ? "중복" : "정상"}
+                            </span>{" "}
+                            {lineGenderSizeQtyRow(r, j)}
+                          </li>
+                        );
+                        })}
+                      </ul>
+                    </div>
+                  );
+                })
+              : null}
+          </article>
         ))}
       </div>
       <div className="size-analysis-dup-pc-wrap" aria-label="중복자 표(PC)">

@@ -2,7 +2,7 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { AdaptiveHomepageLink } from "./AdaptiveHomepageLink";
-import { DevMapButton } from "./DevMapButton";
+import { HeaderActionButtons } from "./HeaderActionButtons";
 import { withAssetVersion } from "@/lib/assetVersion";
 
 const icon192 = withAssetVersion("/icons/icon-192.png");
@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <header className="app-site-header">
             <div className="app-site-header__top">
               <h1 className="app-site-title">재고관리 프로그램</h1>
-              <DevMapButton />
+              <HeaderActionButtons />
             </div>
           </header>
           <nav className="app-main-nav" aria-label="주요 메뉴">

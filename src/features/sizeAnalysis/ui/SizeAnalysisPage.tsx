@@ -1226,7 +1226,6 @@ export function DuplicateMembersView({
   type DupKeyGroup = {
     club: string;
     name: string;
-    size: string;
     list: { r: any; i: number }[];
   };
   const clubMap = new Map<string, Map<string, DupKeyGroup>>();
@@ -1236,11 +1235,10 @@ export function DuplicateMembersView({
     const name = String(r.memberNameRaw ?? r.memberName ?? "").trim();
     if (!name) continue;
     const club = normClubFromNormRow(r);
-    const size = String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
-    const key = `${club}\0${name}\0${size}`;
+    const key = `${club}\0${name}`;
     if (!clubMap.has(club)) clubMap.set(club, new Map());
     const keyMap = clubMap.get(club)!;
-    const cur = keyMap.get(key) ?? { club, name, size, list: [] };
+    const cur = keyMap.get(key) ?? { club, name, list: [] };
     cur.list.push({ r, i });
     keyMap.set(key, cur);
   }
@@ -1253,9 +1251,10 @@ export function DuplicateMembersView({
       const list = group.list;
       if (!list.some(({ r, i }) => duplicateRowIds.has(stableRowKeyForDup(r, i)))) continue;
       const listSorted = [...list].sort(compareRowsBySourceThenIndex);
+      if (listSorted.length < 2) continue;
       groups.push({ ...group, list: listSorted });
     }
-    groups.sort((a, b) => a.name.localeCompare(b.name, "ko") || compareSizeLabel(a.size, b.size));
+    groups.sort((a, b) => a.name.localeCompare(b.name, "ko"));
     if (groups.length) sections.push({ club, groups });
   }
 
@@ -1280,17 +1279,15 @@ export function DuplicateMembersView({
             <h4 className="size-analysis-dup-club__title">{sec.club}</h4>
             {sec.groups.map((g) => {
               const total = g.list.reduce((s, { r }) => s + rowQtyParsed(r), 0);
-              const dupQty = g.list
-                .filter(({ r, i }) => duplicateRowIds.has(stableRowKeyForDup(r, i)))
-                .reduce((s, { r }) => s + rowQtyParsed(r), 0);
+              const dupQty = g.list.slice(1).reduce((s, { r }) => s + rowQtyParsed(r), 0);
               return (
-                <div key={`${sec.club}\0${g.name}\0${g.size}`} className="size-analysis-dup-person">
+                <div key={`${sec.club}\0${g.name}`} className="size-analysis-dup-person">
                   <p className="size-analysis-dup-person__name">
-                    {g.name} · {g.size} · 전체 {total}개 (중복분 {dupQty}개)
+                    {g.name} · 전체 {total}개 (중복분 {dupQty}개)
                   </p>
                   <ul className="size-analysis-dup-person__lines">
                     {g.list.map(({ r, i }, j) => {
-                      const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
+                      const isDup = j > 0;
                       return (
                       <li key={stableRowKeyForDup(r, i)}>
                         –{" "}
@@ -1326,7 +1323,7 @@ export function DuplicateMembersView({
                   </tr>
                 </thead>
                 {sec.groups.map((g) => (
-                  <tbody key={`${sec.club}\0${g.name}\0${g.size}`} className="size-analysis-dup-pc-tbody-group">
+                  <tbody key={`${sec.club}\0${g.name}`} className="size-analysis-dup-pc-tbody-group">
                     {g.list.map(({ r, i }, j) => {
                       const src =
                         r.sourceRowIndex != null && String(r.sourceRowIndex).trim() !== ""
@@ -1337,7 +1334,7 @@ export function DuplicateMembersView({
                         String(r.standardizedSize ?? r.sizeRaw ?? "미분류").trim() || "미분류";
                       const qtyN = rowQtyParsed(r);
                       const qtyCell = qtyN > 0 ? String(qtyN) : "";
-                      const role = duplicateRowIds.has(stableRowKeyForDup(r, i)) ? "중복" : "정상";
+                      const role = j > 0 ? "중복" : "정상";
                       return (
                         <tr key={stableRowKeyForDup(r, i)}>
                           <td>{sec.club}</td>

@@ -6,7 +6,19 @@ const GENDER_RULES: Array<{ re: RegExp; value: "남" | "여" | "공용" }> = [
   { re: /\b(공용|UNISEX)\b/i, value: "공용" },
 ];
 
-const NUMERIC_SIZES = new Set(["80", "85", "90", "95", "100", "105", "110", "115", "120"]);
+/** 사이즈분석 숫자 대역(남여 M/W 접두 표준에 쓰이는 허용 치수) — UI 확인 필터 등에서 동일 기준 재사용 */
+export const SIZE_ANALYSIS_ALLOWED_NUMERIC = new Set([
+  "80",
+  "85",
+  "90",
+  "95",
+  "100",
+  "105",
+  "110",
+  "115",
+  "120",
+]);
+const NUMERIC_SIZES = SIZE_ANALYSIS_ALLOWED_NUMERIC;
 const ALPHA_SIZES = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "FREE"] as const;
 const ALPHA_RE = /\b(4XL|3XL|2XL|XL|XS|FREE|S|M|L)\b/i;
 const QTY_RE = /(\d{1,4})\s*(장|개|EA|PCS)?\b/i;

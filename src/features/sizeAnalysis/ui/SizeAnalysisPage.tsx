@@ -28,6 +28,13 @@ import {
   labelSizeAnalysisParseStatusForRow,
   labelSizeAnalysisReasonForRow,
 } from "@/features/sizeAnalysis/excludeReasonLabels";
+import {
+  displayParseConfidenceUi,
+  isMaleOutOfRange90Row,
+  outsideAllowedSizesDisplayTail,
+  shouldPrioritizeSizeCheckUiDisplay,
+  uiRowOutsideAllowedSizesForAssistFilter,
+} from "@/features/sizeAnalysis/uiOutsideAllowedSizes";
 import { downloadSizeAnalysisResultXlsx } from "@/features/sizeAnalysis/exportSizeAnalysisXlsx";
 import {
   excelColumnLetterFromOneBased,
@@ -242,18 +249,6 @@ function isNameMissingRow(r: any): boolean {
   return String(r?.memberNameRaw ?? r?.memberName ?? "").trim() === "";
 }
 
-function isMaleOutOfRange90Row(r: any): boolean {
-  const gender = String(r?.genderNormalized ?? r?.genderRaw ?? "")
-    .trim()
-    .toLowerCase();
-  const isMale = gender === "남" || gender === "남자" || gender === "m";
-  if (!isMale) return false;
-  const size = String(r?.standardizedSize ?? r?.sizeRaw ?? "")
-    .trim()
-    .toUpperCase();
-  return size === "90" || size === "M90" || size === "90M";
-}
-
 function displaySizeWithWarning(r: any): string {
   const base = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim();
   if (!base) return "";
@@ -262,13 +257,23 @@ function displaySizeWithWarning(r: any): string {
 
 function displayReasonForNormalizedRow(r: any): string {
   const warningReason = isMaleOutOfRange90Row(r) ? "남성 기준 외 사이즈" : "";
+  let core: string;
   if (isNameMissingRow(r)) {
     const hasSize = String(r?.standardizedSize ?? r?.sizeRaw ?? "").trim() !== "";
     const baseReason = hasSize ? "이름 없음" : "이름 없음 / 사이즈 없음";
-    return warningReason ? `${baseReason} / ${warningReason}` : baseReason;
+    core = warningReason ? `${baseReason} / ${warningReason}` : baseReason;
+  } else {
+    const baseReason = labelSizeAnalysisReasonForRow(r);
+    core = warningReason ? (baseReason ? `${baseReason} / ${warningReason}` : warningReason) : baseReason;
   }
-  const baseReason = labelSizeAnalysisReasonForRow(r);
-  return warningReason ? (baseReason ? `${baseReason} / ${warningReason}` : warningReason) : baseReason;
+  const outsideTail = outsideAllowedSizesDisplayTail(r);
+  return outsideTail ? (core ? `${core} · ${outsideTail}` : outsideTail) : core;
+}
+
+/** 정규화 행 테이블 상태 열(UI만): 범위 밖이면 '사이즈 확인' 우선 */
+function labelNormalizedRowParseStatusUi(r: any): string {
+  if (shouldPrioritizeSizeCheckUiDisplay(r)) return "사이즈 확인";
+  return labelSizeAnalysisParseStatusForRow(r);
 }
 
 export function SizeAnalysisPage() {
@@ -281,6 +286,8 @@ export function SizeAnalysisPage() {
   const [allRows, setAllRows] = useState<any[]>([]);
   const [rows, setRows] = useState<any[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  /** 확인 전용: 집계·API와 무관, 전체 보기 목록 필터만 */
+  const [outsideSizesAssistActive, setOutsideSizesAssistActive] = useState(false);
   const [loading, setLoading] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [mappingSaved, setMappingSaved] = useState(false);
@@ -295,6 +302,11 @@ export function SizeAnalysisPage() {
     () => analyzeDuplicateRows(allRows, structureTypeForDup),
     [allRows, structureTypeForDup]
   );
+
+  const allViewDisplayRows = useMemo(() => {
+    if (!outsideSizesAssistActive) return rows;
+    return rows.filter((r) => uiRowOutsideAllowedSizesForAssistFilter(r));
+  }, [rows, outsideSizesAssistActive]);
 
   const clubGroupedRows = useMemo(() => {
     const byClub = new Map<string, { club: string; totalQty: number; rows: Array<{ gender: string; size: string; qty: number; hasReview: boolean; hasUnresolved: boolean }> }>();
@@ -364,6 +376,7 @@ export function SizeAnalysisPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "업로드 실패");
       setJobId(json.jobId);
+      setOutsideSizesAssistActive(false);
       setSheets(json.sheets ?? []);
       const first = json.sheets?.[0]?.name ?? "";
       setSelectedSheet(first);
@@ -653,12 +666,18 @@ export function SizeAnalysisPage() {
             duplicateAnalysis={duplicateAnalysis}
             allRows={allRows}
             statusFilter={statusFilter}
+            outsideSizesAssistActive={outsideSizesAssistActive}
             structureType={structureTypeForDup}
           />
         </div>
 
         <div className="size-analysis-grid-item size-analysis-grid-item--filter">
-          <AnalysisStatusFilter value={statusFilter} onChange={onStatusChange} />
+          <AnalysisStatusFilter
+            value={statusFilter}
+            onChange={onStatusChange}
+            outsideSizesAssistActive={outsideSizesAssistActive}
+            onOutsideSizesAssistChange={setOutsideSizesAssistActive}
+          />
         </div>
 
         <section className="size-analysis-card size-analysis-xlsx-export">
@@ -683,7 +702,7 @@ export function SizeAnalysisPage() {
           {detailViewMode === "all" ? (
             <>
               <AnalysisRowsTable
-                rows={rows}
+                rows={allViewDisplayRows}
                 duplicateRowIds={duplicateAnalysis.duplicateRowIds}
                 onToggleIncludeNameMissingRow={toggleIncludeNameMissingRow}
                 showItemColumn={structureTypeForDup === "multi_item_personal_order"}
@@ -1816,11 +1835,11 @@ export function ClubGroupedView({
   return (
     <section className="size-analysis-card size-analysis-club-group-view">
       <h3>클럽별 보기</h3>
-      <p className="size-analysis-muted size-analysis-club-group-hint">
-        {isMultiItem
-          ? "클럽을 펼치면 상품별(상의/하의/바람막이 등) 매트릭스가 세로로 모두 표시됩니다."
-          : "클럽·성별·사이즈별 수량을 8) 집계와 같은 매트릭스로 확인할 수 있습니다."}
-      </p>
+      {isMultiItem ? (
+        <p className="size-analysis-muted size-analysis-club-group-hint">
+          클럽을 펼치면 상품별(상의/하의/바람막이 등) 매트릭스가 세로로 모두 표시됩니다.
+        </p>
+      ) : null}
       {!isMultiItem ? (
         <div className="size-analysis-club-group-list">
           <article className="size-analysis-club-group-card">
@@ -1977,12 +1996,15 @@ export function AnalysisSummaryCards({
   duplicateAnalysis,
   allRows,
   statusFilter,
+  outsideSizesAssistActive = false,
   structureType,
 }: {
   summary: any;
   duplicateAnalysis: DuplicateAnalysis;
   allRows: any[];
   statusFilter: string;
+  /** 전체 목록 확인용 표시 필터 활성(UI만) */
+  outsideSizesAssistActive?: boolean;
   structureType?: StructureType;
 }) {
   if (!summary) return null;
@@ -2017,10 +2039,11 @@ export function AnalysisSummaryCards({
         총 수량 = 기본 수량 + 중복 수량 기준입니다.
         <br />
         검토필요와 미분류는 확인 후 집계에 반영하세요.
-        {filterLabel !== "all" ? (
+        {statusFilter !== "all" || outsideSizesAssistActive ? (
           <>
             <br />
-            (현재 필터: {filterLabel})
+            (현재 표시 필터: {filterLabel}
+            {outsideSizesAssistActive ? " · 범위외 사이즈(표시 확인)" : ""})
           </>
         ) : null}
       </p>
@@ -2045,7 +2068,17 @@ export function AnalysisSummaryCards({
   );
 }
 
-export function AnalysisStatusFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function AnalysisStatusFilter({
+  value,
+  onChange,
+  outsideSizesAssistActive,
+  onOutsideSizesAssistChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  outsideSizesAssistActive: boolean;
+  onOutsideSizesAssistChange: (next: boolean) => void;
+}) {
   return (
     <section className="size-analysis-card">
       <h3>6) 상태 필터</h3>
@@ -2060,6 +2093,14 @@ export function AnalysisStatusFilter({ value, onChange }: { value: string; onCha
             {STATUS_FILTER_LABEL[opt]}
           </button>
         ))}
+        <button
+          type="button"
+          className={`btn ${outsideSizesAssistActive ? "btn-primary" : "btn-secondary"} size-analysis-filter-btn--outside-sizes`}
+          aria-pressed={outsideSizesAssistActive}
+          onClick={() => onOutsideSizesAssistChange(!outsideSizesAssistActive)}
+        >
+          범위외 사이즈
+        </button>
       </div>
     </section>
   );
@@ -2095,17 +2136,24 @@ function normalizedRowLine1(r: any): string {
 /** 모바일 요약: 검토/미분류/수정완료는 뱃지로, 본문에는 원본행·신뢰도만(중복 강조 방지) */
 function normalizedRowLine2Parts(r: any): {
   subline: string;
-  pill: "needs_review" | "unresolved" | "corrected" | null;
+  pill: "needs_review" | "unresolved" | "corrected" | "size_check" | null;
 } {
   const src =
     r.sourceRowIndex != null && r.sourceRowIndex !== "" ? `원본행 ${r.sourceRowIndex}` : "";
-  const conf = `신뢰도 ${Number(r.parseConfidence ?? 0).toFixed(2)}`;
+  const conf = `신뢰도 ${displayParseConfidenceUi(r).toFixed(2)}`;
   const st = String(r.parseStatus ?? "");
   if (st === "excluded" || r.excluded) {
     const rsn = displayReasonForNormalizedRow(r);
     return {
       subline: [src, rsn, conf].filter((x) => x && x.length > 0).join(" · "),
       pill: null,
+    };
+  }
+  if (shouldPrioritizeSizeCheckUiDisplay(r)) {
+    const rsn = displayReasonForNormalizedRow(r);
+    return {
+      subline: [src, rsn, conf].filter((x) => x && x.length > 0).join(" · "),
+      pill: "size_check",
     };
   }
   if (st === "needs_review" || st === "unresolved" || st === "corrected") {
@@ -2127,6 +2175,11 @@ function normCompactClass(st: string | undefined) {
   if (st === "unresolved") return "size-analysis-norm-compact size-analysis-norm-compact--unresolved";
   if (st === "corrected") return "size-analysis-norm-compact size-analysis-norm-compact--corrected";
   return "size-analysis-norm-compact";
+}
+
+function normCompactClassForRow(r: any): string {
+  if (shouldPrioritizeSizeCheckUiDisplay(r)) return "size-analysis-norm-compact size-analysis-norm-compact--size-check";
+  return normCompactClass(r.parseStatus);
 }
 
 export function AnalysisRowsTable({
@@ -2166,7 +2219,7 @@ export function AnalysisRowsTable({
           const { subline, pill } = normalizedRowLine2Parts(r);
           const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
           return (
-            <article key={stableRowKeyForDup(r, i)} className={normCompactClass(r.parseStatus)}>
+            <article key={stableRowKeyForDup(r, i)} className={normCompactClassForRow(r)}>
               <p className="size-analysis-norm-compact__line1">
                 <span className="size-analysis-norm-compact__line1-text">{normalizedRowLine1(r)}</span>
                 {isDup ? <span className="size-analysis-dup-badge">중복</span> : null}
@@ -2189,6 +2242,8 @@ export function AnalysisRowsTable({
                   <span className="size-analysis-mini-pill size-analysis-mini-pill--unresolved">미분류</span>
                 ) : pill === "corrected" ? (
                   <span className="size-analysis-mini-pill size-analysis-mini-pill--corrected">수정완료</span>
+                ) : pill === "size_check" ? (
+                  <span className="size-analysis-mini-pill size-analysis-mini-pill--size-check">사이즈 확인</span>
                 ) : null}
               </div>
             </article>
@@ -2229,7 +2284,7 @@ export function AnalysisRowsTable({
                   {showItemColumn ? <td data-label="상품명">{r.itemRaw ?? ""}</td> : null}
                   <td data-label="사이즈">{displaySizeWithWarning(r)}</td>
                   <td data-label="수량">{r.qtyParsed ?? r.qtyRaw ?? ""}</td>
-                  <td data-label="상태">{labelSizeAnalysisParseStatusForRow(r)}</td>
+                  <td data-label="상태">{labelNormalizedRowParseStatusUi(r)}</td>
                   <td data-label="사유">{displayReasonForNormalizedRow(r)}</td>
                   <td data-label="수량 포함" className="size-analysis-include-col">
                     {isNameMissingRow(r) && (r.parseStatus === "needs_review" || r.parseStatus === "corrected") ? (
@@ -2245,7 +2300,7 @@ export function AnalysisRowsTable({
                       ""
                     )}
                   </td>
-                  <td data-label="신뢰도">{Number(r.parseConfidence ?? 0).toFixed(2)}</td>
+                  <td data-label="신뢰도">{displayParseConfidenceUi(r).toFixed(2)}</td>
                 </tr>
               );
             })}

@@ -6879,25 +6879,25 @@ label {
 .size-analysis-summary-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 9px;
+  gap: 6px;
 }
 
 /* 폭이 매우 좁을 때만 2열 (그 외 모바일·태블릿도 3열) */
 @media (max-width: 359px) {
   .size-analysis-summary-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
+    gap: 5px;
   }
 }
 
 .size-analysis-summary-card {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 9px 10px;
+  padding: 7px 8px;
   background: #f9fafb;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
@@ -6933,7 +6933,7 @@ label {
 }
 
 .size-analysis-summary-scope-hint {
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
   font-size: 0.8rem;
   line-height: 1.35;
 }
@@ -7203,7 +7203,9 @@ label {
 }
 
 .size-analysis-club-members-desc {
-  font-size: 8px;
+  font-size: 10px;
+  line-height: 1.45;
+  margin: 0 0 6px;
 }
 
 .size-analysis-filter-row {
@@ -7544,6 +7546,10 @@ label {
   gap: 8px;
 }
 
+.size-analysis-view-switch.size-analysis-view-switch--segmented {
+  gap: 0;
+}
+
 .size-analysis-norm-compact-list--mobile,
 .size-analysis-club-agg-compact--mobile {
   display: none;
@@ -7758,6 +7764,11 @@ label {
   border-left-color: #10b981;
 }
 
+.size-analysis-norm-compact--size-check {
+  background: #fefce8;
+  border-left-color: #ca8a04;
+}
+
 .size-analysis-norm-compact__line1 {
   margin: 0;
   display: flex;
@@ -7869,13 +7880,19 @@ label {
   color: #065f46;
 }
 
+.size-analysis-mini-pill--size-check {
+  background: #fef08a;
+  color: #713f12;
+}
+
 .size-analysis-club-group-list {
   display: grid;
   gap: 8px;
 }
 
 .size-analysis-club-group-card {
-  border: 1px solid #e5e7eb;
+  /* 클럽 단위 외곽만: 펼침 시 블록 구분(내부 매트릭스·행 선은 그대로) */
+  border: 1px solid #9aaccc;
   border-radius: 8px;
   padding: 8px;
   background: #fff;
@@ -8032,7 +8049,7 @@ label {
   }
 
   .size-analysis-summary-card {
-    padding: 6px 8px;
+    padding: 5px 6px;
   }
 
   .size-analysis-summary-card__value {
@@ -8249,9 +8266,12 @@ label {
     margin: 0 0 2px;
   }
 
-  .size-analysis-view-switch-card {
-    padding: 2px 3px 3px;
+  .size-analysis-result-region .size-analysis-view-switch-card {
+    padding: 2px;
     position: relative;
+    background: #fafafa;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 8px !important;
   }
 
   .size-analysis-view-switch__heading {
@@ -8269,33 +8289,43 @@ label {
   .size-analysis-view-switch--segmented {
     display: flex;
     width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 7px;
+    gap: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
     overflow: hidden;
-    background: #f3f4f6;
+    background: #fff;
   }
 
   .size-analysis-view-switch--segmented .btn {
     width: auto !important;
     flex: 1 1 0;
-    min-height: 30px;
-    padding: 4px 5px;
-    font-size: 0.8125rem;
+    min-width: 0;
+    min-height: 34px;
+    padding: 6px 2px;
+    font-size: 0.765rem;
     border-radius: 0;
     border: none;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .size-analysis-view-switch--segmented .btn + .btn {
+    border-left: 1px solid #e5e7eb;
+    box-shadow: none;
   }
 
   .size-analysis-view-switch--segmented .btn.btn-primary {
-    background: #fff;
+    background: #e8eaed;
     color: #111827;
     font-weight: 700;
-    box-shadow: inset 0 0 0 1.5px #3b82f6;
+    box-shadow: none;
   }
 
   .size-analysis-view-switch--segmented .btn.btn-secondary {
-    background: transparent;
-    color: #6b7280;
+    background: #f9fafb;
+    color: #57534e;
     font-weight: 500;
   }
 
@@ -8448,32 +8478,67 @@ label {
     position: static;
     width: auto;
     height: auto;
-    margin: 0 0 8px 0;
+    margin: 0 0 6px 0;
     padding: 0;
     overflow: visible;
     clip: auto;
     border: 0;
     white-space: normal;
+    color: #475569;
+  }
+
+  .size-analysis-view-switch-card {
+    padding: 3px;
+    background: #fafafa;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
   }
 
   .size-analysis-view-switch--segmented {
     display: flex;
-    gap: 8px;
+    gap: 0;
     width: 100%;
     max-width: 100%;
-    border: 0;
-    background: transparent;
-    border-radius: 0;
-    overflow: visible;
+    flex-wrap: nowrap;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
   }
 
   .size-analysis-view-switch--segmented .btn {
-    min-height: 0;
-    border-radius: 6px;
+    min-height: 38px;
+    padding: 8px 4px;
+    border-radius: 0;
     box-shadow: none;
+    border: none;
+    font-weight: 600;
+    flex: 1 1 0;
+    min-width: 0;
+    line-height: 1.25;
+    font-size: 0.82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .size-analysis-view-switch--segmented .btn + .btn {
+    border-left: 1px solid #e5e7eb;
+  }
+
+  .size-analysis-view-switch--segmented .btn.btn-secondary {
+    background: #f9fafb;
+    color: #57534e;
+  }
+
+  .size-analysis-view-switch--segmented .btn.btn-secondary:hover {
+    background: #f3f4f6;
+    color: #111827;
   }
 
   .size-analysis-view-switch--segmented .btn.btn-primary {
+    background: #e8eaed;
+    color: #111827;
     box-shadow: none;
   }
 
@@ -8598,7 +8663,7 @@ label {
 
   .size-analysis-grid-item--filter .size-analysis-filter-row {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
     gap: 6px;
   }
 
@@ -8747,7 +8812,6 @@ label {
   .size-analysis-page .size-analysis-xlsx-export__hint,
   .size-analysis-page .size-analysis-run-card__note,
   .size-analysis-page .size-analysis-dup-only-hint,
-  .size-analysis-page .size-analysis-club-members-desc,
   .size-analysis-page .size-analysis-club-group-hint,
   .size-analysis-page .size-analysis-club-size-hint,
   .size-analysis-page .size-analysis-detect-outcome {

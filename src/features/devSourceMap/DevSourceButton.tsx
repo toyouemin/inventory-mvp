@@ -20,10 +20,6 @@ export function DevSourceButton({ pageKey, variant = "default" }: DevSourceButto
     return () => window.clearTimeout(timer);
   }, [copiedFile]);
 
-  if (process.env.NODE_ENV !== "development") {
-    return null;
-  }
-
   async function handleCopy(file: string): Promise<void> {
     try {
       await navigator.clipboard.writeText(file);

@@ -1371,7 +1371,15 @@ export function ClubMembersView({
   structureType?: StructureType;
 }) {
   const isMultiItem = structureType === "multi_item_personal_order";
-  type MemberAggRow = { name: string; item: string; gender: string; size: string; qty: number; hasDup: boolean };
+  type MemberAggRow = {
+    name: string;
+    item: string;
+    gender: string;
+    size: string;
+    qty: number;
+    hasDup: boolean;
+    hasSizeCheck: boolean;
+  };
   const [includeDuplicates, setIncludeDuplicates] = useState(true);
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
 
@@ -1400,9 +1408,10 @@ export function ClubMembersView({
       const key = isMultiItem ? `${name}\0${item}\0${gender}\0${size}` : `${name}\0${gender}\0${size}`;
       if (!byClub.has(club)) byClub.set(club, new Map());
       const rowMap = byClub.get(club)!;
-      const cur = rowMap.get(key) ?? { name, item, gender, size, qty: 0, hasDup: false };
+      const cur = rowMap.get(key) ?? { name, item, gender, size, qty: 0, hasDup: false, hasSizeCheck: false };
       cur.qty += qty;
       if (isDup) cur.hasDup = true;
+      if (shouldPrioritizeSizeCheckUiDisplay(r)) cur.hasSizeCheck = true;
       rowMap.set(key, cur);
     }
 
@@ -1550,11 +1559,19 @@ export function ClubMembersView({
                     {sec.rows.map((row) => (
                       <tr
                         key={`${sec.club}\0${row.name}\0${row.item}\0${row.gender}\0${row.size}`}
-                        className={row.hasDup ? "size-analysis-club-members-row--dup" : ""}
+                        className={[
+                          row.hasDup ? "size-analysis-club-members-row--dup" : "",
+                          row.hasSizeCheck ? "size-analysis-club-members-row--size-check" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
                         <td>
                           {row.name}{" "}
                           {row.hasDup ? <span className="size-analysis-dup-line-tag--dup">중복</span> : null}
+                          {row.hasSizeCheck ? (
+                            <span className="size-analysis-dup-line-tag--size-check">사이즈 확인</span>
+                          ) : null}
                         </td>
                         {isMultiItem ? (
                           <td>
@@ -1609,10 +1626,19 @@ export function ClubMembersView({
                   {sec.rows.map((row) => (
                     <tr
                       key={`${sec.club}\0${row.name}\0${row.item}\0${row.gender}\0${row.size}`}
-                      className={row.hasDup ? "size-analysis-club-members-row--dup" : ""}
+                      className={[
+                        row.hasDup ? "size-analysis-club-members-row--dup" : "",
+                        row.hasSizeCheck ? "size-analysis-club-members-row--size-check" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     >
                       <td>
-                        {row.name} {row.hasDup ? <span className="size-analysis-dup-line-tag--dup">중복</span> : null}
+                        {row.name}{" "}
+                        {row.hasDup ? <span className="size-analysis-dup-line-tag--dup">중복</span> : null}
+                        {row.hasSizeCheck ? (
+                          <span className="size-analysis-dup-line-tag--size-check">사이즈 확인</span>
+                        ) : null}
                       </td>
                       {isMultiItem ? (
                         <td>
@@ -1703,15 +1729,17 @@ export function ClubGroupedView({
           let hasReview = false;
           let hasUnres = false;
           let hasCorrected = false;
+          let hasSizeCheck = false;
           for (const clubName of rows.map((x) => x.club)) {
             const meta = statusByCell.get(`${clubName}\0${gk}\0${sz}`);
             if (!meta) continue;
             hasReview = hasReview || meta.hasReview;
             hasUnres = hasUnres || meta.hasUnres;
             hasCorrected = hasCorrected || meta.hasCorrected;
-            if (hasReview && hasUnres && hasCorrected) break;
+            hasSizeCheck = hasSizeCheck || meta.hasSizeCheck;
+            if (hasReview && hasUnres && hasCorrected && hasSizeCheck) break;
           }
-          return { hasReview, hasUnres, hasCorrected };
+          return { hasReview, hasUnres, hasCorrected, hasSizeCheck };
         },
       };
     });
@@ -1773,10 +1801,17 @@ export function ClubGroupedView({
       const size = sDisp || "미분류";
       const key = `${club}\0${product}\0${gk}\0${size}`;
       const st = String(r.parseStatus ?? "");
-      const cur = statusByProductCell.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false };
+      const cur =
+        statusByProductCell.get(key) ?? {
+          hasReview: false,
+          hasUnres: false,
+          hasCorrected: false,
+          hasSizeCheck: false,
+        };
       if (st === "needs_review") cur.hasReview = true;
       if (st === "unresolved") cur.hasUnres = true;
       if (st === "corrected") cur.hasCorrected = true;
+      if (shouldPrioritizeSizeCheckUiDisplay(r)) cur.hasSizeCheck = true;
       statusByProductCell.set(key, cur);
     }
 
@@ -2380,7 +2415,12 @@ function compareSizeLabel(a: string, b: string): number {
   return aa.localeCompare(bb, "ko");
 }
 
-type CellMeta = { hasReview: boolean; hasUnres: boolean; hasCorrected: boolean };
+type CellMeta = {
+  hasReview: boolean;
+  hasUnres: boolean;
+  hasCorrected: boolean;
+  hasSizeCheck: boolean;
+};
 function buildCellStatusMap(normRows: any[]): Map<string, CellMeta> {
   const map = new Map<string, CellMeta>();
   for (const r of normRows) {
@@ -2391,10 +2431,12 @@ function buildCellStatusMap(normRows: any[]): Map<string, CellMeta> {
     const size = sDisp || "미분류";
     const key = `${club}\0${gk}\0${size}`;
     const st = String(r.parseStatus ?? "");
-    const cur = map.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false };
+    const cur =
+      map.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false, hasSizeCheck: false };
     if (st === "needs_review") cur.hasReview = true;
     if (st === "unresolved") cur.hasUnres = true;
     if (st === "corrected") cur.hasCorrected = true;
+    if (shouldPrioritizeSizeCheckUiDisplay(r)) cur.hasSizeCheck = true;
     map.set(key, cur);
   }
   return map;
@@ -2436,9 +2478,19 @@ function matrixRowKeysForProductRows(rows: Array<{ gender: string }>): Array<"�
   return matrixGenderRowKeys(rows);
 }
 
-type ClubAggCellMeta = { hasReview: boolean; hasUnres: boolean; hasCorrected: boolean };
+type ClubAggCellMeta = {
+  hasReview: boolean;
+  hasUnres: boolean;
+  hasCorrected: boolean;
+  hasSizeCheck: boolean;
+};
 
-const EMPTY_CLUB_AGG_META: ClubAggCellMeta = { hasReview: false, hasUnres: false, hasCorrected: false };
+const EMPTY_CLUB_AGG_META: ClubAggCellMeta = {
+  hasReview: false,
+  hasUnres: false,
+  hasCorrected: false,
+  hasSizeCheck: false,
+};
 
 /** 클럽/성별/사이즈 집계 매트릭스 표 — 8) 집계·클럽별 보기(모바일·PC 공통) */
 function ClubAggMatrixTableDesktop({
@@ -2485,11 +2537,18 @@ function ClubAggMatrixTableDesktop({
               <th className="size-analysis-club-agg-mtx-corner" scope="col" aria-label="성별·사이즈">
                 {"\u200b"}
               </th>
-              {sizes.map((sz) => (
-                <th key={sz} scope="col">
-                  {sz}
-                </th>
-              ))}
+              {sizes.map((sz) => {
+                const colHasSizeCheck = rowKeys.some((rk) => resolveMeta(rk, sz).hasSizeCheck);
+                return (
+                  <th
+                    key={sz}
+                    scope="col"
+                    className={colHasSizeCheck ? "size-analysis-club-agg-mtx-col--size-check" : undefined}
+                  >
+                    {sz}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -2503,17 +2562,24 @@ function ClubAggMatrixTableDesktop({
                   const meta = resolveMeta(gk, sz);
                   const stBits: string[] = [];
                   if (!isDuplicateMatrix) {
+                    if (meta.hasSizeCheck) stBits.push("사이즈 확인");
                     if (meta.hasReview) stBits.push("검토필요");
                     if (meta.hasUnres) stBits.push("미분류");
                     if (meta.hasCorrected) stBits.push("수정완료");
+                  } else if (meta.hasSizeCheck) {
+                    stBits.push("사이즈 확인");
                   }
                   const stLabel = stBits.length ? stBits.join(", ") : undefined;
                   let stateClass = "";
                   if (isDuplicateMatrix && q > 0) {
                     stateClass = "size-analysis-club-agg-mtx-cell--duplicate";
-                  } else if (meta.hasReview) stateClass = "size-analysis-club-agg-mtx-cell--review";
-                  else if (meta.hasUnres) stateClass = "size-analysis-club-agg-mtx-cell--unres";
-                  else if (meta.hasCorrected) stateClass = "size-analysis-club-agg-mtx-cell--corrected";
+                    if (meta.hasSizeCheck) stateClass += " size-analysis-club-agg-mtx-cell--size-check-hint";
+                  } else if (!isDuplicateMatrix) {
+                    if (meta.hasSizeCheck) stateClass = "size-analysis-club-agg-mtx-cell--size-check";
+                    else if (meta.hasReview) stateClass = "size-analysis-club-agg-mtx-cell--review";
+                    else if (meta.hasUnres) stateClass = "size-analysis-club-agg-mtx-cell--unres";
+                    else if (meta.hasCorrected) stateClass = "size-analysis-club-agg-mtx-cell--corrected";
+                  }
                   const show = q > 0 ? String(q) : "";
                   return (
                     <td
@@ -2673,10 +2739,12 @@ export function ProductSizeSummaryTable({
       const size = sDisp || "미분류";
       const key = `${product}\0${gk}\0${size}`;
       const st = String(r.parseStatus ?? "");
-      const cur = map.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false };
+      const cur =
+        map.get(key) ?? { hasReview: false, hasUnres: false, hasCorrected: false, hasSizeCheck: false };
       if (st === "needs_review") cur.hasReview = true;
       if (st === "unresolved") cur.hasUnres = true;
       if (st === "corrected") cur.hasCorrected = true;
+      if (shouldPrioritizeSizeCheckUiDisplay(r)) cur.hasSizeCheck = true;
       map.set(key, cur);
     }
     return map;

@@ -654,7 +654,13 @@ body {
   margin: 0 auto;
   padding: 16px 16px 8px;
   box-sizing: border-box;
-  text-align: center;
+}
+
+.app-site-header__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .app-global-header {
@@ -670,6 +676,25 @@ body {
   font-weight: 700;
   line-height: 1.3;
   word-break: keep-all;
+}
+
+.app-dev-map-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  background: #f3f4f6;
+  color: var(--text);
+  border: 1px solid #e5e7eb;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.app-dev-map-button:hover {
+  background: #e5e7eb;
 }
 
 main {
@@ -3303,6 +3328,12 @@ label {
     max-width: 100%;
   }
 
+  .app-dev-map-button {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+
   .app-main-nav {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -3660,6 +3691,89 @@ label {
 
   .product-card__memo-actions {
     justify-content: flex-end;
+  }
+}
+
+.dev-map-page {
+  max-width: 1100px;
+  margin: 20px auto 80px;
+  padding: 0 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.dev-map-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.dev-map-title {
+  margin: 0 0 10px 0;
+  font-size: 1.2rem;
+}
+
+.dev-map-search {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.dev-map-grid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dev-map-item-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.dev-map-item-category {
+  margin: 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.dev-map-item-file {
+  margin: 0;
+  font-weight: 700;
+  color: #1f6f8b;
+  word-break: break-all;
+}
+
+.dev-map-item-role,
+.dev-map-item-note,
+.dev-map-item-editable-title {
+  margin: 0;
+}
+
+.dev-map-item-editable ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.dev-map-item-editable li {
+  margin: 2px 0;
+}
+
+@media (min-width: 900px) {
+  .dev-map-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .dev-map-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

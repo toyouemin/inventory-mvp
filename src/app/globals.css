@@ -734,6 +734,19 @@ body {
   margin-top: 3px;
 }
 
+.app-settings-panel__link {
+  display: inline-flex;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1f6f8b;
+  text-decoration: none;
+}
+
+.app-settings-panel__link:hover {
+  text-decoration: underline;
+}
+
 main {
   max-width: 960px;
   margin: 32px auto 80px;

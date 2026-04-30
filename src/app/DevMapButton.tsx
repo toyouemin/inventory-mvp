@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 function SettingsPanel() {
@@ -8,6 +9,9 @@ function SettingsPanel() {
       <p className="app-settings-panel__title">설정</p>
       <p className="app-settings-panel__item">개발 구조 보기 패널이 열려 있습니다.</p>
       <p className="app-settings-panel__item">다시 톱니 버튼을 누르면 닫힙니다.</p>
+      <Link href="/dev-map" className="app-settings-panel__link">
+        개발 구조 페이지 열기
+      </Link>
     </div>
   );
 }

@@ -6878,21 +6878,58 @@ label {
 
 .size-analysis-summary-cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+/* 폭이 매우 좁을 때만 2열 (그 외 모바일·태블릿도 3열) */
+@media (max-width: 359px) {
+  .size-analysis-summary-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
 }
 
 .size-analysis-summary-card {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 8px;
+  padding: 9px 10px;
   background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .size-analysis-summary-card__label {
   color: #6b7280;
-  font-size: 0.82rem;
-  margin-bottom: 4px;
+  font-size: 0.8125rem;
+  line-height: 1.25;
+  margin-bottom: 0;
+}
+
+.size-analysis-summary-card__value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.size-analysis-summary-card--hero {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.size-analysis-summary-card--hero .size-analysis-summary-card__value {
+  font-size: 1.375rem;
+}
+
+.size-analysis-summary-card--emphasis {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+
+.size-analysis-summary-card--emphasis .size-analysis-summary-card__value {
+  font-size: 1.25rem;
 }
 
 .size-analysis-summary-scope-hint {
@@ -7951,9 +7988,6 @@ label {
 }
 
 @media (max-width: 960px) {
-  .size-analysis-summary-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .size-analysis-grid {
     grid-template-columns: 1fr;
   }
@@ -7997,22 +8031,25 @@ label {
     grid-column: 1 / -1;
   }
 
-  .size-analysis-summary-cards {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-  }
-
   .size-analysis-summary-card {
-    padding: 5px 6px;
+    padding: 6px 8px;
   }
 
-  .size-analysis-summary-card strong {
+  .size-analysis-summary-card__value {
     line-height: 1.15;
-    font-size: 0.96rem;
+    font-size: 1.05rem;
+  }
+
+  .size-analysis-summary-card--hero .size-analysis-summary-card__value {
+    font-size: 1.25rem;
+  }
+
+  .size-analysis-summary-card--emphasis .size-analysis-summary-card__value {
+    font-size: 1.12rem;
   }
 
   .size-analysis-summary-card__label {
-    margin-bottom: 2px;
+    margin-bottom: 0;
     font-size: 0.77rem;
   }
 
@@ -8682,13 +8719,21 @@ label {
 
   /* 결과 요약 / 상품별 요약 카드 */
   .size-analysis-page .size-analysis-summary-card__label {
-    font-size: 15px;
+    font-size: 13px;
   }
 
-  .size-analysis-page .size-analysis-summary-card strong {
+  .size-analysis-page .size-analysis-summary-card__value {
     font-size: 20px;
     font-weight: 700;
     line-height: 1.25;
+  }
+
+  .size-analysis-page .size-analysis-summary-card--hero .size-analysis-summary-card__value {
+    font-size: 22px;
+  }
+
+  .size-analysis-page .size-analysis-summary-card--emphasis .size-analysis-summary-card__value {
+    font-size: 20px;
   }
 
   /* 설명·보조 문단 (기존 13px대 → 14~15px) */

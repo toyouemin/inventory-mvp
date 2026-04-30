@@ -674,7 +674,7 @@ export function SizeAnalysisPage() {
               downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis, { structureType: structureTypeForDup })
             }
           >
-            엑셀 다운로드 (.xlsx)
+            분석자료 엑셀 다운로드 (.xlsx)
           </button>
         </section>
 
@@ -1962,6 +1962,16 @@ export function ClubGroupedView({
   );
 }
 
+/** 결과 요약 다품목 카드 라벨: 상품명만 표시(예: 바람막이(공용) → 바람막이) */
+function formatProductSummaryCardLabel(raw: string): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return s;
+  const shortened = s.replace(/\s*\(공용\)\s*$/u, "").trim();
+  return shortened || s;
+}
+
+type SummaryCardVisual = "hero" | "emphasis" | "default";
+
 export function AnalysisSummaryCards({
   summary,
   duplicateAnalysis,
@@ -1977,21 +1987,15 @@ export function AnalysisSummaryCards({
 }) {
   if (!summary) return null;
   const totalQty = duplicateAnalysis.totalQty;
-  const finalQty = duplicateAnalysis.normalQty;
   const filterLabel = STATUS_FILTER_LABEL[statusFilter as (typeof STATUS_FILTER_OPTIONS)[number]] ?? statusFilter;
-  /** 가독성: 전체 현황 → 처리 상태 → 제외/중복 → (다품목) 상품별 합계 순 */
-  const cards: Array<[string, string | number]> = [
-    ["총 정규화 행 수", summary.totalRows],
-    ["원본 총수량", totalQty],
-    ["자동확정", summary.auto_confirmed],
-    ["수정완료", summary.corrected],
-    ["검토필요", summary.needs_review],
-    ["미분류", summary.unresolved],
-    ["제외(중복자)", summary.excludedDuplicateCount ?? 0],
-    ["중복 주문(건)", duplicateAnalysis.duplicatePersonCount],
-    ["중복 수량", duplicateAnalysis.duplicateQtyTotal],
-    ["중복 제외 수량", finalQty],
-    ["빈 수량 제외", summary.excludedEmptyQtyCount ?? 0],
+  const cards: Array<{ label: string; value: string | number; visual: SummaryCardVisual }> = [
+    { label: "총수량", value: summary.totalRows, visual: "hero" },
+    { label: "기본 수량", value: totalQty, visual: "emphasis" },
+    { label: "중복 수량", value: duplicateAnalysis.duplicateQtyTotal, visual: "emphasis" },
+    { label: "검토필요", value: summary.needs_review, visual: "default" },
+    { label: "수정완료", value: summary.corrected, visual: "default" },
+    { label: "미분류", value: summary.unresolved, visual: "default" },
+    { label: "빈 수량", value: summary.excludedEmptyQtyCount ?? 0, visual: "default" },
   ];
   if (structureType === "multi_item_personal_order") {
     const byProduct = new Map<string, number>();
@@ -2001,21 +2005,39 @@ export function AnalysisSummaryCards({
       byProduct.set(product, (byProduct.get(product) ?? 0) + rowQtyParsed(r));
     }
     for (const [product, qty] of [...byProduct.entries()].sort((a, b) => a[0].localeCompare(b[0], "ko"))) {
-      cards.push([`상품 합계 · ${product}`, qty]);
+      cards.push({ label: formatProductSummaryCardLabel(product), value: qty, visual: "default" });
     }
   }
   return (
     <section className="size-analysis-card">
       <h3>5) 결과 요약</h3>
       <p className="size-analysis-muted size-analysis-summary-scope-hint">
-        상단은 파싱 상태별 및 중복·빈값 건수 요약입니다. ‘제외(중복)’ 필터는 중복자만 표시하며, 빈 수량은 개수에만 반영됩니다. 수량은 전체·중복·중복제외(전체−중복) 기준으로 계산됩니다. 필터는 전체보기 테이블에만 적용됩니다
-        {filterLabel !== "all" ? ` (현재 필터: ${filterLabel})` : ""}.
+        중복 신청자는 추가 지급 대상으로 포함됩니다.
+        <br />
+        총 수량 = 기본 수량 + 중복 수량 기준입니다.
+        <br />
+        검토필요와 미분류는 확인 후 집계에 반영하세요.
+        {filterLabel !== "all" ? (
+          <>
+            <br />
+            (현재 필터: {filterLabel})
+          </>
+        ) : null}
       </p>
       <div className="size-analysis-summary-cards">
-        {cards.map(([label, value]) => (
-          <article key={label} className="size-analysis-summary-card">
-            <div className="size-analysis-summary-card__label">{label}</div>
-            <strong>{String(value)}</strong>
+        {cards.map((c, idx) => (
+          <article
+            key={`${c.label}-${idx}`}
+            className={[
+              "size-analysis-summary-card",
+              c.visual === "hero" && "size-analysis-summary-card--hero",
+              c.visual === "emphasis" && "size-analysis-summary-card--emphasis",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="size-analysis-summary-card__label">{c.label}</div>
+            <strong className="size-analysis-summary-card__value">{String(c.value)}</strong>
           </article>
         ))}
       </div>
@@ -2642,7 +2664,7 @@ export function ProductSizeSummaryTable({
         {blocks.map((b) => (
           <article key={`prod-card-${b.product}`} className="size-analysis-summary-card">
             <div className="size-analysis-summary-card__label">{b.product}</div>
-            <strong>{b.totalQty}</strong>
+            <strong className="size-analysis-summary-card__value">{b.totalQty}</strong>
           </article>
         ))}
       </div>

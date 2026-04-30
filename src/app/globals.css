@@ -7047,9 +7047,11 @@ label {
   display: block;
 }
 
-/* 중복자 보기: 리스트는 모바일만(표는 PC 전용 래퍼) */
+/* 중복자 보기 · 클럽별 명단: 모바일 아코디언 카드 간격(접었을 때 테두리 겹침 완화) */
 .size-analysis-dup-only-list--mobile {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
   max-width: 100%;
   min-width: 0;

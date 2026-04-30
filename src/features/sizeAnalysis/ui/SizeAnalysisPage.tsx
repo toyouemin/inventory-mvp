@@ -688,7 +688,6 @@ export function SizeAnalysisPage() {
             statusFilter={statusFilter}
             outsideSizesAssistActive={outsideSizesAssistActive}
             outsideAssistEligibleCount={outsideAssistEligibleCount}
-            onOutsideSizesAssistToggle={() => void handleOutsideAssistChange(!outsideSizesAssistActive)}
             structureType={structureTypeForDup}
           />
         </div>
@@ -700,6 +699,7 @@ export function SizeAnalysisPage() {
             outsideSizesAssistActive={outsideSizesAssistActive}
             onOutsideSizesAssistChange={(next) => void handleOutsideAssistChange(next)}
             outsideAssistEligibleCount={outsideAssistEligibleCount}
+            needsReviewCount={Number(summary?.needs_review ?? 0)}
           />
         </div>
 
@@ -2021,7 +2021,6 @@ export function AnalysisSummaryCards({
   statusFilter,
   outsideSizesAssistActive = false,
   outsideAssistEligibleCount,
-  onOutsideSizesAssistToggle,
   structureType,
 }: {
   summary: any;
@@ -2030,10 +2029,8 @@ export function AnalysisSummaryCards({
   statusFilter: string;
   /** 전체 목록 확인용 표시 필터 활성(UI만) */
   outsideSizesAssistActive?: boolean;
-  /** 전체 목록 행 중 범위외 사이즈(중복 제외 제외 행 미포함). 집계와 무관 */
+  /** 전체 목록 행 중 범위외 사이즈(중복 제외 제외 행 미포함). 집계와 무관 · 표시 전용 */
   outsideAssistEligibleCount: number;
-  /** 상태 필터의 범위외 사이즈 버튼과 동일하게 토글 */
-  onOutsideSizesAssistToggle: () => void;
   structureType?: StructureType;
 }) {
   if (!summary) return null;
@@ -2047,6 +2044,7 @@ export function AnalysisSummaryCards({
     { label: "수정완료", value: summary.corrected, visual: "default" },
     { label: "미분류", value: summary.unresolved, visual: "default" },
     { label: "빈 수량", value: summary.excludedEmptyQtyCount ?? 0, visual: "default" },
+    { label: "범위외 사이즈", value: outsideAssistEligibleCount, visual: "default" },
   ];
   if (structureType === "multi_item_personal_order") {
     const byProduct = new Map<string, number>();
@@ -2080,41 +2078,21 @@ export function AnalysisSummaryCards({
         ) : null}
       </p>
       <div className="size-analysis-summary-cards">
-        {cards.flatMap((c, idx) => {
-          const articleProps = [
-            "size-analysis-summary-card",
-            c.visual === "hero" && "size-analysis-summary-card--hero",
-            c.visual === "emphasis" && "size-analysis-summary-card--emphasis",
-          ]
-            .filter(Boolean)
-            .join(" ");
-          const articleEl = (
-            <article key={`${c.label}-${idx}`} className={articleProps}>
-              <div className="size-analysis-summary-card__label">{c.label}</div>
-              <strong className="size-analysis-summary-card__value">{String(c.value)}</strong>
-            </article>
-          );
-          if (c.label !== "빈 수량") return [articleEl];
-          return [
-            articleEl,
-            <button
-              key={`outside-assist-summary-after-empty-${idx}`}
-              type="button"
-              className={[
-                "size-analysis-summary-card",
-                "size-analysis-summary-card--assist-toggle",
-                outsideSizesAssistActive && "size-analysis-summary-card--assist-toggle-active",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              aria-pressed={outsideSizesAssistActive}
-              onClick={onOutsideSizesAssistToggle}
-            >
-              <div className="size-analysis-summary-card__label">범위외 사이즈</div>
-              <strong className="size-analysis-summary-card__value">{outsideAssistEligibleCount}</strong>
-            </button>,
-          ];
-        })}
+        {cards.map((c, idx) => (
+          <article
+            key={`${c.label}-${idx}`}
+            className={[
+              "size-analysis-summary-card",
+              c.visual === "hero" && "size-analysis-summary-card--hero",
+              c.visual === "emphasis" && "size-analysis-summary-card--emphasis",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <div className="size-analysis-summary-card__label">{c.label}</div>
+            <strong className="size-analysis-summary-card__value">{String(c.value)}</strong>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -2126,12 +2104,15 @@ export function AnalysisStatusFilter({
   outsideSizesAssistActive,
   onOutsideSizesAssistChange,
   outsideAssistEligibleCount,
+  needsReviewCount,
 }: {
   value: string;
   onChange: (v: string) => void;
   outsideSizesAssistActive: boolean;
   onOutsideSizesAssistChange: (next: boolean) => void;
   outsideAssistEligibleCount: number;
+  /** 요약 기준 검토필요 건수 — 0 초과일 때만 버튼에 (n) 표시 */
+  needsReviewCount: number;
 }) {
   return (
     <section className="size-analysis-card">
@@ -2139,6 +2120,11 @@ export function AnalysisStatusFilter({
       <div className="size-analysis-filter-row size-analysis-filter-row--status-radio" role="group" aria-label="상태·범위외 표시 필터">
         {STATUS_FILTER_OPTIONS.map((opt, idx) => {
           const active = opt === value && !outsideSizesAssistActive;
+          const labelBase = STATUS_FILTER_LABEL[opt];
+          const label =
+            opt === "needs_review" && needsReviewCount > 0
+              ? `${labelBase} (${needsReviewCount})`
+              : labelBase;
           return (
             <button
               key={opt}
@@ -2147,7 +2133,7 @@ export function AnalysisStatusFilter({
               type="button"
               aria-pressed={active}
             >
-              {STATUS_FILTER_LABEL[opt]}
+              {label}
             </button>
           );
         })}

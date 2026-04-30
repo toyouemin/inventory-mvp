@@ -65,12 +65,32 @@ function rawHasGarmentNumericOutOfBand(raw: string): boolean {
   return false;
 }
 
-function rowIsDuplicateExcludedForUi(r: {
+/** 중복 판정으로 제외(parseStatus 제외 · duplicate_*). 집계와 무관한 UI 카운트·표시 신뢰도 보정에 공통 사용 */
+export function uiRowExcludedAsDuplicateExcluded(r: {
   parseStatus?: string | null;
   excludeReason?: string | null;
 }): boolean {
   if (String(r.parseStatus ?? "") !== "excluded") return false;
   return String(r.excludeReason ?? "").trim().startsWith("duplicate_");
+}
+
+/**
+ * 결과 요약·필터 표시 전용 행 개수 (집계/parse 필드 수정 없음).
+ * - 허용 밖 표기(UI 기준): uiRowOutsideAllowedSizesForAssistFilter
+ * - 제외 행 중 duplicate_* 만 카운트에서 제외 (다른 제외 행은 포함)
+ */
+export function countUiOutsideAllowedSizesAssistEligibleRows(rows: Iterable<{
+  parseStatus?: string | null;
+  excludeReason?: string | null;
+  sizeRaw?: string | null;
+  standardizedSize?: string | null;
+}>): number {
+  let n = 0;
+  for (const r of rows) {
+    if (uiRowExcludedAsDuplicateExcluded(r)) continue;
+    if (uiRowOutsideAllowedSizesForAssistFilter(r)) n++;
+  }
+  return n;
 }
 
 /**
@@ -88,7 +108,7 @@ export function displayParseConfidenceUi(r: {
 }): number {
   const base = Number(r.parseConfidence ?? 0);
   const fallback = Number.isFinite(base) ? base : 0;
-  if (rowIsDuplicateExcludedForUi(r)) return fallback;
+  if (uiRowExcludedAsDuplicateExcluded(r)) return fallback;
   if (!uiRowOutsideAllowedSizesForAssistFilter(r)) return fallback;
   return OUT_OF_RANGE_UI_DISPLAY_CONFIDENCE;
 }

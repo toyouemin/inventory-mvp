@@ -257,8 +257,10 @@ export const ProductCard = memo(function ProductCard({
     const raw = product?.stockUpdatedAt;
     if (!raw) return "-";
     const d = dayjs(raw);
-    return d.isValid() ? d.format("MM/DD HH:mm") : "-";
+    return d.isValid() ? d.format("YY/MM/DD HH:mm") : "-";
   }, [product?.stockUpdatedAt]);
+
+  const stockChangeSummaryLine = (product?.stockChangeSummary ?? "").trim();
 
   if (debugProductsDupes) {
     console.info("[productsPipeline][ProductCard render]", {
@@ -324,9 +326,18 @@ export const ProductCard = memo(function ProductCard({
               </button>
               <span
                 className="product-card__head-stock-updated-at"
-                title={product?.stockUpdatedAt ? dayjs(product.stockUpdatedAt).format("YYYY-MM-DD HH:mm") : undefined}
+                title={
+                  product?.stockUpdatedAt
+                    ? stockChangeSummaryLine !== ""
+                      ? `${dayjs(product.stockUpdatedAt).format("YYYY-MM-DD HH:mm")}\n${stockChangeSummaryLine}`
+                      : dayjs(product.stockUpdatedAt).format("YYYY-MM-DD HH:mm")
+                    : undefined
+                }
               >
-                {stockUpdatedAtShort}
+                <span className="product-card__head-stock-date">{stockUpdatedAtShort}</span>
+                {stockChangeSummaryLine !== "" ? (
+                  <span className="product-card__head-stock-summary">{stockChangeSummaryLine}</span>
+                ) : null}
               </span>
             </div>
           </div>

@@ -353,6 +353,37 @@ function ProductsTableThumbCell({
   );
 }
 
+function ProductsStockUpdatedCell(props: {
+  stockUpdatedAt: string | null | undefined;
+  stockChangeSummary?: string | null | undefined;
+}) {
+  const stockUpdatedAtText = props.stockUpdatedAt ? dayjs(props.stockUpdatedAt).format("YY/MM/DD HH:mm") : "-";
+  const isRecent =
+    !!props.stockUpdatedAt && dayjs().diff(dayjs(props.stockUpdatedAt), "day") < 1;
+  const summaryLine =
+    typeof props.stockChangeSummary === "string" ? props.stockChangeSummary.trim() : "";
+  const detailedTitle =
+    summaryLine !== ""
+      ? `${stockUpdatedAtText}\n${summaryLine}`
+      : props.stockUpdatedAt
+        ? dayjs(props.stockUpdatedAt).format("YYYY-MM-DD HH:mm")
+        : undefined;
+
+  return (
+    <td
+      className={`products-table__td-updated${isRecent ? " products-table__td-updated--recent" : ""}`}
+      title={detailedTitle}
+    >
+      <div className="products-table__updated-stack">
+        <span className="products-table__updated-text">{stockUpdatedAtText}</span>
+        {summaryLine !== "" ? (
+          <span className="products-table__updated-summary">{summaryLine}</span>
+        ) : null}
+      </div>
+    </td>
+  );
+}
+
 const ProductsTableRow = memo(function ProductsTableRow({
   row,
   rowSaving,
@@ -372,8 +403,6 @@ const ProductsTableRow = memo(function ProductsTableRow({
 }) {
   const qtyRaw = Number(row.variantStock);
   const qty = Number.isFinite(qtyRaw) ? qtyRaw : 0;
-  const stockUpdatedAtText = row.stockUpdatedAt ? dayjs(row.stockUpdatedAt).format("YY/MM/DD HH:mm") : "-";
-  const isRecent = !!row.stockUpdatedAt && dayjs().diff(dayjs(row.stockUpdatedAt), "day") < 1;
   if (row.isListNoVisibleOptionsRow) {
     return (
       <tr className="products-table__tr-novis">
@@ -417,11 +446,10 @@ const ProductsTableRow = memo(function ProductsTableRow({
         <td>{row.extraPrice != null ? `${Number(row.extraPrice).toLocaleString()}원` : "-"}</td>
         <td>—</td>
         <td>—</td>
-        <td className={`products-table__td-updated${isRecent ? " products-table__td-updated--recent" : ""}`}>
-          <span className="products-table__updated-text" title={stockUpdatedAtText}>
-            {stockUpdatedAtText}
-          </span>
-        </td>
+        <ProductsStockUpdatedCell
+          stockUpdatedAt={row.stockUpdatedAt}
+          stockChangeSummary={row.stockChangeSummary}
+        />
         <td>
           <div className="row-actions">
             <button type="button" className="btn btn-secondary btn-row" onClick={() => onEdit(row.id)}>
@@ -517,11 +545,10 @@ const ProductsTableRow = memo(function ProductsTableRow({
           "-"
         )}
       </td>
-      <td className={`products-table__td-updated${isRecent ? " products-table__td-updated--recent" : ""}`}>
-        <span className="products-table__updated-text" title={stockUpdatedAtText}>
-          {stockUpdatedAtText}
-        </span>
-      </td>
+      <ProductsStockUpdatedCell
+        stockUpdatedAt={row.stockUpdatedAt}
+        stockChangeSummary={row.stockChangeSummary}
+      />
       <td>
         <div className="row-actions">
           <button type="button" className="btn btn-secondary btn-row" onClick={() => onEdit(row.id)}>
@@ -628,10 +655,31 @@ function mergeProductsFromServerSnapshot(
     if (!id) return [];
     if (pendingPids.has(id)) {
       const loc = prevById.get(id);
-      return [loc ? { ...srv, stock: loc.stock, stockUpdatedAt: loc.stockUpdatedAt } : srv];
+      return [
+        loc
+          ? {
+              ...srv,
+              stock: loc.stock,
+              stockUpdatedAt: loc.stockUpdatedAt,
+              stockChangeSummary: loc.stockChangeSummary ?? srv.stockChangeSummary ?? null,
+            }
+          : srv,
+      ];
     }
     if (variantPendingOwners.has(id)) {
-      return [{ ...srv, stock: variantStockSumForProduct(mergedVariants, id) }];
+      const loc = prevById.get(id);
+      return [
+        {
+          ...srv,
+          stock: variantStockSumForProduct(mergedVariants, id),
+          ...(loc
+            ? {
+                stockUpdatedAt: loc.stockUpdatedAt,
+                stockChangeSummary: loc.stockChangeSummary ?? srv.stockChangeSummary ?? null,
+              }
+            : {}),
+        },
+      ];
     }
     return [srv];
   });
@@ -991,7 +1039,13 @@ export function ProductsClient({
                 key,
                 productId,
                 deltaToServer: d,
-                saved: saved ? { stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt } : null,
+                saved: saved
+                  ? {
+                      stock: saved.stock,
+                      stockUpdatedAt: saved.stockUpdatedAt,
+                      stockChangeSummary: saved.stockChangeSummary,
+                    }
+                  : null,
               });
               const snapshotUnchanged =
                 variantsDigestLiveRef.current === digestBefore &&
@@ -1012,7 +1066,12 @@ export function ProductsClient({
                   setLocalProducts((prev) =>
                     prev.map((x) =>
                       x.id === productId
-                        ? { ...x, stock: saved.stock, stockUpdatedAt: saved.stockUpdatedAt }
+                        ? {
+                            ...x,
+                            stock: saved.stock,
+                            stockUpdatedAt: saved.stockUpdatedAt,
+                            stockChangeSummary: saved.stockChangeSummary ?? null,
+                          }
                         : x
                     )
                   );
@@ -1141,6 +1200,7 @@ export function ProductsClient({
                       variantStock: saved.variantStock,
                       productId: saved.productId,
                       productStock: saved.productRow?.stock ?? saved.productStock,
+                      stockChangeSummary: saved.stockChangeSummary,
                     }
                   : null,
               });
@@ -1182,6 +1242,7 @@ export function ProductsClient({
                               saved.productUpdatedAt ??
                               x.stockUpdatedAt ??
                               null,
+                            stockChangeSummary: saved.stockChangeSummary ?? x.stockChangeSummary ?? null,
                           }
                         : x
                     )
@@ -1541,7 +1602,10 @@ export function ProductsClient({
   const productsServerSig = useMemo(
     () =>
       [...products]
-        .map((p) => `${p.id}:${p.stock ?? 0}:${p.stockUpdatedAt ?? ""}`)
+        .map(
+          (p) =>
+            `${p.id}:${p.stock ?? 0}:${p.stockUpdatedAt ?? ""}:${p.stockChangeSummary ?? ""}`
+        )
         .sort()
         .join("|"),
     [products]

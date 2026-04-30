@@ -11,6 +11,8 @@ export type Product = {
   createdAt?: string | null;
   updatedAt?: string | null;
   stockUpdatedAt?: string | null;
+  /** `products.stock_change_summary` — `[남95: +2, …]` 형식, 같은 초 내 ± 조정 병합 */
+  stockChangeSummary?: string | null;
   wholesalePrice?: number | null;
   msrpPrice?: number | null;
   salePrice?: number | null;

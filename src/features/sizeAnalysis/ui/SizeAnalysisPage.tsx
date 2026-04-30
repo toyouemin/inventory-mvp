@@ -29,6 +29,7 @@ import {
   labelSizeAnalysisReasonForRow,
 } from "@/features/sizeAnalysis/excludeReasonLabels";
 import {
+  countUiOutsideAllowedSizesAssistEligibleRows,
   displayParseConfidenceUi,
   isMaleOutOfRange90Row,
   outsideAllowedSizesDisplayTail,
@@ -301,6 +302,11 @@ export function SizeAnalysisPage() {
   const duplicateAnalysis = useMemo(
     () => analyzeDuplicateRows(allRows, structureTypeForDup),
     [allRows, structureTypeForDup]
+  );
+
+  const outsideAssistEligibleCount = useMemo(
+    () => countUiOutsideAllowedSizesAssistEligibleRows(allRows),
+    [allRows]
   );
 
   const allViewDisplayRows = useMemo(() => {
@@ -667,6 +673,8 @@ export function SizeAnalysisPage() {
             allRows={allRows}
             statusFilter={statusFilter}
             outsideSizesAssistActive={outsideSizesAssistActive}
+            outsideAssistEligibleCount={outsideAssistEligibleCount}
+            onOutsideSizesAssistToggle={() => setOutsideSizesAssistActive((v) => !v)}
             structureType={structureTypeForDup}
           />
         </div>
@@ -677,6 +685,7 @@ export function SizeAnalysisPage() {
             onChange={onStatusChange}
             outsideSizesAssistActive={outsideSizesAssistActive}
             onOutsideSizesAssistChange={setOutsideSizesAssistActive}
+            outsideAssistEligibleCount={outsideAssistEligibleCount}
           />
         </div>
 
@@ -1997,6 +2006,8 @@ export function AnalysisSummaryCards({
   allRows,
   statusFilter,
   outsideSizesAssistActive = false,
+  outsideAssistEligibleCount,
+  onOutsideSizesAssistToggle,
   structureType,
 }: {
   summary: any;
@@ -2005,6 +2016,10 @@ export function AnalysisSummaryCards({
   statusFilter: string;
   /** 전체 목록 확인용 표시 필터 활성(UI만) */
   outsideSizesAssistActive?: boolean;
+  /** 전체 목록 행 중 범위외 사이즈(중복 제외 제외 행 미포함). 집계와 무관 */
+  outsideAssistEligibleCount: number;
+  /** 상태 필터의 범위외 사이즈 버튼과 동일하게 토글 */
+  onOutsideSizesAssistToggle: () => void;
   structureType?: StructureType;
 }) {
   if (!summary) return null;
@@ -2043,26 +2058,49 @@ export function AnalysisSummaryCards({
           <>
             <br />
             (현재 표시 필터: {filterLabel}
-            {outsideSizesAssistActive ? " · 범위외 사이즈(표시 확인)" : ""})
+            {outsideSizesAssistActive
+              ? ` · 범위외 사이즈(표시 확인 · ${outsideAssistEligibleCount})`
+              : ""}
+            )
           </>
         ) : null}
       </p>
       <div className="size-analysis-summary-cards">
-        {cards.map((c, idx) => (
-          <article
-            key={`${c.label}-${idx}`}
-            className={[
-              "size-analysis-summary-card",
-              c.visual === "hero" && "size-analysis-summary-card--hero",
-              c.visual === "emphasis" && "size-analysis-summary-card--emphasis",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <div className="size-analysis-summary-card__label">{c.label}</div>
-            <strong className="size-analysis-summary-card__value">{String(c.value)}</strong>
-          </article>
-        ))}
+        {cards.flatMap((c, idx) => {
+          const articleProps = [
+            "size-analysis-summary-card",
+            c.visual === "hero" && "size-analysis-summary-card--hero",
+            c.visual === "emphasis" && "size-analysis-summary-card--emphasis",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          const articleEl = (
+            <article key={`${c.label}-${idx}`} className={articleProps}>
+              <div className="size-analysis-summary-card__label">{c.label}</div>
+              <strong className="size-analysis-summary-card__value">{String(c.value)}</strong>
+            </article>
+          );
+          if (c.label !== "빈 수량") return [articleEl];
+          return [
+            articleEl,
+            <button
+              key={`outside-assist-summary-after-empty-${idx}`}
+              type="button"
+              className={[
+                "size-analysis-summary-card",
+                "size-analysis-summary-card--assist-toggle",
+                outsideSizesAssistActive && "size-analysis-summary-card--assist-toggle-active",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              aria-pressed={outsideSizesAssistActive}
+              onClick={onOutsideSizesAssistToggle}
+            >
+              <div className="size-analysis-summary-card__label">범위외 사이즈</div>
+              <strong className="size-analysis-summary-card__value">{outsideAssistEligibleCount}</strong>
+            </button>,
+          ];
+        })}
       </div>
     </section>
   );
@@ -2073,11 +2111,13 @@ export function AnalysisStatusFilter({
   onChange,
   outsideSizesAssistActive,
   onOutsideSizesAssistChange,
+  outsideAssistEligibleCount,
 }: {
   value: string;
   onChange: (v: string) => void;
   outsideSizesAssistActive: boolean;
   onOutsideSizesAssistChange: (next: boolean) => void;
+  outsideAssistEligibleCount: number;
 }) {
   return (
     <section className="size-analysis-card">
@@ -2099,7 +2139,7 @@ export function AnalysisStatusFilter({
           aria-pressed={outsideSizesAssistActive}
           onClick={() => onOutsideSizesAssistChange(!outsideSizesAssistActive)}
         >
-          범위외 사이즈
+          범위외 사이즈 ({outsideAssistEligibleCount})
         </button>
       </div>
     </section>

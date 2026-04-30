@@ -6,9 +6,11 @@ import { runProductCsvPipeline, type ParsedCsvRow } from "./csvProductPipeline";
 import { dominantNormSkuFromVariantSkus, normalizeSkuForMatch } from "./skuNormalize";
 import {
   aggregateDuplicateVariantsByCompositeKey,
+  formatGenderSizeDisplay,
   PRODUCT_VARIANTS_ON_CONFLICT,
   variantCompositeKey,
 } from "./variantOptions";
+import { mergeProductStockChangeSummary } from "./stockChangeSummary";
 import { ensureCategorySortOrderRow, syncCategorySortOrderAfterCsv } from "./categorySortOrder.server";
 import { buildCategoryOrderMapFromCsvRows } from "./categorySortOrder.utils";
 import {
@@ -44,7 +46,7 @@ async function debugSelectProductsStockRow(stage: string, productId: string): Pr
   if (!LOG_PRODUCT_STOCK_UPDATE) return;
   const { data, error } = await supabaseServer
     .from("products")
-    .select("stock, updated_at, stock_updated_at")
+    .select("stock, updated_at, stock_updated_at, stock_change_summary")
     .eq("id", productId)
     .maybeSingle();
   if (error) {
@@ -240,6 +242,7 @@ export async function updateProduct(
   if (data.stock !== undefined) {
     stockTimestampForProduct = new Date().toISOString();
     updateData.stock_updated_at = stockTimestampForProduct;
+    updateData.stock_change_summary = null;
   }
   if (Object.keys(updateData).length > 0) {
     // 상품 메타 수정 기준 시각(재고 변경 시각은 stock_updated_at으로 분리)
@@ -665,19 +668,36 @@ export async function adjustStock(productId: string, delta: number, note?: strin
 
   const { data: product, error: readErr } = await supabaseServer
     .from("products")
-    .select("stock")
+    .select("stock, stock_updated_at, stock_change_summary")
     .eq("id", productId)
     .single();
 
   if (readErr) throw new Error(readErr.message);
 
-  const prev = (product?.stock ?? 0) as number;
+  const prodRow = product as {
+    stock?: unknown;
+    stock_updated_at?: string | null;
+    stock_change_summary?: string | null;
+  } | null;
+  const prev = (prodRow?.stock ?? 0) as number;
   const next = Math.max(0, prev + delta);
   const actualDelta = next - prev;
   if (actualDelta === 0) return;
 
   const touchedAt = new Date().toISOString();
-  const payload = { stock: next, updated_at: touchedAt, stock_updated_at: touchedAt };
+  const summary = mergeProductStockChangeSummary({
+    prevSummary: prodRow?.stock_change_summary ?? null,
+    prevStockUpdatedAtIso: prodRow?.stock_updated_at ?? null,
+    nextStockUpdatedAtIso: touchedAt,
+    delta: actualDelta,
+    label: "재고",
+  });
+  const payload = {
+    stock: next,
+    updated_at: touchedAt,
+    stock_updated_at: touchedAt,
+    stock_change_summary: summary,
+  };
   debugLogProductsStockPayload("adjustStock", productId, payload);
   const { error: upErr } = await supabaseServer.from("products").update(payload).eq("id", productId);
   if (upErr) throw new Error(upErr.message);
@@ -697,7 +717,7 @@ export async function adjustStock(productId: string, delta: number, note?: strin
 
   /** `/products`는 RSC 재검증 시 `variantsSyncDigest`·클라 state가 뒤틀리거나 리마운트될 수 있어 ±조정에서는 생략(낙관적 UI는 클라가 유지). */
   revalidatePath("/status");
-  return { productId, stock: next, stockUpdatedAt: touchedAt };
+  return { productId, stock: next, stockUpdatedAt: touchedAt, stockChangeSummary: summary };
 }
 
 /** `adjustStock`과 동일 — 옵션 없는 상품만 가능 (`addMove` → `adjustStock`). */
@@ -722,7 +742,7 @@ export async function adjustVariantStock(
 
   const { data: row, error: readErr } = await supabaseServer
     .from("product_variants")
-    .select("stock, product_id")
+    .select("stock, product_id, gender, size")
     .eq("id", variantId)
     .single();
 
@@ -743,9 +763,30 @@ export async function adjustVariantStock(
   const productId = String((row as { product_id?: string }).product_id ?? "").trim();
   let productStock = 0;
   let productUpdatedAt: string | null = null;
-  let productRow: { stock: number; updated_at: string | null; stock_updated_at: string | null } | null = null;
+  let productRow: {
+    stock: number;
+    updated_at: string | null;
+    stock_updated_at: string | null;
+    stock_change_summary: string | null;
+  } | null = null;
   if (productId) {
     const touchedAt = new Date().toISOString();
+    const vr = row as { gender?: string | null; size?: string | null };
+    const label =
+      formatGenderSizeDisplay(vr?.gender ?? null, vr?.size ?? null).trim() || "옵션";
+    const { data: prodMeta, error: prodMetaErr } = await supabaseServer
+      .from("products")
+      .select("stock_change_summary, stock_updated_at")
+      .eq("id", productId)
+      .maybeSingle();
+    if (prodMetaErr) throw new Error(prodMetaErr.message);
+    const mergedSummary = mergeProductStockChangeSummary({
+      prevSummary: (prodMeta as { stock_change_summary?: string | null } | null)?.stock_change_summary ?? null,
+      prevStockUpdatedAtIso: (prodMeta as { stock_updated_at?: string | null } | null)?.stock_updated_at ?? null,
+      nextStockUpdatedAtIso: touchedAt,
+      delta: actualDelta,
+      label,
+    });
     const { data: variants, error: variantsReadErr } = await supabaseServer
       .from("product_variants")
       .select("stock")
@@ -755,7 +796,12 @@ export async function adjustVariantStock(
       const n = Number((cur as { stock: unknown }).stock);
       return acc + (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0);
     }, 0);
-    const payload = { stock: total, updated_at: touchedAt, stock_updated_at: touchedAt };
+    const payload = {
+      stock: total,
+      updated_at: touchedAt,
+      stock_updated_at: touchedAt,
+      stock_change_summary: mergedSummary,
+    };
     debugLogProductsStockPayload("adjustVariantStock", productId, payload);
     const { error: productUpErr } = await supabaseServer
       .from("products")
@@ -764,12 +810,18 @@ export async function adjustVariantStock(
     if (productUpErr) throw new Error(productUpErr.message);
     const { data: reloadedProductRow, error: productReadErr } = await supabaseServer
       .from("products")
-      .select("stock, updated_at, stock_updated_at")
+      .select("stock, updated_at, stock_updated_at, stock_change_summary")
       .eq("id", productId)
       .maybeSingle();
     if (productReadErr) throw new Error(productReadErr.message);
     await debugSelectProductsStockRow("adjustVariantStock", productId);
-    productRow = (reloadedProductRow as { stock: number; updated_at: string | null; stock_updated_at: string | null } | null) ?? null;
+    productRow =
+      (reloadedProductRow as {
+        stock: number;
+        updated_at: string | null;
+        stock_updated_at: string | null;
+        stock_change_summary: string | null;
+      } | null) ?? null;
     productStock = Number(productRow?.stock ?? 0);
     productUpdatedAt = (productRow?.stock_updated_at as string | null) ?? touchedAt;
   }
@@ -787,7 +839,16 @@ export async function adjustVariantStock(
   }
 
   revalidatePath("/status");
-  return { variantId, variantStock: next, productId, productStock, productUpdatedAt, productRow };
+  const stockChangeSummary = productRow?.stock_change_summary ?? null;
+  return {
+    variantId,
+    variantStock: next,
+    productId,
+    productStock,
+    productUpdatedAt,
+    productRow,
+    stockChangeSummary,
+  };
 }
 
 export async function updateVariantMemo(
@@ -1078,7 +1139,10 @@ async function syncProductsStockFromVariantSums(
 
     for (const [productId, total] of sumByProduct) {
       const payload: Record<string, unknown> = { stock: total, updated_at: nextTouchedAt };
-      if (touchedAt) payload.stock_updated_at = nextTouchedAt;
+      if (touchedAt) {
+        payload.stock_updated_at = nextTouchedAt;
+        payload.stock_change_summary = null;
+      }
       debugLogProductsStockPayload("syncProductsStockFromVariantSums", productId, payload);
       const { error: upErr } = await supabaseServer
         .from("products")

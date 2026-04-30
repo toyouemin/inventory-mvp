@@ -1236,9 +1236,13 @@ button.download-dropdown__item:disabled {
 }
 
 .product-card__head-stock-updated-at {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: min(11rem, 52%);
+  max-width: min(13rem, 56%);
   margin-top: 0;
   font-size: 12px;
   font-weight: 400;
@@ -1246,9 +1250,21 @@ button.download-dropdown__item:disabled {
   text-align: right;
   line-height: 1.25;
   align-self: flex-end;
-  white-space: nowrap;
+  white-space: normal;
+}
+
+.product-card__head-stock-date {
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.product-card__head-stock-summary {
+  width: 100%;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.25;
+  color: #8f96a3;
 }
 
 /* ??????????? ??? ????(44??8), ?????? margin??? ??? */
@@ -1860,9 +1876,18 @@ label {
   outline-offset: 1px;
 }
 
+.products-table__updated-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: 128px;
+  vertical-align: middle;
+}
+
 .products-table__updated-text {
   display: inline-block;
-  max-width: 104px;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1871,8 +1896,21 @@ label {
   vertical-align: middle;
 }
 
+.products-table__updated-summary {
+  display: block;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #8f96a3;
+  white-space: normal;
+  word-break: break-word;
+}
+
 .products-table__td-updated--recent .products-table__updated-text {
   color: var(--accent);
+}
+
+.products-table__td-updated--recent .products-table__updated-summary {
+  color: rgb(146 138 117);
 }
 
 .products-table__th-stock,
@@ -6930,6 +6968,23 @@ label {
 
 .size-analysis-summary-card--emphasis .size-analysis-summary-card__value {
   font-size: 1.25rem;
+}
+
+button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle {
+  cursor: pointer;
+  text-align: left;
+  appearance: none;
+  width: auto;
+}
+
+button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle:hover {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+}
+
+button.size-analysis-summary-card.size-analysis-summary-card--assist-toggle-active {
+  background: #eff6ff;
+  border-color: #93c5fd;
 }
 
 .size-analysis-summary-scope-hint {

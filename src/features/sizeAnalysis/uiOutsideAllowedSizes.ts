@@ -3,7 +3,7 @@ import { preprocessSizeForGenderNumParse } from "./personSizePolicy";
 
 const ALLOW = SIZE_ANALYSIS_ALLOWED_NUMERIC;
 
-/** 기존 화면과 동일: 남성 + 90(M90 등)은 별도 확인 대상으로 취급 */
+/** 남성 + 90·120(M90·M120 등)은 남90과 동일하게 별도 확인 대상으로 취급 */
 export function isMaleOutOfRange90Row(r: {
   genderNormalized?: string | null;
   genderRaw?: string | null;
@@ -18,7 +18,14 @@ export function isMaleOutOfRange90Row(r: {
   const size = String(r.standardizedSize ?? r.sizeRaw ?? "")
     .trim()
     .toUpperCase();
-  return size === "90" || size === "M90" || size === "90M";
+  return (
+    size === "90" ||
+    size === "M90" ||
+    size === "90M" ||
+    size === "120" ||
+    size === "M120" ||
+    size === "120M"
+  );
 }
 
 /**

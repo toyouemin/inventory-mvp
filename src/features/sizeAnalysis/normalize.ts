@@ -6,7 +6,7 @@ const GENDER_RULES: Array<{ re: RegExp; value: "남" | "여" | "공용" }> = [
   { re: /\b(공용|UNISEX)\b/i, value: "공용" },
 ];
 
-/** 사이즈분석 숫자 대역(남여 M/W 접두 표준에 쓰이는 허용 치수) — UI 확인 필터 등에서 동일 기준 재사용. 120은 정책상 범위외 */
+/** 사이즈분석 숫자 대역(M/W 접두·허용 치수 판정) — UI·집계에서 동일 기준 재사용. 120은 목록 밖이나 남90과 동일하게 자동 처리·집계 포함 */
 export const SIZE_ANALYSIS_ALLOWED_NUMERIC = new Set([
   "80",
   "85",
@@ -92,6 +92,7 @@ export function extractSizeGenderQty(raw: string | null | undefined): ParsePiece
   const hasAmbiguousMixed = Boolean(numSize && alphaSize);
   const normalizedSize = size ? normalizeSize(size) : undefined;
   const validSize = normalizedSize && (NUMERIC_SIZES.has(normalizedSize) || ALPHA_SIZES.includes(normalizedSize as never));
+  const numeric120WithGender = normalizedSize === "120" && Boolean(gender);
 
   if (hasAmbiguousMixed || uniqueSizes.size > 1) {
     return {
@@ -108,7 +109,7 @@ export function extractSizeGenderQty(raw: string | null | undefined): ParsePiece
     return { confidence: 0.15, reason: "유효 토큰 미검출", status: "unresolved" };
   }
 
-  if (validSize && (gender || qty !== undefined)) {
+  if ((validSize || numeric120WithGender) && (gender || qty !== undefined)) {
     return {
       gender,
       size: normalizedSize,
@@ -144,7 +145,7 @@ export function normalizeSize(raw: string | null | undefined): string | undefine
   const s = preprocessCell(raw);
   if (!s) return undefined;
   if (NUMERIC_SIZES.has(s)) return s;
-  /** 120: 허용 목록엔 없으나 토큰으로는 인식(범위외·검토 경로) */
+  /** 120: 허용 숫자 집합 밖이나 토큰 인식·남90과 동일 자동/집계 경로 */
   if (s === "120") return "120";
 
   if (s === "XXL") return "2XL";
@@ -170,8 +171,9 @@ export function parseQty(raw: string | null | undefined): number | undefined {
  */
 export function isLikelySizeQtyConflation(standardizedSize: string | undefined, qty: number | undefined): boolean {
   if (standardizedSize == null || qty === undefined) return false;
-  if (!NUMERIC_SIZES.has(standardizedSize)) return false;
-  return Number(standardizedSize) === qty;
+  if (NUMERIC_SIZES.has(standardizedSize)) return Number(standardizedSize) === qty;
+  if (standardizedSize === "120") return qty === 120;
+  return false;
 }
 
 /**
@@ -204,7 +206,7 @@ function applyUnknownManualQtySizeRules(
   sizeNorm: string | undefined,
   qty: number
 ): { qty: number; status: ParseStatus; reason: string; confidence: number } {
-  if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && qty === Number(sizeNorm)) {
+  if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || sizeNorm === "120") && qty === Number(sizeNorm)) {
     return {
       qty: 1,
       status: "auto_confirmed",
@@ -316,7 +318,7 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
     const sizeNorm = normalizeSize(m[2]);
     let q = Number(m[3]);
     const gNorm: "남" | "여" | "공용" = g === "남" ? "남" : g === "여" ? "여" : "공용";
-    if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
+    if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || sizeNorm === "120") && Number.isFinite(q) && q > 0) {
       const r = applyUnknownManualQtySizeRules(sizeNorm, q);
       return {
         gender: gNorm,
@@ -378,7 +380,7 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
     const b = m[2];
     const sizeNorm = normalizeSize(a);
     let q = Number(b);
-    if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
+    if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || sizeNorm === "120") && Number.isFinite(q) && q > 0) {
       const r = applyUnknownManualQtySizeRules(sizeNorm, q);
       return {
         size: sizeNorm,
@@ -396,7 +398,7 @@ export function parseManualItemOrderSegment(raw: string | null | undefined): Par
     const sizeNorm = normalizeSize(m[2]);
     const q = Number(m[3]);
     const gNorm: "남" | "여" = mw === "M" ? "남" : "여";
-    if (sizeNorm && NUMERIC_SIZES.has(sizeNorm) && Number.isFinite(q) && q > 0) {
+    if (sizeNorm && (NUMERIC_SIZES.has(sizeNorm) || sizeNorm === "120") && Number.isFinite(q) && q > 0) {
       const r = applyUnknownManualQtySizeRules(sizeNorm, q);
       return {
         gender: gNorm,

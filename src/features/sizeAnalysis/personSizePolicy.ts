@@ -16,7 +16,7 @@ import {
 
 const NUMERIC_SIZES = SIZE_ANALYSIS_ALLOWED_NUMERIC;
 
-/** 80~120 숫자 토큰 추출(120은 허용 목록 밖이나 문자열에서 인식용) */
+/** 80~120 숫자 토큰 추출(120 포함, 집계·남90과 동일 정책) */
 const NUM_SIZE_IN_TEXT = /(?<![0-9])(80|85|90|95|100|105|110|115|120)(?![0-9])/g;
 const GENDER_MARK_RE = /남자|여자|남|여|[MWmw]/g;
 
@@ -76,8 +76,7 @@ function uniqueNumericSizeFromString(s: string): string | null {
 }
 
 /**
- * 한 덩어리 문자열에서 성별 토큰 + 80~115(및 120 토큰) 숫자가 모두 있으면 M100/W90 및 수정완료(corrected).
- * 120만 있는 조합은 허용 목록 밖 → null.
+ * 한 덩어리 문자열에서 성별 토큰 + 80~120 숫자가 모두 있으면 M100/W90/M120 등 및 수정완료(corrected).
  * (Prisma/UI 상 `corrected` = 수정완료)
  */
 export function tryFixedMwFromGenderAndNumericInString(text: string | undefined): PersonSizePolicyResult | null {
@@ -87,7 +86,8 @@ export function tryFixedMwFromGenderAndNumericInString(text: string | undefined)
   if (!s) return null;
   const line = uniqueMwLineFromGenderMarkers(s);
   const num = uniqueNumericSizeFromString(s);
-  if (line == null || num == null || !NUMERIC_SIZES.has(num)) return null;
+  if (line == null || num == null) return null;
+  if (!NUMERIC_SIZES.has(num) && num !== "120") return null;
   const letter = line;
   const genderNormalized: "남" | "여" = letter === "M" ? "남" : "여";
   return {
@@ -95,14 +95,17 @@ export function tryFixedMwFromGenderAndNumericInString(text: string | undefined)
     genderNormalized,
     parseStatus: "corrected",
     parseConfidence: 0.93,
-    parseReason: "성별+숫자사이즈(80~115) 결합 → 표준 M/W 접두",
+    parseReason:
+      num === "120"
+        ? "성별+숫자사이즈(120) 결합 → 표준 M/W 접두"
+        : "성별+숫자사이즈(80~115) 결합 → 표준 M/W 접두",
   };
 }
 
 /**
  * size 열·성별 열 기준 (사이즈분석 people 경로) 정규화.
  * - M/W+숫자 → 최우선, gender와 불일치해도 인정 → 자동확정
- * - 숫자만(80~115) → 남→M, 여→W 보정 → 수정완료(corrected) · 120은 검토(범위외)
+ * - 숫자만(80~115·120) → 남→M, 여→W 보정 → 수정완료(corrected) (120은 남90과 동일 집계·상태 톤)
  * - 그 외 S/M/L/XL 등 → normalizeSize → 자동확정
  * - size 없음/비정상 → 검토필요
  */
@@ -128,22 +131,13 @@ export function normalizePersonSizePolicy(sizeRaw: string | undefined, genderRaw
   if (m1) {
     const letter = m1[1]!.toUpperCase() as "M" | "W";
     const num = m1[2]!;
-    if (NUMERIC_SIZES.has(num)) {
-      return {
-        standardizedSize: `${letter}${num}`,
-        genderNormalized: genderFromCol,
-        parseStatus: "auto_confirmed",
-        parseConfidence: 0.95,
-        parseReason: "접두(M/W) 사이즈",
-      };
-    }
-    if (num === "120") {
+    if (NUMERIC_SIZES.has(num) || num === "120") {
       return {
         standardizedSize: `${letter}${num}`,
         genderNormalized: genderFromCol ?? (letter === "M" ? "남" : "여"),
-        parseStatus: "needs_review",
-        parseConfidence: 0.42,
-        parseReason: "범위외 숫자 사이즈(120)",
+        parseStatus: "auto_confirmed",
+        parseConfidence: 0.95,
+        parseReason: "접두(M/W) 사이즈",
       };
     }
     return {
@@ -186,13 +180,30 @@ export function normalizePersonSizePolicy(sizeRaw: string | undefined, genderRaw
       };
     }
     if (num === "120") {
+      if (genderFromCol === "남") {
+        return {
+          standardizedSize: "M120",
+          genderNormalized: "남",
+          parseStatus: "corrected",
+          parseConfidence: 0.9,
+          parseReason: "숫자 사이즈 + 성별(남) → M접두",
+        };
+      }
+      if (genderFromCol === "여") {
+        return {
+          standardizedSize: "W120",
+          genderNormalized: "여",
+          parseStatus: "corrected",
+          parseConfidence: 0.9,
+          parseReason: "숫자 사이즈 + 성별(여) → W접두",
+        };
+      }
       return {
-        standardizedSize:
-          genderFromCol === "남" ? "M120" : genderFromCol === "여" ? "W120" : undefined,
+        standardizedSize: undefined,
         genderNormalized: genderFromCol,
         parseStatus: "needs_review",
-        parseConfidence: 0.42,
-        parseReason: "범위외 숫자 사이즈(120)",
+        parseConfidence: 0.35,
+        parseReason: "숫자만 — 성별(남/여)로 접두 보정 불가(공용/미입력)",
       };
     }
   }

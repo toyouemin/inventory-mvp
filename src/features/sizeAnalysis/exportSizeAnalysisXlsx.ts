@@ -270,7 +270,7 @@ export function downloadSizeAnalysisResultXlsx(
   const ymd = formatDownloadFileNameDateYymmdd();
   const rawName = opts?.uploadFileName?.trim();
   const base = rawName ? baseNameFromUploadFileName(rawName) : "size-analysis";
-  const fileName = `${base}_${ymd}.xlsx`;
+  const fileName = `[분석) ${base}_${ymd}.xlsx`;
   XLSX.writeFile(wb, fileName, { bookType: "xlsx", cellStyles: true });
 }
 

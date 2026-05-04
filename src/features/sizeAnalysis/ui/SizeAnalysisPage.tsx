@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { buildColumnSizesForClub } from "@/features/sizeAnalysis/clubAggMatrixColumns";
 import type { StructureType } from "@/features/sizeAnalysis/types";
@@ -278,6 +279,93 @@ function labelNormalizedRowParseStatusUi(r: any): string {
   return labelSizeAnalysisParseStatusForRow(r);
 }
 
+function SizeAnalysisHelpModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="size-analysis-help-overlay"
+      role="presentation"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="size-analysis-help-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="size-analysis-help-title"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="size-analysis-help-dialog__head">
+          <h2 id="size-analysis-help-title" className="size-analysis-help-dialog__title">
+            사이즈 분석기 사용방법
+          </h2>
+          <button type="button" className="size-analysis-help-close" aria-label="닫기" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="size-analysis-help-dialog__body">
+          <section className="size-analysis-help-section">
+            <h3 className="size-analysis-help-section__title">1. 업로드 파일 준비</h3>
+            <ul className="size-analysis-help-list">
+              <li>첫 줄은 단일 셀로 각각 제목(헤더)을 구성.</li>
+              <li>기본 형식: 이름 / 성별 / 사이즈 / 수량</li>
+              <li>다품목: 이름 / 상품별 열(바람막이, 반바지 등)</li>
+              <li>
+                불필요 열이 있어도 가능
+                <br />
+                예)연락처, 이니셜, 비고 등
+              </li>
+              <li>
+                공용: 셀 제목에 (공용) 표기
+                <br />
+                예) 오버핏→오버핏(공용)→공용 사이즈 자동 인식
+              </li>
+              <li>실제 티셔츠는 신청 클럽명으로 수정 후 업로드</li>
+            </ul>
+          </section>
+          <section className="size-analysis-help-section">
+            <h3 className="size-analysis-help-section__title">2. 시트 선택(자동)</h3>
+            <ul className="size-analysis-help-list">
+              <li>자동 인식, 다른 시트는 수동 선택</li>
+            </ul>
+          </section>
+          <section className="size-analysis-help-section">
+            <h3 className="size-analysis-help-section__title">3. 구조 분석(자동)</h3>
+            <ul className="size-analysis-help-list">
+              <li>헤더 이상 없을 시 자동</li>
+            </ul>
+          </section>
+          <section className="size-analysis-help-section">
+            <h3 className="size-analysis-help-section__title">4. 필드 매핑(자동)</h3>
+            <ul className="size-analysis-help-list">
+              <li>자동일 경우 [매핑 완료됨]</li>
+              <li>부족한 항목만 수동 선택</li>
+              <li>자동 매핑 완료 후 [분석 실행]</li>
+            </ul>
+          </section>
+          <section className="size-analysis-help-section">
+            <h3 className="size-analysis-help-section__title">5. 결과 확인</h3>
+            <ul className="size-analysis-help-list">
+              <li>클럽별·다품목 등 자동으로 분석</li>
+              <li>전체 보기: 전체 데이터</li>
+              <li>주문 명단: 실제 지급 기준</li>
+              <li>중복자: 중복된 사람(예: 2장 지급)</li>
+              <li>검토 필요: 확인 필요한 데이터 → 수량 미포함</li>
+              <li>범위외 사이즈: 남90·120 등 확인 대상 → 수량 포함</li>
+              <li>엑셀 다운로드 후 시트별로 확인</li>
+            </ul>
+          </section>
+        </div>
+        <div className="size-analysis-help-dialog__footer">
+          <button type="button" className="size-analysis-help-close" aria-label="닫기" onClick={onClose}>
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SizeAnalysisPage() {
   const [jobId, setJobId] = useState<string>("");
   const [sheets, setSheets] = useState<Array<{ name: string; rowCount: number }>>([]);
@@ -297,6 +385,7 @@ export function SizeAnalysisPage() {
   const [detailViewMode, setDetailViewMode] = useState<"all" | "club" | "duplicates" | "clubMembers">("all");
   /** 분석 엑셀 다운로드 파일명에 사용(업로드 시 설정) */
   const [uploadedSourceFileName, setUploadedSourceFileName] = useState<string | null>(null);
+  const [helpModalOpen, setHelpModalOpen] = useState(false);
   const autoDetectedKeyRef = useRef<string>("");
 
   const structureTypeForDup: StructureType | undefined =
@@ -575,12 +664,34 @@ export function SizeAnalysisPage() {
     : -1;
   const allSetupStepsComplete = step1Complete && step2Complete && step3Complete && step4Complete;
 
+  useEffect(() => {
+    if (!helpModalOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setHelpModalOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [helpModalOpen]);
+
   return (
     <main className="size-analysis-page">
       <div className="size-analysis-page__title-row">
-        <h2>사이즈 분석</h2>
-        <span className="size-analysis-muted size-analysis-page__title-tag">각 클럽별 사이즈 분류 및 분석 추출기</span>
+        <h2 className="size-analysis-page__title-primary">자동 사이즈 분류 및 분석</h2>
+        <button
+          type="button"
+          className="btn btn-secondary size-analysis-help-btn"
+          onClick={() => setHelpModalOpen(true)}
+        >
+          사용방법
+        </button>
       </div>
+
+      {helpModalOpen
+        ? createPortal(
+            <SizeAnalysisHelpModal onClose={() => setHelpModalOpen(false)} />,
+            document.body
+          )
+        : null}
 
       <div className="size-analysis-pc-grid">
         <div className="size-analysis-wizard" aria-label="사이즈 분석 단계">
@@ -773,7 +884,7 @@ export function SizeAnalysisUploadCard({ onUpload, loading: isUploading }: { onU
 
   return (
     <div className="size-analysis-upload-card__inner">
-      <p className="size-analysis-muted size-analysis-upload-card__hint">실제 티셔츠 신청 클럽명으로 수정 후 업로드</p>
+      <p className="size-analysis-muted size-analysis-upload-card__hint">엑셀 규칙에 맞는지 확인 후 업로드</p>
       <label className="size-analysis-upload-card__file-label" aria-busy={isUploading}>
         <input
           type="file"

@@ -66,7 +66,7 @@ export function StatusClient({
   const zeroStock = filtered.filter((r) => (Number(r.stock) || 0) === 0).length;
 
   return (
-    <div className="products-page">
+    <div className="products-page status-stock-page">
       <div className="products-content-container">
         <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>재고 현황</h1>
 
@@ -135,7 +135,10 @@ export function StatusClient({
                 </tr>
               ) : (
                 filtered.map((r) => (
-                  <tr key={r.id}>
+                  <tr
+                    key={r.id}
+                    className={(Number(r.stock) || 0) === 0 ? "status-stock-table__row--zero" : undefined}
+                  >
                     <td className="status-stock-table__category">
                       {(r.category ?? "").trim() || "—"}
                     </td>

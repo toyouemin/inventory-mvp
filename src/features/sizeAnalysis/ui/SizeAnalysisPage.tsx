@@ -294,6 +294,8 @@ export function SizeAnalysisPage() {
   const [mappingSaved, setMappingSaved] = useState(false);
   const [autoMappingNeedsReview, setAutoMappingNeedsReview] = useState(false);
   const [detailViewMode, setDetailViewMode] = useState<"all" | "club" | "duplicates" | "clubMembers">("all");
+  /** 분석 엑셀 다운로드 파일명에 사용(업로드 시 설정) */
+  const [uploadedSourceFileName, setUploadedSourceFileName] = useState<string | null>(null);
   const autoDetectedKeyRef = useRef<string>("");
 
   const structureTypeForDup: StructureType | undefined =
@@ -371,6 +373,7 @@ export function SizeAnalysisPage() {
   );
 
   async function uploadFile(file: File) {
+    setUploadedSourceFileName(file.name);
     setError("");
     setMappingSaved(false);
     setAutoMappingNeedsReview(false);
@@ -713,7 +716,10 @@ export function SizeAnalysisPage() {
             className="btn btn-secondary"
             disabled={allRows.length === 0}
             onClick={() =>
-              downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis, { structureType: structureTypeForDup })
+              downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis, {
+                structureType: structureTypeForDup,
+                uploadFileName: uploadedSourceFileName ?? undefined,
+              })
             }
           >
             분석자료 엑셀 다운로드 (.xlsx)

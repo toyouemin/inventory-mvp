@@ -2275,29 +2275,6 @@ label {
   word-break: keep-all;
 }
 
-@media (min-width: 769px) {
-  .status-stock-stats {
-    gap: 12px;
-    max-width: 42rem;
-  }
-
-  .status-stock-stat {
-    padding: 10px 14px;
-    flex: 0 1 auto;
-    min-width: 7.5rem;
-    text-align: left;
-  }
-
-  .status-stock-stat__label {
-    font-size: 12px;
-    margin-bottom: 4px;
-  }
-
-  .status-stock-stat__value {
-    font-size: 18px;
-  }
-}
-
 .status-stock-stats-note {
   font-size: 12px;
   line-height: 1.45;
@@ -2306,30 +2283,197 @@ label {
   max-width: 56rem;
 }
 
-/*
- * ??????????? ???????????? ???????
- * - ???????= ??? ??(max-content), ??? ??22ch + 48ch + ????? */
+/* /status 재고현황 — PC(≥769px) 전용: 넓은 대시보드 레이아웃 (모바일 ≤768px 규칙은 별도 블록에서 유지) */
 @media (min-width: 769px) {
-  .table.status-stock-table {
-    width: max-content;
-    max-width: min(100%, calc(22ch + 48ch + 8.5rem));
+  .products-page.status-stock-page .products-content-container {
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 24px 32px;
+    box-sizing: border-box;
   }
 
-  .status-stock-table__category {
-    max-width: 22ch;
+  .products-page.status-stock-page > .products-content-container > h1 {
+    font-size: 34px !important;
+    font-weight: 700 !important;
+    margin: 0 0 18px !important;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
   }
 
-  .status-stock-table__name {
-    max-width: 48ch;
+  .products-page.status-stock-page .products-toolbar {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   }
 
-  .status-stock-table__stock {
-    min-width: 4.75rem;
-    padding-right: 10px;
+  .products-page.status-stock-page .products-toolbar .products-search {
+    font-size: 16px;
   }
 
-  .status-stock-table__empty {
+  .products-page.status-stock-page .products-toolbar .btn-compact,
+  .products-page.status-stock-page .products-toolbar .products-category-select {
+    font-size: 15px;
+  }
+
+  .products-page.status-stock-page .toolbar-row--search {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin: 0;
+  }
+
+  .products-page.status-stock-page .products-search {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .products-page.status-stock-page .status-stock-stats {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 16px;
+    width: 100%;
     max-width: none;
+    margin: 0 0 18px;
+  }
+
+  .products-page.status-stock-page .status-stock-stat {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 18px 20px;
+    text-align: left;
+    border: 1px solid #e5e0d8;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  }
+
+  .products-page.status-stock-page .status-stock-stat__label {
+    font-size: 15px;
+    margin-bottom: 8px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .products-page.status-stock-page .status-stock-stat__value {
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+  }
+
+  .products-page.status-stock-page .status-stock-stats-note {
+    margin: 0 0 22px;
+    max-width: none;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #6f6a63;
+    padding: 0 2px;
+  }
+
+  .products-page.status-stock-page .status-stock-stats-note strong {
+    font-size: inherit;
+  }
+
+  .products-page.status-stock-page .status-stock-table-wrap {
+    background: #fff;
+    border: 1px solid #e5e0d8;
+    border-radius: 14px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    width: 100%;
+    max-height: none;
+    box-sizing: border-box;
+  }
+
+  .products-page.status-stock-page .status-stock-table-wrap .table.status-stock-table {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    table-layout: auto;
+  }
+
+  .products-page.status-stock-page .status-stock-table thead th {
+    background: #ede8e0;
+    color: #3d3a36;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 16px 18px;
+    border-bottom: 1px solid #e5e0d8;
+    vertical-align: middle;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody td {
+    padding: 14px 18px;
+    vertical-align: middle;
+    font-size: 16px;
+    border-bottom: 1px solid #efeae4;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody tr:hover td {
+    background: #faf7f3;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody tr.status-stock-table__row--zero td {
+    background: #fdf2f2;
+    color: #5c4a4a;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody tr.status-stock-table__row--zero:hover td {
+    background: #fae8e8;
+  }
+
+  .products-page.status-stock-page .status-stock-table__category {
+    max-width: none;
+    font-size: 16px;
+    padding-right: 12px;
+  }
+
+  .products-page.status-stock-page .status-stock-table__name {
+    max-width: none;
+    padding-right: 12px;
+    font-size: 16px;
+  }
+
+  .products-page.status-stock-page .status-stock-table__name a {
+    font-size: inherit;
+  }
+
+  .products-page.status-stock-page .status-stock-table__stock {
+    min-width: 5.5rem;
+    padding-right: 16px;
+    padding-left: 12px;
+    text-align: right;
+    font-size: 16px;
+  }
+
+  .products-page.status-stock-page .status-stock-table__stock strong {
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .products-page.status-stock-page .status-stock-table thead .status-stock-table__stock {
+    text-align: right;
+  }
+
+  .products-page.status-stock-page .status-stock-table__empty {
+    max-width: none;
+    padding: 28px 16px !important;
+    text-align: center;
+    font-size: 16px;
   }
 }
 
@@ -4148,24 +4292,6 @@ label {
     overflow-x: visible;
   }
 
-  /* PC only: option row overflow guard */
-  .product-card__option-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    column-gap: 6px;
-    overflow: hidden;
-  }
-
-  .product-card__option-chips-scroll {
-    min-width: 0;
-    max-width: min(200px, 42%);
-  }
-
-  .product-card__option-name--chips {
-    max-width: 100%;
-  }
-
   .product-card__option-right {
     min-width: 0;
     max-width: 100%;
@@ -4195,6 +4321,62 @@ label {
 
   .product-card__memo-visibility-toggle {
     top: -21.5px;
+  }
+}
+
+/* PC(≥769px): 상품 카드 사이즈/옵션 칩(공용85 등) 잘림 방지 — 모바일(≤768px)은 건드리지 않음 */
+@media (min-width: 769px) {
+  .product-card__option-item {
+    overflow: visible;
+  }
+
+  .product-card__option-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    overflow: visible;
+  }
+
+  .product-card__option-chips-scroll {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+    width: auto;
+    min-width: unset;
+    max-width: none;
+    overflow-x: visible;
+    overflow-y: visible;
+  }
+
+  .product-card__option-name,
+  .product-card__option-name--chips {
+    width: auto;
+    min-width: unset;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+
+  .product-card__opt-chips {
+    flex-shrink: 0;
+  }
+
+  .product-card__opt-chip {
+    width: auto;
+    min-width: unset;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    padding: 2px 8px;
+    font-size: 14px;
+  }
+
+  .product-card__option-right {
+    flex: 0 1 auto;
+    min-width: 0;
+    margin-left: auto;
   }
 }
 

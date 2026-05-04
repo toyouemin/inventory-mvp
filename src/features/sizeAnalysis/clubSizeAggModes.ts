@@ -348,6 +348,29 @@ export function buildAggRowsDedupedFirst(rows: any[], duplicateRowIds: Set<strin
   return sortedAggRowsFromDetailMap(detailMap);
 }
 
+/**
+ * `buildAggRowsDedupedFirst`와 동일 조건·중복 키(`stableRowId`·원본 `rows` 인덱스)를 유지하고,
+ * `itemRaw` trim이 `itemRawTrimmed`와 일치하는 행만 합산(다품목 개인주문형 엑셀 품목별 매트릭스용).
+ */
+export function buildAggRowsDedupedFirstForItem(
+  rows: any[],
+  duplicateRowIds: Set<string>,
+  itemRawTrimmed: string
+): AggRow[] {
+  const detailMap = new Map<string, AggRow>();
+  for (let i = 0; i < rows.length; i += 1) {
+    const r = rows[i]!;
+    if (String(r?.itemRaw ?? "").trim() !== itemRawTrimmed) continue;
+    if (duplicateRowIds.has(stableRowId(r, i))) continue;
+    if (!rowIncludedInFinalAggregation(r)) continue;
+    const club = normClubFromNormRow(r);
+    const { gender, size } = matrixAggGenderAndSizeFromRow(r);
+    const qty = rowQtyParsed(r);
+    pushRowIntoDetailMap(detailMap, club, gender, size, qty);
+  }
+  return sortedAggRowsFromDetailMap(detailMap);
+}
+
 export function buildClubAggBlock(club: string, clubRows: AggRow[]): ClubAggBlock {
   const totalQty = clubRows.reduce((s, r) => s + r.qty, 0);
   const columnSizes = buildColumnSizesForClub(clubRows);

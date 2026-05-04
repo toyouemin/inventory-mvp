@@ -9685,6 +9685,15 @@ label {
     align-items: stretch;
   }
 
+  /* 업로드 위저드 열(640px)과 가로 정렬: 제목·사용방법을 업로드 칸 위에 맞춤 */
+  .size-analysis-page > .size-analysis-page__title-row {
+    max-width: 640px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+  }
+
   .size-analysis-pc-grid > .size-analysis-wizard {
     grid-column: 1 / -1;
     max-width: 640px;

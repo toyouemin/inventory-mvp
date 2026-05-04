@@ -44,6 +44,7 @@ import {
   mergeAutoFieldMap,
   suggestFieldIndicesFromHeaderRow,
 } from "@/features/sizeAnalysis/fieldMappingUi";
+import { detectMultiItemProductColumns } from "@/features/sizeAnalysis/structure";
 
 type Mapping = {
   structureType: "single_row_person" | "repeated_slots" | "size_matrix" | "multi_item_personal_order" | "unknown";
@@ -947,10 +948,21 @@ export function FieldMappingEditor({
       const after = next?.[k];
       if (before === undefined && after !== undefined) addedCount += 1;
     });
+    let payload: Mapping = { ...m, fields: next };
+    if (m.structureType === "multi_item_personal_order") {
+      const suggested = detectMultiItemProductColumns(headerCells);
+      const prev = Array.isArray(m.productColumns) ? m.productColumns : [];
+      const prevSet = new Set(prev);
+      const merged = Array.from(
+        new Set([...prev, ...suggested].filter((x): x is number => Number.isInteger(x) && x >= 0))
+      ).sort((a, b) => a - b);
+      payload = { ...payload, productColumns: merged };
+      addedCount += suggested.filter((c) => !prevSet.has(c)).length;
+    }
     setAutoFillMessage(
       addedCount > 0 ? `자동 매핑 적용됨 (${addedCount}개)` : "추가로 매핑된 항목 없음"
     );
-    onChange({ ...m, fields: next });
+    onChange(payload);
   }
 
   const unknownUnmapped = unknownRequired.filter((k) => m.fields[k] === undefined);

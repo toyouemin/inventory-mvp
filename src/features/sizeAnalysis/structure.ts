@@ -33,7 +33,20 @@ const MULTI_ITEM_PRODUCT_HEADER_HINTS = [
   /트랙\s*탑/i,
   /트레이닝\s*복|트레이닝\s*팬츠|트레이닝|츄리닝/i,
   /자켓|점퍼/i,
+  /오버핏/i,
 ];
+
+/**
+ * 다품목 개인주문형 — 상품 컬럼 자동 매칭용 헤더 정규화.
+ * 앞뒤 공백 제거 → 괄호(반·전각) 및 안쪽 문구 제거 → 모든 공백 제거.
+ * 예: "오버핏(공용)" → "오버핏", "경기복 상의" → "경기복상의"
+ */
+export function normalizeHeaderForMultiItemProductMatch(value: string | undefined): string {
+  let s = String(value ?? "").trim();
+  s = s.replace(/\([^)]*\)/g, "").replace(/（[^）]*）/g, "");
+  s = s.replace(/\s+/g, "");
+  return s.trim();
+}
 
 function normalizeHeaderText(value: string | undefined): string {
   return String(value ?? "")
@@ -89,7 +102,7 @@ function scoreHeaderRow(row: string[]): number {
   return groups.length * 100 + uniqueRoleCount * 10 + personRoles.length * 3 + fallbackHits;
 }
 
-function detectMultiItemProductColumns(rawHeader: string[]): number[] {
+export function detectMultiItemProductColumns(rawHeader: string[]): number[] {
   const normalizedHeader = rawHeader.map(preprocessCell);
   const coreRoleIndices = new Set<number>();
   normalizedHeader.forEach((h, idx) => {
@@ -110,7 +123,9 @@ function detectMultiItemProductColumns(rawHeader: string[]): number[] {
     const norm = preprocessCell(raw);
     if (!norm) continue;
     if (ROLE_KEYWORDS.size.test(norm) || ROLE_KEYWORDS.size2.test(norm)) continue;
-    if (MULTI_ITEM_PRODUCT_HEADER_HINTS.some((re) => re.test(raw))) {
+    const forProductMatch = normalizeHeaderForMultiItemProductMatch(raw);
+    if (!forProductMatch) continue;
+    if (MULTI_ITEM_PRODUCT_HEADER_HINTS.some((re) => re.test(forProductMatch))) {
       out.push(i);
     }
   }

@@ -3524,7 +3524,7 @@ label {
   box-sizing: border-box;
 }
 
-/* ??? CSV ???????? ??? */
+/* 상품 CSV 업로드 실패 모달 오버레이 */
 .modal-overlay.csv-upload-error-overlay {
   align-items: center;
   justify-content: center;
@@ -3572,6 +3572,43 @@ label {
 .csv-upload-error-modal__btn {
   width: auto;
   min-width: 6.5rem;
+}
+
+/* 상품 CSV 업로드 성공 확인(완료 버튼) */
+.csv-upload-success-modal__title {
+  color: #047857;
+}
+
+.csv-upload-success-modal__body {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+
+.csv-upload-success-modal__lead {
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.csv-upload-success-modal__skip {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.csv-upload-success-modal__skip-rows {
+  font-weight: 500;
+  color: #374151;
+}
+
+.csv-upload-success-modal__hint {
+  margin: 0;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.csv-upload-success-modal__done {
+  min-width: 7.5rem;
+  font-weight: 700;
 }
 
 .modal-header-add-product {

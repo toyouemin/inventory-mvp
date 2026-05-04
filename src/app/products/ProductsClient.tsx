@@ -773,6 +773,10 @@ export function ProductsClient({
   const csvUploadHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [csvUploadErrorOpen, setCsvUploadErrorOpen] = useState(false);
   const [csvUploadErrorMessage, setCsvUploadErrorMessage] = useState("");
+  /** CSV 업로드 성공 후 사용자가 「완료」를 눌러 목록 갱신·닫기 */
+  const [csvUploadSuccessOpen, setCsvUploadSuccessOpen] = useState(false);
+  const [csvUploadSuccessSkippedCount, setCsvUploadSuccessSkippedCount] = useState(0);
+  const [csvUploadSuccessSkippedRows, setCsvUploadSuccessSkippedRows] = useState<number[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -955,6 +959,19 @@ export function ProductsClient({
   function closeCsvUploadErrorModal() {
     setCsvUploadErrorOpen(false);
     setCsvUploadErrorMessage("");
+  }
+
+  function closeCsvUploadSuccessModalAndRefresh() {
+    setCsvUploadSuccessOpen(false);
+    setCsvUploadSuccessSkippedCount(0);
+    setCsvUploadSuccessSkippedRows([]);
+    setUploadOpen(false);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        router.refresh();
+      });
+    });
+    showUploadHighlight("success");
   }
 
   const updateDownloadMenuPosition = useCallback(() => {
@@ -2051,13 +2068,9 @@ export function ProductsClient({
           result.skippedRows
         );
       }
-      showUploadHighlight("success");
-      /* refresh는 다음 페인트 이후에 — 토스트가 먼저 보이도록(즉시 refresh 시 상태가 덮일 수 있음) */
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          router.refresh();
-        });
-      });
+      setCsvUploadSuccessSkippedCount(result.skippedCount);
+      setCsvUploadSuccessSkippedRows(result.skippedRows);
+      setCsvUploadSuccessOpen(true);
     } catch (err) {
       console.error("[uploadProductsCsv]", err);
       openCsvUploadErrorModal(err instanceof Error ? err.message : String(err));
@@ -2825,6 +2838,47 @@ export function ProductsClient({
             <div className="csv-upload-error-modal__actions">
               <button type="button" className="btn btn-secondary csv-upload-error-modal__btn" onClick={closeCsvUploadErrorModal}>
                 닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {csvUploadSuccessOpen ? (
+        <div
+          className="modal-overlay csv-upload-error-overlay csv-upload-success-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="csv-upload-success-title"
+          aria-describedby="csv-upload-success-desc"
+        >
+          <div className="modal csv-upload-error-modal csv-upload-success-modal" onClick={(e) => e.stopPropagation()}>
+            <h2 id="csv-upload-success-title" className="csv-upload-error-modal__title csv-upload-success-modal__title">
+              CSV 업로드 완료
+            </h2>
+            <div id="csv-upload-success-desc" className="csv-upload-error-modal__body csv-upload-success-modal__body">
+              <p className="csv-upload-success-modal__lead">업로드한 CSV가 서버에 반영되었습니다.</p>
+              {csvUploadSuccessSkippedCount > 0 ? (
+                <p className="csv-upload-success-modal__skip">
+                  SKU 또는 상품명이 비어 건너뛴 행: <strong>{csvUploadSuccessSkippedCount}</strong>개
+                  {csvUploadSuccessSkippedRows.length > 0 ? (
+                    <span className="csv-upload-success-modal__skip-rows">
+                      {" "}
+                      (파일 줄 번호: {csvUploadSuccessSkippedRows.slice(0, 40).join(", ")}
+                      {csvUploadSuccessSkippedRows.length > 40 ? " …" : ""})
+                    </span>
+                  ) : null}
+                </p>
+              ) : null}
+              <p className="csv-upload-success-modal__hint">아래 「완료」를 누르면 목록이 최신으로 갱신됩니다.</p>
+            </div>
+            <div className="csv-upload-error-modal__actions">
+              <button
+                type="button"
+                className="btn btn-primary csv-upload-error-modal__btn csv-upload-success-modal__done"
+                onClick={closeCsvUploadSuccessModalAndRefresh}
+              >
+                완료
               </button>
             </div>
           </div>

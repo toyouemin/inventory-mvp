@@ -954,6 +954,18 @@ main {
   color: var(--accent);
 }
 
+.app-main-nav > .nav-dropdown {
+  overflow: visible;
+}
+
+.app-main-nav > .nav-dropdown[open] {
+  z-index: 40;
+}
+
+.app-main-nav .nav-dropdown__summary:hover {
+  color: var(--accent);
+}
+
 .nav-dropdown {
   position: relative;
 }
@@ -2293,7 +2305,7 @@ label {
     box-sizing: border-box;
   }
 
-  .products-page.status-stock-page > .products-content-container > h1 {
+  .products-page.status-stock-page .status-stock-page__title {
     font-size: 34px !important;
     font-weight: 700 !important;
     margin: 0 0 18px !important;
@@ -2356,8 +2368,8 @@ label {
   }
 
   .products-page.status-stock-page .status-stock-stat__label {
-    font-size: 15px;
-    margin-bottom: 8px;
+    font-size: 13px;
+    margin-bottom: 6px;
     color: var(--muted);
     white-space: nowrap;
     overflow: hidden;
@@ -2365,10 +2377,10 @@ label {
   }
 
   .products-page.status-stock-page .status-stock-stat__value {
-    font-size: 34px;
-    font-weight: 800;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
   }
 
   .products-page.status-stock-page .status-stock-stats-note {
@@ -2474,6 +2486,199 @@ label {
     padding: 28px 16px !important;
     text-align: center;
     font-size: 16px;
+  }
+}
+
+/* /status 재고현황 — 모바일(≤768px): PC 대시보드와 동일한 톤·카드형 레이아웃 */
+@media (max-width: 768px) {
+  .products-page.status-stock-page .status-stock-page__title {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    margin: 0 0 12px !important;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  .products-page.status-stock-page .products-toolbar {
+    position: relative;
+    top: auto;
+    z-index: 1;
+    background: #fff;
+    border: 1px solid #e5e0d8;
+    border-radius: 12px;
+    padding: 12px 12px;
+    margin-bottom: 14px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .products-page.status-stock-page .products-toolbar .products-search {
+    font-size: 15px;
+  }
+
+  .products-page.status-stock-page .products-toolbar .btn-compact,
+  .products-page.status-stock-page .products-toolbar .products-category-select {
+    font-size: 14px;
+  }
+
+  .products-page.status-stock-page .toolbar-row--search {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin: 0;
+  }
+
+  .products-page.status-stock-page .products-search {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .products-page.status-stock-page .toolbar-row--search .btn-compact {
+    flex: 0 0 auto;
+  }
+
+  .products-page.status-stock-page .toolbar-row--search .products-category-select-wrap {
+    flex: 0 1 auto;
+    min-width: 64px;
+    max-width: 100%;
+  }
+
+  .products-page.status-stock-page .toolbar-row--search .products-category-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .products-page.status-stock-page .status-stock-stats {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 10px;
+    width: 100%;
+    margin: 0 0 12px;
+  }
+
+  .products-page.status-stock-page .status-stock-stat {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 12px 10px;
+    text-align: left;
+    border: 1px solid #e5e0d8;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+  }
+
+  .products-page.status-stock-page .status-stock-stat__label {
+    font-size: 12px;
+    margin-bottom: 4px;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .products-page.status-stock-page .status-stock-stat__value {
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+  }
+
+  .products-page.status-stock-page .status-stock-stats-note {
+    margin: 0 0 14px;
+    max-width: none;
+    font-size: 13px;
+    line-height: 1.55;
+    color: #6f6a63;
+    padding: 0 2px;
+  }
+
+  .products-page.status-stock-page .status-stock-stats-note strong {
+    font-size: inherit;
+  }
+
+  .products-page.status-stock-page .table-wrap.status-stock-table-wrap {
+    max-height: none;
+    background: #fff;
+    border: 1px solid #e5e0d8;
+    border-radius: 12px;
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .products-page.status-stock-page .status-stock-table-wrap .table.status-stock-table {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    table-layout: auto;
+  }
+
+  .products-page.status-stock-page .status-stock-table thead th {
+    background: #ede8e0;
+    color: #3d3a36;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 11px 10px;
+    border-bottom: 1px solid #e5e0d8;
+    vertical-align: middle;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody td {
+    padding: 10px 10px;
+    vertical-align: middle;
+    font-size: 14px;
+    border-bottom: 1px solid #efeae4;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .products-page.status-stock-page .status-stock-table tbody tr.status-stock-table__row--zero td {
+    background: #fdf2f2;
+    color: #5c4a4a;
+  }
+
+  .products-page.status-stock-page .status-stock-table__category {
+    max-width: 28%;
+    font-size: 13px;
+    padding-right: 8px;
+  }
+
+  .products-page.status-stock-page .status-stock-table__name {
+    font-size: 14px;
+    padding-right: 8px;
+  }
+
+  .products-page.status-stock-page .status-stock-table__name a {
+    font-size: inherit;
+  }
+
+  .products-page.status-stock-page .status-stock-table__stock {
+    min-width: 4.25rem;
+    padding-left: 6px;
+    padding-right: 10px;
+    text-align: right;
+    font-size: 14px;
+  }
+
+  .products-page.status-stock-page .status-stock-table__stock strong {
+    font-size: 15px;
+    font-weight: 800;
+  }
+
+  .products-page.status-stock-page .status-stock-table thead .status-stock-table__stock {
+    text-align: right;
+  }
+
+  .products-page.status-stock-page .status-stock-table__empty {
+    padding: 22px 12px !important;
+    text-align: center;
+    font-size: 14px;
   }
 }
 

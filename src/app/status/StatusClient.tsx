@@ -68,7 +68,7 @@ export function StatusClient({
   return (
     <div className="products-page status-stock-page">
       <div className="products-content-container">
-        <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>재고 현황</h1>
+        <h1 className="status-stock-page__title">재고 현황</h1>
 
         <div className="products-toolbar products-toolbar--compact">
           <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">

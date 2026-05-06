@@ -1551,6 +1551,11 @@ export function ClubMembersView({
   };
   const [includeDuplicates, setIncludeDuplicates] = useState(true);
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
+  /** 주문 명단 탭·다품목 개인주문형 전용 (전체보기 정규화 표 필터와 분리) */
+  const [orderListFilterName, setOrderListFilterName] = useState("");
+  const [orderListFilterProduct, setOrderListFilterProduct] = useState("");
+  const [orderListFilterGender, setOrderListFilterGender] = useState("");
+  const [orderListFilterSize, setOrderListFilterSize] = useState("");
 
   const sections = useMemo(() => {
     const byClub = new Map<string, Map<string, MemberAggRow>>();
@@ -1617,6 +1622,35 @@ export function ClubMembersView({
     .sort((a, b) => a.club.localeCompare(b.club, "ko"));
   }, [allRows, duplicateRowIds, includeDuplicates, isMultiItem]);
 
+  const displaySections = useMemo(() => {
+    if (!isMultiItem) return sections;
+    const match = (cell: string, q: string) => {
+      const t = q.trim().toLowerCase();
+      if (!t) return true;
+      return cell.toLowerCase().includes(t);
+    };
+    return sections
+      .map((sec) => {
+        const rows = sec.rows.filter(
+          (row) =>
+            match(row.name, orderListFilterName) &&
+            match(row.item, orderListFilterProduct) &&
+            match(row.gender, orderListFilterGender) &&
+            match(row.size, orderListFilterSize)
+        );
+        const totalQty = rows.reduce((sum, row) => sum + row.qty, 0);
+        return { ...sec, rows, totalQty };
+      })
+      .filter((sec) => sec.rows.length > 0);
+  }, [
+    sections,
+    isMultiItem,
+    orderListFilterName,
+    orderListFilterProduct,
+    orderListFilterGender,
+    orderListFilterSize,
+  ]);
+
   function toggleClub(club: string) {
     setExpandedClubs((prev) => {
       const next = new Set(prev);
@@ -1643,6 +1677,64 @@ export function ClubMembersView({
           ? "클럽별로 같은 이름·상품명·성별·사이즈 수량을 합산해 표시합니다."
           : "클럽별로 같은 이름·성별·사이즈 수량을 합산해 표시합니다."}
       </p>
+      {isMultiItem ? (
+        <div
+          className="size-analysis-order-list-filters"
+          role="group"
+          aria-label="주문 명단 검색"
+        >
+          <div className="size-analysis-order-list-filters__grid">
+            <div className="size-analysis-order-list-filters__field">
+              <label htmlFor="order-list-filter-name">이름</label>
+              <input
+                id="order-list-filter-name"
+                className="size-analysis-order-list-filters__input"
+                type="search"
+                value={orderListFilterName}
+                onChange={(e) => setOrderListFilterName(e.target.value)}
+                placeholder="검색…"
+                autoComplete="off"
+              />
+            </div>
+            <div className="size-analysis-order-list-filters__field">
+              <label htmlFor="order-list-filter-product">상품명</label>
+              <input
+                id="order-list-filter-product"
+                className="size-analysis-order-list-filters__input"
+                type="search"
+                value={orderListFilterProduct}
+                onChange={(e) => setOrderListFilterProduct(e.target.value)}
+                placeholder="검색…"
+                autoComplete="off"
+              />
+            </div>
+            <div className="size-analysis-order-list-filters__field">
+              <label htmlFor="order-list-filter-gender">성별</label>
+              <input
+                id="order-list-filter-gender"
+                className="size-analysis-order-list-filters__input"
+                type="search"
+                value={orderListFilterGender}
+                onChange={(e) => setOrderListFilterGender(e.target.value)}
+                placeholder="검색…"
+                autoComplete="off"
+              />
+            </div>
+            <div className="size-analysis-order-list-filters__field">
+              <label htmlFor="order-list-filter-size">사이즈</label>
+              <input
+                id="order-list-filter-size"
+                className="size-analysis-order-list-filters__input"
+                type="search"
+                value={orderListFilterSize}
+                onChange={(e) => setOrderListFilterSize(e.target.value)}
+                placeholder="검색…"
+                autoComplete="off"
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
       <label className="size-analysis-muted size-analysis-include-toggle">
         <input
           type="checkbox"
@@ -1652,8 +1744,14 @@ export function ClubMembersView({
         중복자 포함
       </label>
 
+      {isMultiItem && sections.length > 0 && displaySections.length === 0 ? (
+        <p className="size-analysis-muted" style={{ marginTop: 8 }}>
+          조건에 맞는 명단이 없습니다.
+        </p>
+      ) : null}
+
       <div className="size-analysis-dup-only-list--mobile">
-        {sections.map((sec) => (
+        {displaySections.map((sec) => (
           <article key={sec.club} className="size-analysis-club-group-card">
             <button
               type="button"
@@ -1763,7 +1861,7 @@ export function ClubMembersView({
       </div>
 
       <div className="size-analysis-dup-pc-wrap" aria-label="클럽별 명단 표(PC)">
-        {sections.map((sec) => (
+        {displaySections.map((sec) => (
           <div key={`${sec.club}-pc`} className="size-analysis-dup-pc-club">
             <h4 className="size-analysis-dup-pc-club__title">{sec.club} ({sec.totalQty}개)</h4>
             <div

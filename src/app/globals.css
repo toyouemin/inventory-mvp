@@ -8203,6 +8203,70 @@ label {
   margin: 0 0 6px;
 }
 
+/* 주문 명단(다품목): 제목 아래 검색 필터 — 모바일 2열, PC 4열 */
+.size-analysis-order-list-filters {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 8px;
+  overflow: hidden;
+}
+
+.size-analysis-order-list-filters__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 8px;
+}
+
+.size-analysis-order-list-filters__field {
+  min-width: 0;
+}
+
+.size-analysis-order-list-filters__field label {
+  display: block;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  margin: 0 0 2px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.size-analysis-order-list-filters__input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 0.75rem;
+  padding: 4px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  min-height: 28px;
+}
+
+.size-analysis-order-list-filters__input:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 0;
+  border-color: #93c5fd;
+}
+
+@media (min-width: 769px) {
+  .size-analysis-order-list-filters__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px 10px;
+  }
+
+  .size-analysis-order-list-filters__field label {
+    font-size: 0.72rem;
+  }
+
+  .size-analysis-order-list-filters__input {
+    font-size: 0.8rem;
+    padding: 5px 8px;
+    min-height: 30px;
+  }
+}
+
 .size-analysis-filter-row {
   display: flex;
   flex-wrap: wrap;

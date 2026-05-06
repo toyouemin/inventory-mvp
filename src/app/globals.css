@@ -1006,6 +1006,12 @@ main {
   font-weight: 500;
 }
 
+@media (min-width: 769px) {
+  .app-main-nav {
+    justify-content: center;
+  }
+}
+
 @media (max-width: 768px) {
   .nav-dropdown__menu {
     min-width: 108px;
@@ -8315,16 +8321,15 @@ label {
 
 .size-analysis-order-list-filter-panel-floating {
   box-sizing: border-box;
-  width: auto;
-  min-width: 260px;
-  max-width: min(480px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  max-width: min(300px, calc(100vw - 16px));
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
   max-height: min(60vh, 360px);
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
   align-items: stretch;
   text-align: left;
@@ -8332,27 +8337,31 @@ label {
 
 .size-analysis-order-list-filter-panel-floating__actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 8px;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 5px 6px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
   box-sizing: border-box;
 }
 
 .size-analysis-order-list-filter-panel-floating .size-analysis-order-list-filter-panel-floating__btn {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: auto !important;
-  min-width: 100px;
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
   font-size: 0.72rem !important;
-  padding: 4px 8px !important;
+  padding: 3px 6px !important;
   min-height: auto !important;
 }
 
 .size-analysis-order-list-filter-check-list {
   list-style: none;
   margin: 0;
-  padding: 6px 8px 8px;
+  padding: 4px 6px 6px;
   overflow-x: hidden;
   overflow-y: auto;
   flex: 1;
@@ -8374,7 +8383,7 @@ label {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   min-width: 0;
   font-size: 0.78rem;
@@ -10172,5 +10181,145 @@ label {
   .size-analysis-page .size-analysis-field-mapping .size-analysis-map-hint-2 {
     font-size: 15px;
     line-height: 1.45;
+  }
+
+  /* PC(1024+) 결과 영역만: 요약·집계·명단·전체보기 표 가독성 소폭 상향 — 모바일 미디어쿼리 미수정 */
+  .size-analysis-page .size-analysis-grid-item--summary .size-analysis-summary-card__label {
+    font-size: 14.5px;
+    line-height: 1.32;
+  }
+
+  .size-analysis-page .size-analysis-grid-item--summary .size-analysis-summary-card__value {
+    font-size: 22px;
+    line-height: 1.24;
+  }
+
+  .size-analysis-page .size-analysis-grid-item--summary .size-analysis-summary-card--hero .size-analysis-summary-card__value {
+    font-size: 24px;
+    line-height: 1.22;
+  }
+
+  .size-analysis-page .size-analysis-grid-item--summary .size-analysis-summary-card--emphasis .size-analysis-summary-card__value {
+    font-size: 22px;
+    line-height: 1.24;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-card > h3 {
+    font-size: 21px;
+    line-height: 1.38;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-muted,
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-group-hint,
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-size-hint,
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-agg-hint,
+  .size-analysis-page .size-analysis-result-region .size-analysis-dup-only-hint {
+    font-size: 15.5px;
+    line-height: 1.48;
+  }
+
+  /* 전체 보기·정규화·클럽 사이즈 표 등 */
+  .size-analysis-page .size-analysis-result-region .size-analysis-table th,
+  .size-analysis-page .size-analysis-result-region .size-analysis-table td {
+    font-size: 15.5px;
+    line-height: 1.45;
+    padding: 7px 9px;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-th-label {
+    font-size: 0.9rem;
+    line-height: 1.32;
+  }
+
+  /* 클럽/성별/사이즈·상품별 집계 매트릭스 */
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-agg-mtx {
+    font-size: 15.5px;
+    line-height: 1.45;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-agg-mtx th,
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-agg-mtx td {
+    padding: 6px 8px;
+    line-height: 1.4;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-agg-mtx-clubline {
+    font-size: 0.93rem;
+    line-height: 1.38;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-agg-mgroup__head {
+    font-size: 0.93rem;
+    line-height: 1.34;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-agg-line {
+    font-size: 0.93rem;
+    line-height: 1.38;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-agg-mode-tab {
+    font-size: 16.5px;
+    line-height: 1.32;
+    padding: 11px 15px;
+  }
+
+  /* 주문 명단·중복자 PC 표 */
+  .size-analysis-page .size-analysis-result-region .size-analysis-order-list-table th,
+  .size-analysis-page .size-analysis-result-region .size-analysis-order-list-table td {
+    font-size: 15.5px;
+    line-height: 1.42;
+    padding: 7px 9px;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-dup-pc-table {
+    font-size: 15.5px;
+    line-height: 1.45;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-dup-pc-table th,
+  .size-analysis-page .size-analysis-result-region .size-analysis-dup-pc-table td {
+    padding: 6px 8px;
+    line-height: 1.42;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-dup-pc-club__title {
+    font-size: 0.94rem;
+    line-height: 1.36;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-dup-person__name {
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-dup-person__lines {
+    font-size: 0.88rem;
+    line-height: 1.42;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-group-head__summary {
+    font-size: 0.86rem;
+    line-height: 1.38;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-club-group-head__total {
+    font-size: 0.94rem;
+    line-height: 1.3;
+  }
+
+  /* 보기 전환: 표 본문과 동일 톤의 글씨 크기 */
+  .size-analysis-page .size-analysis-result-region .size-analysis-view-switch--segmented .btn {
+    min-height: 44px;
+    padding: 10px 7px;
+    font-size: 16.5px;
+    line-height: 1.3;
+  }
+
+  .size-analysis-page .size-analysis-result-region .size-analysis-norm-section .size-analysis-collapsible-head .size-analysis-collapsible-toggle {
+    min-height: 32px;
+    padding: 5px 11px;
+    font-size: 0.85rem;
+    line-height: 1.25;
   }
 }

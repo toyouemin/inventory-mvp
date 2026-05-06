@@ -1715,8 +1715,10 @@ export function ClubMembersView({
     const pad = 8;
     const iw = typeof window !== "undefined" ? window.innerWidth : 400;
     const ih = typeof window !== "undefined" ? window.innerHeight : 800;
-    const maxPanelW = Math.min(480, iw - pad * 2);
-    let left = Math.max(pad, Math.min(r.left, iw - maxPanelW - pad));
+    const maxPanelW = Math.min(300, iw - pad * 2);
+    let left = r.left;
+    if (left + maxPanelW > iw - pad) left = iw - pad - maxPanelW;
+    left = Math.max(pad, left);
     let top = r.bottom + 4;
     const panelMaxH = Math.min(360, Math.round(ih * 0.6));
     if (top + panelMaxH > ih - pad) top = Math.max(pad, ih - pad - panelMaxH);
@@ -2713,34 +2715,10 @@ function normCompactClassForRow(r: any): string {
   return normCompactClass(r.parseStatus);
 }
 
-function normTableIncludeFilterText(r: any): string {
-  if (!isNameMissingRow(r) || (r.parseStatus !== "needs_review" && r.parseStatus !== "corrected")) return "";
-  return String(r.parseStatus ?? "") === "corrected" ? "포함" : "미포함";
-}
-
-function NormTableFilterTh({
-  label,
-  value,
-  onChange,
-  placeholder = "검색…",
-}: {
-  label: string;
-  value: string;
-  onChange: (next: string) => void;
-  placeholder?: string;
-}) {
+function NormTableTh({ label, className }: { label: string; className?: string }) {
   return (
-    <th scope="col" className="size-analysis-th-with-filter">
+    <th scope="col" className={["size-analysis-th-with-filter", className].filter(Boolean).join(" ")}>
       <div className="size-analysis-th-label">{label}</div>
-      <input
-        className="size-analysis-col-filter"
-        type="search"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        aria-label={`${label} 열 필터`}
-        autoComplete="off"
-      />
     </th>
   );
 }
@@ -2757,56 +2735,8 @@ export function AnalysisRowsTable({
   showItemColumn?: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const [colFilters, setColFilters] = useState({
-    sourceRow: "",
-    club: "",
-    name: "",
-    gender: "",
-    item: "",
-    size: "",
-    qty: "",
-    status: "",
-    reason: "",
-    include: "",
-    confidence: "",
-  });
 
-  const filteredIndexed = useMemo(() => {
-    const f = colFilters;
-    const match = (cell: string, q: string) => {
-      const t = q.trim().toLowerCase();
-      if (!t) return true;
-      return cell.toLowerCase().includes(t);
-    };
-    const out: { r: any; i: number }[] = [];
-    for (let i = 0; i < rows.length; i += 1) {
-      const r = rows[i]!;
-      const source = String(r.sourceRowIndex ?? "");
-      const club = String(r.clubNameRaw ?? "");
-      const name = String(r.memberNameRaw ?? "");
-      const gender = String(r.genderNormalized ?? r.genderRaw ?? "");
-      const item = String(r.itemRaw ?? "");
-      const size = displaySizeWithWarning(r);
-      const qty = String(r.qtyParsed ?? r.qtyRaw ?? "");
-      const status = labelNormalizedRowParseStatusUi(r);
-      const reason = displayReasonForNormalizedRow(r);
-      const inc = normTableIncludeFilterText(r);
-      const conf = displayParseConfidenceUi(r).toFixed(2);
-      if (!match(source, f.sourceRow)) continue;
-      if (!match(club, f.club)) continue;
-      if (!match(name, f.name)) continue;
-      if (!match(gender, f.gender)) continue;
-      if (showItemColumn && !match(item, f.item)) continue;
-      if (!match(size, f.size)) continue;
-      if (!match(qty, f.qty)) continue;
-      if (!match(status, f.status)) continue;
-      if (!match(reason, f.reason)) continue;
-      if (!match(inc, f.include)) continue;
-      if (!match(conf, f.confidence)) continue;
-      out.push({ r, i });
-    }
-    return out;
-  }, [rows, colFilters, showItemColumn]);
+  const indexedRows = useMemo(() => rows.map((r, i) => ({ r, i })), [rows]);
 
   return (
     <section className="size-analysis-card size-analysis-norm-section">
@@ -2868,74 +2798,21 @@ export function AnalysisRowsTable({
           <table className="size-analysis-table size-analysis-table--normalized">
           <thead>
             <tr>
-              <NormTableFilterTh
-                label="원본행"
-                value={colFilters.sourceRow}
-                onChange={(sourceRow) => setColFilters((p) => ({ ...p, sourceRow }))}
-              />
-              <NormTableFilterTh
-                label="클럽"
-                value={colFilters.club}
-                onChange={(club) => setColFilters((p) => ({ ...p, club }))}
-              />
-              <NormTableFilterTh
-                label="이름"
-                value={colFilters.name}
-                onChange={(name) => setColFilters((p) => ({ ...p, name }))}
-              />
-              <NormTableFilterTh
-                label="성별"
-                value={colFilters.gender}
-                onChange={(gender) => setColFilters((p) => ({ ...p, gender }))}
-              />
-              {showItemColumn ? (
-                <NormTableFilterTh
-                  label="상품명"
-                  value={colFilters.item}
-                  onChange={(item) => setColFilters((p) => ({ ...p, item }))}
-                />
-              ) : null}
-              <NormTableFilterTh
-                label="사이즈"
-                value={colFilters.size}
-                onChange={(size) => setColFilters((p) => ({ ...p, size }))}
-              />
-              <NormTableFilterTh
-                label="수량"
-                value={colFilters.qty}
-                onChange={(qty) => setColFilters((p) => ({ ...p, qty }))}
-              />
-              <NormTableFilterTh
-                label="상태"
-                value={colFilters.status}
-                onChange={(status) => setColFilters((p) => ({ ...p, status }))}
-              />
-              <NormTableFilterTh
-                label="사유"
-                value={colFilters.reason}
-                onChange={(reason) => setColFilters((p) => ({ ...p, reason }))}
-              />
-              <th scope="col" className="size-analysis-include-col size-analysis-th-with-filter">
-                <div className="size-analysis-th-label">수량 포함</div>
-                <input
-                  className="size-analysis-col-filter"
-                  type="search"
-                  value={colFilters.include}
-                  onChange={(e) => setColFilters((p) => ({ ...p, include: e.target.value }))}
-                  placeholder="포함·미포함"
-                  aria-label="수량 포함 열 필터"
-                  autoComplete="off"
-                />
-              </th>
-              <NormTableFilterTh
-                label="신뢰도"
-                value={colFilters.confidence}
-                onChange={(confidence) => setColFilters((p) => ({ ...p, confidence }))}
-              />
+              <NormTableTh label="원본행" />
+              <NormTableTh label="클럽" />
+              <NormTableTh label="이름" />
+              <NormTableTh label="성별" />
+              {showItemColumn ? <NormTableTh label="상품명" /> : null}
+              <NormTableTh label="사이즈" />
+              <NormTableTh label="수량" />
+              <NormTableTh label="상태" />
+              <NormTableTh label="사유" />
+              <NormTableTh label="수량 포함" className="size-analysis-include-col" />
+              <NormTableTh label="신뢰도" />
             </tr>
           </thead>
           <tbody>
-            {filteredIndexed.map(({ r, i }) => {
+            {indexedRows.map(({ r, i }) => {
               const isDup = duplicateRowIds.has(stableRowKeyForDup(r, i));
               return (
                 <tr key={stableRowKeyForDup(r, i)}>

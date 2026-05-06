@@ -419,7 +419,6 @@ function buildProductSheets(rows: any[], duplicateRowIds: Set<string>): Array<{ 
     const aoa = [["성별", "사이즈", "수량"], ...body];
     const ws = buildStyledAoaSheet(aoa, {
       centerCols: new Set([0, 1, 2]),
-      autofilter: true,
       emptyMessage: "(집계할 데이터가 없습니다)",
       highlightCell: (row, _r, _c) => {
         const label = String(row[0] ?? "").trim();
@@ -854,7 +853,6 @@ function buildSheetDupStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet
   }
   return buildStyledAoaSheet(aoa, {
     centerCols: new Set([2, 3, 4, 5, 6]),
-    autofilter: true,
     groupKeyByRow: (row, r) => (r === 0 ? "" : `${String(row[0] ?? "")}\0${String(row[1] ?? "")}`),
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
@@ -901,7 +899,6 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
   if (!hasData) {
     const ws = buildStyledAoaSheet(aoa, {
       centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
-      autofilter: true,
       emptyMessage: "(검토필요·미분류에 해당하는 행이 없습니다)",
     });
     const addr = XLSX.utils.encode_cell({ r: 1, c: 0 });
@@ -913,7 +910,6 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
   }
   return buildStyledAoaSheet(aoa, {
     centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
-    autofilter: true,
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
       if (c !== 6) return null;

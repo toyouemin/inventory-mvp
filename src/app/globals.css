@@ -8203,13 +8203,17 @@ label {
   margin: 0 0 6px;
 }
 
-/* 주문 명단(다품목): 제목 아래 검색 필터 — 모바일 2열, PC 4열 */
+/* 주문 명단(다품목): 이름 검색 + 헤더 엑셀식 필터 */
 .size-analysis-order-list-filters {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   margin: 0 0 8px;
   overflow: hidden;
+}
+
+.size-analysis-order-list-filters--name-only {
+  max-width: min(100%, 320px);
 }
 
 .size-analysis-order-list-filters__grid {
@@ -8265,6 +8269,103 @@ label {
     padding: 5px 8px;
     min-height: 30px;
   }
+}
+
+/* 주문 명단: 헤더 ▼ 필터 · 고정 패널 */
+.size-analysis-order-list-th-filter-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.size-analysis-order-list-th-filter-wrap__label {
+  display: inline-block;
+  max-width: calc(100% - 28px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.size-analysis-order-list-filter-trigger {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 4px;
+  min-width: 22px;
+  height: 22px;
+  line-height: 1;
+  font-size: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #f9fafb;
+  color: #374151;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.size-analysis-order-list-filter-trigger:hover {
+  background: #f3f4f6;
+}
+
+.size-analysis-order-list-filter-trigger[aria-expanded="true"] {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.size-analysis-order-list-filter-panel-floating {
+  box-sizing: border-box;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  max-height: min(60vh, 360px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.size-analysis-order-list-filter-panel-floating__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.size-analysis-order-list-filter-panel-floating__btn {
+  font-size: 0.72rem !important;
+  padding: 4px 8px !important;
+  min-height: auto !important;
+}
+
+.size-analysis-order-list-filter-check-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px 8px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.size-analysis-order-list-filter-check-list li {
+  margin: 0;
+  padding: 2px 0;
+}
+
+.size-analysis-order-list-filter-check-list__label {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.size-analysis-order-list-filter-check-list__text {
+  flex: 1;
+  min-width: 0;
 }
 
 .size-analysis-filter-row {

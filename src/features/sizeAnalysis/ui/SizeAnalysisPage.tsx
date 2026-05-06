@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { buildColumnSizesForClub } from "@/features/sizeAnalysis/clubAggMatrixColumns";
@@ -1551,11 +1551,15 @@ export function ClubMembersView({
   };
   const [includeDuplicates, setIncludeDuplicates] = useState(true);
   const [expandedClubs, setExpandedClubs] = useState<Set<string>>(new Set());
-  /** 주문 명단 탭·다품목 개인주문형 전용 (전체보기 정규화 표 필터와 분리) */
+  /** 주문 명단: 이름 부분 검색 */
   const [orderListFilterName, setOrderListFilterName] = useState("");
-  const [orderListFilterProduct, setOrderListFilterProduct] = useState("");
-  const [orderListFilterGender, setOrderListFilterGender] = useState("");
-  const [orderListFilterSize, setOrderListFilterSize] = useState("");
+  /** 엑셀식 컬럼 필터 — 빈 Set이면 해당 컬럼은 전체 보기 */
+  const [orderListCheckedProducts, setOrderListCheckedProducts] = useState<Set<string>>(() => new Set());
+  const [orderListCheckedGenders, setOrderListCheckedGenders] = useState<Set<string>>(() => new Set());
+  const [orderListCheckedSizes, setOrderListCheckedSizes] = useState<Set<string>>(() => new Set());
+  type OrderListFilterPanelCol = "product" | "gender" | "size";
+  type OrderListPanelPosition = { col: OrderListFilterPanelCol; top: number; left: number; width: number };
+  const [orderListPanel, setOrderListPanel] = useState<OrderListPanelPosition | null>(null);
 
   const sections = useMemo(() => {
     const byClub = new Map<string, Map<string, MemberAggRow>>();
@@ -1622,21 +1626,47 @@ export function ClubMembersView({
     .sort((a, b) => a.club.localeCompare(b.club, "ko"));
   }, [allRows, duplicateRowIds, includeDuplicates, isMultiItem]);
 
+  const orderListUniqueProducts = useMemo(() => {
+    if (!isMultiItem) return [] as string[];
+    const s = new Set<string>();
+    for (const sec of sections) for (const r of sec.rows) s.add(r.item);
+    return Array.from(s).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [sections, isMultiItem]);
+
+  const orderListUniqueGenders = useMemo(() => {
+    if (!isMultiItem) return [] as string[];
+    const s = new Set<string>();
+    for (const sec of sections) for (const r of sec.rows) s.add(r.gender);
+    return Array.from(s).sort((a, b) => compareGenderForClubSize(a, b) || a.localeCompare(b, "ko"));
+  }, [sections, isMultiItem]);
+
+  const orderListUniqueSizes = useMemo(() => {
+    if (!isMultiItem) return [] as string[];
+    const s = new Set<string>();
+    for (const sec of sections) for (const r of sec.rows) s.add(r.size);
+    return Array.from(s).sort((a, b) => compareSizeLabel(a, b));
+  }, [sections, isMultiItem]);
+
   const displaySections = useMemo(() => {
     if (!isMultiItem) return sections;
-    const match = (cell: string, q: string) => {
+    const nameMatch = (cell: string, q: string) => {
       const t = q.trim().toLowerCase();
       if (!t) return true;
       return cell.toLowerCase().includes(t);
     };
+    const passProduct = (item: string) =>
+      orderListCheckedProducts.size === 0 || orderListCheckedProducts.has(item);
+    const passGender = (g: string) =>
+      orderListCheckedGenders.size === 0 || orderListCheckedGenders.has(g);
+    const passSize = (sz: string) => orderListCheckedSizes.size === 0 || orderListCheckedSizes.has(sz);
     return sections
       .map((sec) => {
         const rows = sec.rows.filter(
           (row) =>
-            match(row.name, orderListFilterName) &&
-            match(row.item, orderListFilterProduct) &&
-            match(row.gender, orderListFilterGender) &&
-            match(row.size, orderListFilterSize)
+            nameMatch(row.name, orderListFilterName) &&
+            passProduct(row.item) &&
+            passGender(row.gender) &&
+            passSize(row.size)
         );
         const totalQty = rows.reduce((sum, row) => sum + row.qty, 0);
         return { ...sec, rows, totalQty };
@@ -1646,10 +1676,121 @@ export function ClubMembersView({
     sections,
     isMultiItem,
     orderListFilterName,
-    orderListFilterProduct,
-    orderListFilterGender,
-    orderListFilterSize,
+    orderListCheckedProducts,
+    orderListCheckedGenders,
+    orderListCheckedSizes,
   ]);
+
+  useEffect(() => {
+    if (!orderListPanel) return;
+    const onDown = (ev: Event) => {
+      const el = ev.target as HTMLElement;
+      if (el.closest("[data-order-list-filter-ui]")) return;
+      setOrderListPanel(null);
+    };
+    const onScroll = () => setOrderListPanel(null);
+    document.addEventListener("mousedown", onDown, true);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown, true);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [orderListPanel]);
+
+  function onOrderListFilterTrigger(col: OrderListFilterPanelCol, e: ReactMouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    const pad = 8;
+    const iw = typeof window !== "undefined" ? window.innerWidth : 400;
+    const w = Math.min(288, iw - pad * 2);
+    const left = Math.max(pad, Math.min(r.left, iw - w - pad));
+    setOrderListPanel((prev) => {
+      if (prev?.col === col) return null;
+      return { col, top: r.bottom + 4, left, width: w };
+    });
+  }
+
+  function selectAllOrderListColumn(col: OrderListFilterPanelCol) {
+    if (col === "product") setOrderListCheckedProducts(new Set(orderListUniqueProducts));
+    else if (col === "gender") setOrderListCheckedGenders(new Set(orderListUniqueGenders));
+    else setOrderListCheckedSizes(new Set(orderListUniqueSizes));
+  }
+
+  function clearOrderListColumn(col: OrderListFilterPanelCol) {
+    if (col === "product") setOrderListCheckedProducts(new Set());
+    else if (col === "gender") setOrderListCheckedGenders(new Set());
+    else setOrderListCheckedSizes(new Set());
+  }
+
+  function toggleOrderListColumnValue(col: OrderListFilterPanelCol, value: string) {
+    if (col === "product") {
+      setOrderListCheckedProducts((prev) => {
+        const n = new Set(prev);
+        if (n.has(value)) n.delete(value);
+        else n.add(value);
+        return n;
+      });
+    } else if (col === "gender") {
+      setOrderListCheckedGenders((prev) => {
+        const n = new Set(prev);
+        if (n.has(value)) n.delete(value);
+        else n.add(value);
+        return n;
+      });
+    } else {
+      setOrderListCheckedSizes((prev) => {
+        const n = new Set(prev);
+        if (n.has(value)) n.delete(value);
+        else n.add(value);
+        return n;
+      });
+    }
+  }
+
+  function renderOrderListMemberThead() {
+    if (!isMultiItem) {
+      return (
+        <thead>
+          <tr>
+            <th scope="col">이름</th>
+            <th scope="col">성별</th>
+            <th scope="col">사이즈</th>
+            <th scope="col">수량</th>
+          </tr>
+        </thead>
+      );
+    }
+    const panelOpenCol = orderListPanel?.col ?? null;
+    const headBtn = (col: OrderListFilterPanelCol, label: string) => (
+      <th scope="col">
+        <div className="size-analysis-order-list-th-filter-wrap">
+          <span className="size-analysis-order-list-th-filter-wrap__label">{label}</span>
+          <button
+            type="button"
+            className="size-analysis-order-list-filter-trigger"
+            data-order-list-filter-ui
+            aria-expanded={panelOpenCol === col}
+            aria-haspopup="dialog"
+            aria-label={`${label} 필터`}
+            onClick={(e) => onOrderListFilterTrigger(col, e)}
+          >
+            ▼
+          </button>
+        </div>
+      </th>
+    );
+    return (
+      <thead>
+        <tr>
+          <th scope="col">이름</th>
+          {headBtn("product", "상품명")}
+          {headBtn("gender", "성별")}
+          {headBtn("size", "사이즈")}
+          <th scope="col">수량</th>
+        </tr>
+      </thead>
+    );
+  }
 
   function toggleClub(club: string) {
     setExpandedClubs((prev) => {
@@ -1679,59 +1820,21 @@ export function ClubMembersView({
       </p>
       {isMultiItem ? (
         <div
-          className="size-analysis-order-list-filters"
+          className="size-analysis-order-list-filters size-analysis-order-list-filters--name-only"
           role="group"
-          aria-label="주문 명단 검색"
+          aria-label="주문 명단 이름 검색"
         >
-          <div className="size-analysis-order-list-filters__grid">
-            <div className="size-analysis-order-list-filters__field">
-              <label htmlFor="order-list-filter-name">이름</label>
-              <input
-                id="order-list-filter-name"
-                className="size-analysis-order-list-filters__input"
-                type="search"
-                value={orderListFilterName}
-                onChange={(e) => setOrderListFilterName(e.target.value)}
-                placeholder="검색…"
-                autoComplete="off"
-              />
-            </div>
-            <div className="size-analysis-order-list-filters__field">
-              <label htmlFor="order-list-filter-product">상품명</label>
-              <input
-                id="order-list-filter-product"
-                className="size-analysis-order-list-filters__input"
-                type="search"
-                value={orderListFilterProduct}
-                onChange={(e) => setOrderListFilterProduct(e.target.value)}
-                placeholder="검색…"
-                autoComplete="off"
-              />
-            </div>
-            <div className="size-analysis-order-list-filters__field">
-              <label htmlFor="order-list-filter-gender">성별</label>
-              <input
-                id="order-list-filter-gender"
-                className="size-analysis-order-list-filters__input"
-                type="search"
-                value={orderListFilterGender}
-                onChange={(e) => setOrderListFilterGender(e.target.value)}
-                placeholder="검색…"
-                autoComplete="off"
-              />
-            </div>
-            <div className="size-analysis-order-list-filters__field">
-              <label htmlFor="order-list-filter-size">사이즈</label>
-              <input
-                id="order-list-filter-size"
-                className="size-analysis-order-list-filters__input"
-                type="search"
-                value={orderListFilterSize}
-                onChange={(e) => setOrderListFilterSize(e.target.value)}
-                placeholder="검색…"
-                autoComplete="off"
-              />
-            </div>
+          <div className="size-analysis-order-list-filters__field">
+            <label htmlFor="order-list-filter-name">이름</label>
+            <input
+              id="order-list-filter-name"
+              className="size-analysis-order-list-filters__input"
+              type="search"
+              value={orderListFilterName}
+              onChange={(e) => setOrderListFilterName(e.target.value)}
+              placeholder="검색…"
+              autoComplete="off"
+            />
           </div>
         </div>
       ) : null}
@@ -1813,15 +1916,7 @@ export function ClubMembersView({
                       <col className="size-analysis-club-members-col-qty" />
                     </colgroup>
                   ) : null}
-                  <thead>
-                    <tr>
-                      <th scope="col">이름</th>
-                      {isMultiItem ? <th scope="col">상품명</th> : null}
-                      <th scope="col">성별</th>
-                      <th scope="col">사이즈</th>
-                      <th scope="col">수량</th>
-                    </tr>
-                  </thead>
+                  {renderOrderListMemberThead()}
                   <tbody>
                     {sec.rows.map((row) => (
                       <tr
@@ -1880,15 +1975,7 @@ export function ClubMembersView({
                   .filter(Boolean)
                   .join(" ")}
               >
-                <thead>
-                  <tr>
-                    <th scope="col">이름</th>
-                    {isMultiItem ? <th scope="col">상품명</th> : null}
-                    <th scope="col">성별</th>
-                    <th scope="col">사이즈</th>
-                    <th scope="col">수량</th>
-                  </tr>
-                </thead>
+                {renderOrderListMemberThead()}
                 <tbody>
                   {sec.rows.map((row) => (
                     <tr
@@ -1925,6 +2012,77 @@ export function ClubMembersView({
           </div>
         ))}
       </div>
+
+      {isMultiItem && orderListPanel ? (
+        <div
+          className="size-analysis-order-list-filter-panel-floating"
+          data-order-list-filter-ui
+          style={{
+            position: "fixed",
+            top: orderListPanel.top,
+            left: orderListPanel.left,
+            width: orderListPanel.width,
+            zIndex: 400,
+          }}
+          role="dialog"
+          aria-label={
+            orderListPanel.col === "product"
+              ? "상품명 필터"
+              : orderListPanel.col === "gender"
+                ? "성별 필터"
+                : "사이즈 필터"
+          }
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="size-analysis-order-list-filter-panel-floating__actions">
+            <button
+              type="button"
+              className="btn btn-secondary size-analysis-order-list-filter-panel-floating__btn"
+              onClick={() => selectAllOrderListColumn(orderListPanel.col)}
+            >
+              전체 선택
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary size-analysis-order-list-filter-panel-floating__btn"
+              onClick={() => clearOrderListColumn(orderListPanel.col)}
+            >
+              전체 해제
+            </button>
+          </div>
+          <ul
+            className="size-analysis-order-list-filter-check-list"
+            role="listbox"
+            aria-multiselectable
+          >
+            {(orderListPanel.col === "product"
+              ? orderListUniqueProducts
+              : orderListPanel.col === "gender"
+                ? orderListUniqueGenders
+                : orderListUniqueSizes
+            ).map((value) => {
+              const checked =
+                orderListPanel.col === "product"
+                  ? orderListCheckedProducts.has(value)
+                  : orderListPanel.col === "gender"
+                    ? orderListCheckedGenders.has(value)
+                    : orderListCheckedSizes.has(value);
+              return (
+                <li key={`${orderListPanel.col}\0${value}`} role="option" aria-selected={checked}>
+                  <label className="size-analysis-order-list-filter-check-list__label">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleOrderListColumnValue(orderListPanel.col, value)}
+                    />
+                    <span className="size-analysis-order-list-filter-check-list__text">{value}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
     </section>
   );
 }

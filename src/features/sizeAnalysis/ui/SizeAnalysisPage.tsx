@@ -1715,7 +1715,7 @@ export function ClubMembersView({
     const pad = 8;
     const iw = typeof window !== "undefined" ? window.innerWidth : 400;
     const ih = typeof window !== "undefined" ? window.innerHeight : 800;
-    const w = Math.max(220, Math.min(320, iw - pad * 2));
+    const w = Math.max(260, Math.min(360, iw - pad * 2));
     let left = Math.max(pad, Math.min(r.left, iw - w - pad));
     let top = r.bottom + 4;
     const panelMaxH = Math.min(360, Math.round(ih * 0.6));
@@ -2049,7 +2049,7 @@ export function ClubMembersView({
             top: orderListPanel.top,
             left: orderListPanel.left,
             width: orderListPanel.width,
-            minWidth: 220,
+            minWidth: 260,
             zIndex: 400,
           }}
           role="dialog"
@@ -2097,13 +2097,13 @@ export function ClubMembersView({
                     : orderListCheckedSizes.has(value);
               return (
                 <li key={`${orderListPanel.col}\0${value}`} role="option" aria-selected={checked}>
-                  <label className="size-analysis-order-list-filter-check-list__label">
+                  <label className="size-analysis-order-list-filter-option">
                     <input
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleOrderListColumnValue(orderListPanel.col, value)}
                     />
-                    <span className="size-analysis-order-list-filter-check-list__text">{value}</span>
+                    <span className="size-analysis-order-list-filter-option-text">{value}</span>
                   </label>
                 </li>
               );

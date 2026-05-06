@@ -8315,7 +8315,7 @@ label {
 
 .size-analysis-order-list-filter-panel-floating {
   box-sizing: border-box;
-  min-width: 220px;
+  min-width: 260px;
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -8345,6 +8345,7 @@ label {
   list-style: none;
   margin: 0;
   padding: 6px 8px 8px;
+  overflow-x: hidden;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
@@ -8353,22 +8354,30 @@ label {
 .size-analysis-order-list-filter-check-list li {
   margin: 0;
   padding: 2px 0;
+  min-width: 0;
 }
 
-.size-analysis-order-list-filter-check-list__label {
+.size-analysis-order-list-filter-option {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
   font-size: 0.78rem;
   cursor: pointer;
-  white-space: nowrap;
-  max-width: 100%;
 }
 
-.size-analysis-order-list-filter-check-list__text {
-  flex: 1;
+.size-analysis-order-list-filter-option input {
+  flex-shrink: 0;
+}
+
+.size-analysis-order-list-filter-option-text {
+  display: block;
   min-width: 0;
-  overflow-x: auto;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .size-analysis-filter-row {

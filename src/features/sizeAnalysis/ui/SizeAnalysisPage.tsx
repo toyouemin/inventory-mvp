@@ -1570,7 +1570,7 @@ export function ClubMembersView({
   const [orderListCheckedGenders, setOrderListCheckedGenders] = useState<Set<string>>(() => new Set());
   const [orderListCheckedSizes, setOrderListCheckedSizes] = useState<Set<string>>(() => new Set());
   type OrderListFilterPanelCol = "product" | "gender" | "size";
-  type OrderListPanelPosition = { col: OrderListFilterPanelCol; top: number; left: number; width: number };
+  type OrderListPanelPosition = { col: OrderListFilterPanelCol; top: number; left: number; maxWidth: number };
   const [orderListPanel, setOrderListPanel] = useState<OrderListPanelPosition | null>(null);
 
   const sections = useMemo(() => {
@@ -1715,14 +1715,14 @@ export function ClubMembersView({
     const pad = 8;
     const iw = typeof window !== "undefined" ? window.innerWidth : 400;
     const ih = typeof window !== "undefined" ? window.innerHeight : 800;
-    const w = Math.max(260, Math.min(360, iw - pad * 2));
-    let left = Math.max(pad, Math.min(r.left, iw - w - pad));
+    const maxPanelW = Math.min(480, iw - pad * 2);
+    let left = Math.max(pad, Math.min(r.left, iw - maxPanelW - pad));
     let top = r.bottom + 4;
     const panelMaxH = Math.min(360, Math.round(ih * 0.6));
     if (top + panelMaxH > ih - pad) top = Math.max(pad, ih - pad - panelMaxH);
     setOrderListPanel((prev) => {
       if (prev?.col === col) return null;
-      return { col, top, left, width: w };
+      return { col, top, left, maxWidth: maxPanelW };
     });
   }
 
@@ -2048,8 +2048,7 @@ export function ClubMembersView({
             position: "fixed",
             top: orderListPanel.top,
             left: orderListPanel.left,
-            width: orderListPanel.width,
-            minWidth: 260,
+            maxWidth: orderListPanel.maxWidth,
             zIndex: 400,
           }}
           role="dialog"

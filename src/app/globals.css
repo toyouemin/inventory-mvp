@@ -8315,7 +8315,9 @@ label {
 
 .size-analysis-order-list-filter-panel-floating {
   box-sizing: border-box;
+  width: auto;
   min-width: 260px;
+  max-width: min(480px, calc(100vw - 16px));
   background: #fff;
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -8324,18 +8326,24 @@ label {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  align-items: stretch;
+  text-align: left;
 }
 
 .size-analysis-order-list-filter-panel-floating__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   padding: 8px;
   border-bottom: 1px solid #e5e7eb;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-.size-analysis-order-list-filter-panel-floating__btn {
+.size-analysis-order-list-filter-panel-floating .size-analysis-order-list-filter-panel-floating__btn {
+  flex: 1 1 auto;
+  width: auto !important;
+  min-width: 100px;
   font-size: 0.72rem !important;
   padding: 4px 8px !important;
   min-height: auto !important;
@@ -8349,26 +8357,37 @@ label {
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .size-analysis-order-list-filter-check-list li {
   margin: 0;
   padding: 2px 0;
   min-width: 0;
+  display: block;
+  text-align: left;
 }
 
 .size-analysis-order-list-filter-option {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   width: 100%;
   min-width: 0;
   font-size: 0.78rem;
   cursor: pointer;
+  color: #111827;
 }
 
-.size-analysis-order-list-filter-option input {
+/* .size-analysis-card input { width:100% }(모바일) 때문에 체크박스가 행 전체를 차지해 라벨 글씨가 안 보이는 문제 방지 */
+.size-analysis-order-list-filter-panel-floating .size-analysis-order-list-filter-option input[type="checkbox"] {
+  width: auto !important;
+  max-width: none !important;
   flex-shrink: 0;
+  margin: 0;
 }
 
 .size-analysis-order-list-filter-option-text {
@@ -8378,6 +8397,7 @@ label {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: #111827;
 }
 
 .size-analysis-filter-row {

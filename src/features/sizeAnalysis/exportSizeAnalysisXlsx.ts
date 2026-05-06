@@ -1,3 +1,4 @@
+import ExcelJS from "exceljs";
 import * as XLSX from "xlsx-js-style";
 
 import { applyExcelDownloadFontToWorksheet } from "@/lib/excelDownloadFont";
@@ -254,32 +255,61 @@ function buildStyledAoaSheet(
   return ws;
 }
 
+const SIZE_ANALYSIS_FULL_LIST_SHEET = "전체목록";
+
+/**
+ * SheetJS로 만든 xlsx 바이너리를 ExcelJS로 다시 읽어, 전체목록 시트에만 틀 고정·자동 필터를 OOXML에 맞게 기록합니다.
+ * (SheetJS의 `!views`는 Excel에서 틀 고정이 반영되지 않는 경우가 있어 ExcelJS로 보강합니다.)
+ */
+async function saveSizeAnalysisWorkbookWithExcelJsPatch(
+  wb: XLSX.WorkBook,
+  fullListShape: { rowCount: number; colCount: number },
+  fileName: string
+): Promise<void> {
+  const raw = XLSX.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
+  const ejWb = new ExcelJS.Workbook();
+  await ejWb.xlsx.load(raw);
+  const ws = ejWb.getWorksheet(SIZE_ANALYSIS_FULL_LIST_SHEET);
+  if (ws) {
+    ws.views = [{ state: "frozen", ySplit: 1, xSplit: 0, topLeftCell: "A2" }];
+    const { rowCount, colCount } = fullListShape;
+    if (rowCount >= 2 && colCount >= 1) {
+      const lastColLetter = XLSX.utils.encode_col(colCount - 1);
+      ws.autoFilter = {
+        from: "A1",
+        to: `${lastColLetter}${rowCount}`,
+      };
+    }
+  }
+  const buf = await ejWb.xlsx.writeBuffer();
+  const blob = new Blob([buf], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /**
  * 사이즈 분석 결과 `rows`·중복 집계를 기준으로 4시트 xlsx를 만들어 브라우저에 저장합니다.
  */
-export function downloadSizeAnalysisResultXlsx(
+export async function downloadSizeAnalysisResultXlsx(
   rows: any[],
   duplicateAnalysis: DupInput,
   opts?: { structureType?: StructureType; uploadFileName?: string }
-): void {
+): Promise<void> {
   const isMultiItem = opts?.structureType === "multi_item_personal_order";
   const aoa1 = buildSheetAll(rows, duplicateAnalysis.duplicateRowIds, isMultiItem);
   const aoa3 = buildSheetDupMembers(rows, duplicateAnalysis.duplicateRowIds);
   const aoa4 = buildSheetReview(rows);
 
   const wb = XLSX.utils.book_new();
-  const wsFullList = buildSheetAllStyled(aoa1, isMultiItem);
-  wsFullList["!views"] = [
-    {
-      state: "frozen",
-      ySplit: 1,
-      xSplit: 0,
-      topLeftCell: "A2",
-      activePane: "bottomLeft",
-      showGridLines: true,
-    },
-  ];
-  XLSX.utils.book_append_sheet(wb, wsFullList, "전체목록");
+  XLSX.utils.book_append_sheet(wb, buildSheetAllStyled(aoa1, isMultiItem), SIZE_ANALYSIS_FULL_LIST_SHEET);
   XLSX.utils.book_append_sheet(
     wb,
     buildClubAggregateStyledSheet(rows, duplicateAnalysis.duplicateRowIds, { structureType: opts?.structureType }),
@@ -298,7 +328,9 @@ export function downloadSizeAnalysisResultXlsx(
   const rawName = opts?.uploadFileName?.trim();
   const base = rawName ? baseNameFromUploadFileName(rawName) : "size-analysis";
   const fileName = `(분석) ${base}_${ymd}.xlsx`;
-  XLSX.writeFile(wb, fileName, { bookType: "xlsx", cellStyles: true });
+  const fullListRowCount = aoa1.length;
+  const fullListColCount = Math.max(...aoa1.map((r) => r.length), 1);
+  await saveSizeAnalysisWorkbookWithExcelJsPatch(wb, { rowCount: fullListRowCount, colCount: fullListColCount }, fileName);
 }
 
 function genderOrderForMultiItem(raw: unknown): number {

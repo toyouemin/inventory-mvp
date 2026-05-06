@@ -1530,6 +1530,18 @@ export function DuplicateMembersView({
   );
 }
 
+/** 주문명단 필터 패널: 성별 목록 정렬 — 공용 → 남 → 여 */
+function compareOrderListFilterGendersForPanel(a: string, b: string): number {
+  const rank = (g: string) => {
+    const t = String(g ?? "").trim();
+    if (t === "공용" || t === "") return 0;
+    if (t === "남") return 1;
+    if (t === "여") return 2;
+    return 3;
+  };
+  return rank(a) - rank(b) || String(a).localeCompare(String(b), "ko");
+}
+
 export function ClubMembersView({
   allRows,
   duplicateRowIds,
@@ -1637,7 +1649,7 @@ export function ClubMembersView({
     if (!isMultiItem) return [] as string[];
     const s = new Set<string>();
     for (const sec of sections) for (const r of sec.rows) s.add(r.gender);
-    return Array.from(s).sort((a, b) => compareGenderForClubSize(a, b) || a.localeCompare(b, "ko"));
+    return Array.from(s).sort((a, b) => compareOrderListFilterGendersForPanel(a, b));
   }, [sections, isMultiItem]);
 
   const orderListUniqueSizes = useMemo(() => {
@@ -1702,11 +1714,15 @@ export function ClubMembersView({
     const r = e.currentTarget.getBoundingClientRect();
     const pad = 8;
     const iw = typeof window !== "undefined" ? window.innerWidth : 400;
-    const w = Math.min(288, iw - pad * 2);
-    const left = Math.max(pad, Math.min(r.left, iw - w - pad));
+    const ih = typeof window !== "undefined" ? window.innerHeight : 800;
+    const w = Math.max(220, Math.min(320, iw - pad * 2));
+    let left = Math.max(pad, Math.min(r.left, iw - w - pad));
+    let top = r.bottom + 4;
+    const panelMaxH = Math.min(360, Math.round(ih * 0.6));
+    if (top + panelMaxH > ih - pad) top = Math.max(pad, ih - pad - panelMaxH);
     setOrderListPanel((prev) => {
       if (prev?.col === col) return null;
-      return { col, top: r.bottom + 4, left, width: w };
+      return { col, top, left, width: w };
     });
   }
 
@@ -1761,31 +1777,42 @@ export function ClubMembersView({
       );
     }
     const panelOpenCol = orderListPanel?.col ?? null;
-    const headBtn = (col: OrderListFilterPanelCol, label: string) => (
-      <th scope="col">
-        <div className="size-analysis-order-list-th-filter-wrap">
-          <span className="size-analysis-order-list-th-filter-wrap__label">{label}</span>
+    const headFilterTh = (col: OrderListFilterPanelCol, label: string) => {
+      const active =
+        col === "product"
+          ? orderListCheckedProducts.size > 0
+          : col === "gender"
+            ? orderListCheckedGenders.size > 0
+            : orderListCheckedSizes.size > 0;
+      return (
+        <th scope="col">
           <button
             type="button"
-            className="size-analysis-order-list-filter-trigger"
+            className={[
+              "size-analysis-order-list-th-filter-btn",
+              active ? "size-analysis-order-list-th-filter-btn--active" : "",
+              panelOpenCol === col ? "size-analysis-order-list-th-filter-btn--open" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             data-order-list-filter-ui
             aria-expanded={panelOpenCol === col}
             aria-haspopup="dialog"
             aria-label={`${label} 필터`}
             onClick={(e) => onOrderListFilterTrigger(col, e)}
           >
-            ▼
+            {label}
           </button>
-        </div>
-      </th>
-    );
+        </th>
+      );
+    };
     return (
       <thead>
         <tr>
           <th scope="col">이름</th>
-          {headBtn("product", "상품명")}
-          {headBtn("gender", "성별")}
-          {headBtn("size", "사이즈")}
+          {headFilterTh("product", "상품명")}
+          {headFilterTh("gender", "성별")}
+          {headFilterTh("size", "사이즈")}
           <th scope="col">수량</th>
         </tr>
       </thead>
@@ -2022,6 +2049,7 @@ export function ClubMembersView({
             top: orderListPanel.top,
             left: orderListPanel.left,
             width: orderListPanel.width,
+            minWidth: 220,
             zIndex: 400,
           }}
           role="dialog"

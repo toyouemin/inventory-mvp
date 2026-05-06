@@ -268,7 +268,18 @@ export function downloadSizeAnalysisResultXlsx(
   const aoa4 = buildSheetReview(rows);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, buildSheetAllStyled(aoa1, isMultiItem), "전체목록");
+  const wsFullList = buildSheetAllStyled(aoa1, isMultiItem);
+  wsFullList["!views"] = [
+    {
+      state: "frozen",
+      ySplit: 1,
+      xSplit: 0,
+      topLeftCell: "A2",
+      activePane: "bottomLeft",
+      showGridLines: true,
+    },
+  ];
+  XLSX.utils.book_append_sheet(wb, wsFullList, "전체목록");
   XLSX.utils.book_append_sheet(
     wb,
     buildClubAggregateStyledSheet(rows, duplicateAnalysis.duplicateRowIds, { structureType: opts?.structureType }),
@@ -464,7 +475,7 @@ function buildSheetAllStyled(aoa: Array<Array<string | number>>, includeItemColu
   const centerCols = includeItemColumn ? new Set([0, 3, 5, 6, 7, 8, 9, 10]) : new Set([0, 3, 4, 5, 6, 7, 8, 9]);
   return buildStyledAoaSheet(aoa, {
     centerCols,
-    freezeHeader: true,
+    freezeHeader: false,
     autofilter: true,
     emptyMessage: "(전체목록 데이터가 없습니다)",
     highlightCell: (row, r, c) => {

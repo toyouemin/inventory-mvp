@@ -181,6 +181,8 @@ function worksheetToAoa(ws: XLSX.WorkSheet): any[][] {
 type StyledSheetOptions = {
   centerCols: Set<number>;
   freezeHeader?: boolean;
+  /** 첫 행(헤더) 기준 자동 필터 — 데이터가 1줄 이상일 때만 설정 */
+  autofilter?: boolean;
   emptyMessage?: string;
   groupKeyByRow?: (row: Array<string | number>, rowIndex: number) => string;
   highlightCell?: (
@@ -231,8 +233,22 @@ function buildStyledAoaSheet(
   const cMax = Math.max(0, colCount - 1);
   ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rMax, c: cMax } });
   autoFitColumns(ws, aoa);
-  if (options.freezeHeader) {
-    (ws as any)["!freeze"] = { xSplit: 0, ySplit: 1 };
+  if (options.freezeHeader && rowCount > 0) {
+    (ws as XLSX.WorkSheet)["!views"] = [
+      {
+        state: "frozen",
+        ySplit: 1,
+        topLeftCell: "A2",
+        activePane: "bottomLeft",
+        pane: "bottomLeft",
+      },
+    ];
+  }
+  if (options.autofilter && rowCount >= 2) {
+    const lastExcelRow = rowCount;
+    (ws as XLSX.WorkSheet)["!autofilter"] = {
+      ref: `A1:${XLSX.utils.encode_col(cMax)}${lastExcelRow}`,
+    };
   }
   applyExcelDownloadFontToWorksheet(ws);
   return ws;
@@ -416,6 +432,7 @@ function buildProductSheets(rows: any[], duplicateRowIds: Set<string>): Array<{ 
     const ws = buildStyledAoaSheet(aoa, {
       centerCols: new Set([0, 1, 2]),
       freezeHeader: true,
+      autofilter: true,
       emptyMessage: "(집계할 데이터가 없습니다)",
       highlightCell: (row, _r, _c) => {
         const label = String(row[0] ?? "").trim();
@@ -448,6 +465,7 @@ function buildSheetAllStyled(aoa: Array<Array<string | number>>, includeItemColu
   return buildStyledAoaSheet(aoa, {
     centerCols,
     freezeHeader: true,
+    autofilter: true,
     emptyMessage: "(전체목록 데이터가 없습니다)",
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
@@ -850,6 +868,8 @@ function buildSheetDupStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet
   }
   return buildStyledAoaSheet(aoa, {
     centerCols: new Set([2, 3, 4, 5, 6]),
+    freezeHeader: true,
+    autofilter: true,
     groupKeyByRow: (row, r) => (r === 0 ? "" : `${String(row[0] ?? "")}\0${String(row[1] ?? "")}`),
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
@@ -896,6 +916,8 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
   if (!hasData) {
     const ws = buildStyledAoaSheet(aoa, {
       centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
+      freezeHeader: true,
+      autofilter: true,
       emptyMessage: "(검토필요·미분류에 해당하는 행이 없습니다)",
     });
     const addr = XLSX.utils.encode_cell({ r: 1, c: 0 });
@@ -907,6 +929,8 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
   }
   return buildStyledAoaSheet(aoa, {
     centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
+    freezeHeader: true,
+    autofilter: true,
     highlightCell: (row, r, c) => {
       if (r < 1) return null;
       if (c !== 6) return null;

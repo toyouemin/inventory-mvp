@@ -828,7 +828,7 @@ export function SizeAnalysisPage() {
             className="btn btn-secondary"
             disabled={allRows.length === 0}
             onClick={() =>
-              void downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis, {
+              downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis, {
                 structureType: structureTypeForDup,
                 uploadFileName: uploadedSourceFileName ?? undefined,
               })

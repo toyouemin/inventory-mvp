@@ -1,4 +1,3 @@
-import ExcelJS from "exceljs";
 import * as XLSX from "xlsx-js-style";
 
 import { applyExcelDownloadFontToWorksheet } from "@/lib/excelDownloadFont";
@@ -181,7 +180,6 @@ function worksheetToAoa(ws: XLSX.WorkSheet): any[][] {
 
 type StyledSheetOptions = {
   centerCols: Set<number>;
-  freezeHeader?: boolean;
   /** 첫 행(헤더) 기준 자동 필터 — 데이터가 1줄 이상일 때만 설정 */
   autofilter?: boolean;
   emptyMessage?: string;
@@ -234,17 +232,6 @@ function buildStyledAoaSheet(
   const cMax = Math.max(0, colCount - 1);
   ws["!ref"] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rMax, c: cMax } });
   autoFitColumns(ws, aoa);
-  if (options.freezeHeader && rowCount > 0) {
-    (ws as XLSX.WorkSheet)["!views"] = [
-      {
-        state: "frozen",
-        ySplit: 1,
-        topLeftCell: "A2",
-        activePane: "bottomLeft",
-        pane: "bottomLeft",
-      },
-    ];
-  }
   if (options.autofilter && rowCount >= 2) {
     const lastExcelRow = rowCount;
     (ws as XLSX.WorkSheet)["!autofilter"] = {
@@ -255,61 +242,21 @@ function buildStyledAoaSheet(
   return ws;
 }
 
-const SIZE_ANALYSIS_FULL_LIST_SHEET = "전체목록";
-
-/**
- * SheetJS로 만든 xlsx 바이너리를 ExcelJS로 다시 읽어, 전체목록 시트에만 틀 고정·자동 필터를 OOXML에 맞게 기록합니다.
- * (SheetJS의 `!views`는 Excel에서 틀 고정이 반영되지 않는 경우가 있어 ExcelJS로 보강합니다.)
- */
-async function saveSizeAnalysisWorkbookWithExcelJsPatch(
-  wb: XLSX.WorkBook,
-  fullListShape: { rowCount: number; colCount: number },
-  fileName: string
-): Promise<void> {
-  const raw = XLSX.write(wb, { bookType: "xlsx", type: "array", cellStyles: true });
-  const ejWb = new ExcelJS.Workbook();
-  await ejWb.xlsx.load(raw);
-  const ws = ejWb.getWorksheet(SIZE_ANALYSIS_FULL_LIST_SHEET);
-  if (ws) {
-    ws.views = [{ state: "frozen", ySplit: 1, xSplit: 0, topLeftCell: "A2" }];
-    const { rowCount, colCount } = fullListShape;
-    if (rowCount >= 2 && colCount >= 1) {
-      const lastColLetter = XLSX.utils.encode_col(colCount - 1);
-      ws.autoFilter = {
-        from: "A1",
-        to: `${lastColLetter}${rowCount}`,
-      };
-    }
-  }
-  const buf = await ejWb.xlsx.writeBuffer();
-  const blob = new Blob([buf], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 /**
  * 사이즈 분석 결과 `rows`·중복 집계를 기준으로 4시트 xlsx를 만들어 브라우저에 저장합니다.
  */
-export async function downloadSizeAnalysisResultXlsx(
+export function downloadSizeAnalysisResultXlsx(
   rows: any[],
   duplicateAnalysis: DupInput,
   opts?: { structureType?: StructureType; uploadFileName?: string }
-): Promise<void> {
+): void {
   const isMultiItem = opts?.structureType === "multi_item_personal_order";
   const aoa1 = buildSheetAll(rows, duplicateAnalysis.duplicateRowIds, isMultiItem);
   const aoa3 = buildSheetDupMembers(rows, duplicateAnalysis.duplicateRowIds);
   const aoa4 = buildSheetReview(rows);
 
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, buildSheetAllStyled(aoa1, isMultiItem), SIZE_ANALYSIS_FULL_LIST_SHEET);
+  XLSX.utils.book_append_sheet(wb, buildSheetAllStyled(aoa1, isMultiItem), "전체목록");
   XLSX.utils.book_append_sheet(
     wb,
     buildClubAggregateStyledSheet(rows, duplicateAnalysis.duplicateRowIds, { structureType: opts?.structureType }),
@@ -328,9 +275,7 @@ export async function downloadSizeAnalysisResultXlsx(
   const rawName = opts?.uploadFileName?.trim();
   const base = rawName ? baseNameFromUploadFileName(rawName) : "size-analysis";
   const fileName = `(분석) ${base}_${ymd}.xlsx`;
-  const fullListRowCount = aoa1.length;
-  const fullListColCount = Math.max(...aoa1.map((r) => r.length), 1);
-  await saveSizeAnalysisWorkbookWithExcelJsPatch(wb, { rowCount: fullListRowCount, colCount: fullListColCount }, fileName);
+  XLSX.writeFile(wb, fileName, { bookType: "xlsx", cellStyles: true });
 }
 
 function genderOrderForMultiItem(raw: unknown): number {
@@ -474,7 +419,6 @@ function buildProductSheets(rows: any[], duplicateRowIds: Set<string>): Array<{ 
     const aoa = [["성별", "사이즈", "수량"], ...body];
     const ws = buildStyledAoaSheet(aoa, {
       centerCols: new Set([0, 1, 2]),
-      freezeHeader: true,
       autofilter: true,
       emptyMessage: "(집계할 데이터가 없습니다)",
       highlightCell: (row, _r, _c) => {
@@ -507,7 +451,6 @@ function buildSheetAllStyled(aoa: Array<Array<string | number>>, includeItemColu
   const centerCols = includeItemColumn ? new Set([0, 3, 5, 6, 7, 8, 9, 10]) : new Set([0, 3, 4, 5, 6, 7, 8, 9]);
   return buildStyledAoaSheet(aoa, {
     centerCols,
-    freezeHeader: false,
     autofilter: true,
     emptyMessage: "(전체목록 데이터가 없습니다)",
     highlightCell: (row, r, c) => {
@@ -911,7 +854,6 @@ function buildSheetDupStyled(aoa: Array<Array<string | number>>): XLSX.WorkSheet
   }
   return buildStyledAoaSheet(aoa, {
     centerCols: new Set([2, 3, 4, 5, 6]),
-    freezeHeader: true,
     autofilter: true,
     groupKeyByRow: (row, r) => (r === 0 ? "" : `${String(row[0] ?? "")}\0${String(row[1] ?? "")}`),
     highlightCell: (row, r, c) => {
@@ -959,7 +901,6 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
   if (!hasData) {
     const ws = buildStyledAoaSheet(aoa, {
       centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
-      freezeHeader: true,
       autofilter: true,
       emptyMessage: "(검토필요·미분류에 해당하는 행이 없습니다)",
     });
@@ -972,7 +913,6 @@ function buildSheetReviewStyled(aoa: Array<Array<string | number>>): XLSX.WorkSh
   }
   return buildStyledAoaSheet(aoa, {
     centerCols: new Set([0, 3, 4, 5, 6, 7, 8]),
-    freezeHeader: true,
     autofilter: true,
     highlightCell: (row, r, c) => {
       if (r < 1) return null;

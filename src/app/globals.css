@@ -2291,9 +2291,8 @@ label {
 
 /* ??? ???: ??? ??? ????? ? ??? 0 ????????????), ???? ?????? ??? */
 .status-stock-stats {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   align-items: stretch;
   gap: 8px;
   width: 100%;
@@ -2302,7 +2301,6 @@ label {
 }
 
 .status-stock-stat {
-  flex: 1 1 0;
   min-width: 0;
   border: 1px solid #ddd;
   border-radius: 10px;
@@ -2336,6 +2334,8 @@ button.status-stock-stat.status-stock-stat--zero-toggle {
   cursor: pointer;
   text-align: center;
   -webkit-tap-highlight-color: transparent;
+  grid-column: 1 / -1;
+  width: 100%;
   transition:
     background 0.12s ease,
     border-color 0.12s ease,
@@ -2430,9 +2430,8 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stats {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     align-items: stretch;
     gap: 16px;
     width: 100%;
@@ -2441,7 +2440,6 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stat {
-    flex: 1 1 0;
     min-width: 0;
     padding: 18px 20px;
     text-align: left;
@@ -2634,9 +2632,8 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stats {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     align-items: stretch;
     gap: 10px;
     width: 100%;
@@ -2644,7 +2641,6 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stat {
-    flex: 1 1 0;
     min-width: 0;
     padding: 12px 10px;
     text-align: left;

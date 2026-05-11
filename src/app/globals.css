@@ -2328,6 +2328,49 @@ label {
   word-break: keep-all;
 }
 
+button.status-stock-stat.status-stock-stat--zero-toggle {
+  appearance: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+button.status-stock-stat.status-stock-stat--zero-toggle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+button.status-stock-stat.status-stock-stat--zero-toggle:hover {
+  border-color: #b8b3ad;
+  background: #faf8f5;
+}
+
+button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
+  border-color: #6366f1;
+  background: #eef2ff;
+  box-shadow: inset 0 1px 2px rgba(99, 102, 241, 0.12);
+}
+
+.products-page.status-stock-page button.status-stock-stat.status-stock-stat--zero-toggle:hover {
+  border-color: #c4c0ba;
+  background: #f5f2ed;
+}
+
+.products-page.status-stock-page button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
+  border-color: #6366f1;
+  background: #eef2ff;
+  box-shadow:
+    inset 0 1px 2px rgba(99, 102, 241, 0.15),
+    0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
 .status-stock-stats-note {
   font-size: 12px;
   line-height: 1.45;
@@ -2625,6 +2668,12 @@ label {
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: -0.01em;
+  }
+
+  .products-page.status-stock-page button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
+    box-shadow:
+      inset 0 1px 2px rgba(99, 102, 241, 0.15),
+      0 3px 12px rgba(0, 0, 0, 0.06);
   }
 
   .products-page.status-stock-page .status-stock-stats-note {

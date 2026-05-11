@@ -141,27 +141,31 @@ export function StatusClient({
                 ))}
               </select>
             </div>
-            <button
-              type="button"
-              className={`btn btn-compact status-stock-zero-toggle ${hideZeroStock ? "btn-primary" : "btn-secondary"}`}
-              aria-pressed={hideZeroStock}
-              aria-label={
-                hideZeroStock
-                  ? "재고 0 품목 숨김 켜짐. 클릭하면 재고 0도 목록에 표시합니다."
-                  : "재고 0 품목 숨김 꺼짐. 클릭하면 재고 0을 목록에서 숨깁니다."
-              }
-              title={hideZeroStock ? "지금: 재고 0 안 보임 · 클릭하면 보임" : "지금: 재고 0 보임 · 클릭하면 숨김"}
-              onClick={() => setHideZeroStock((v) => !v)}
-            >
-              재고 0 {hideZeroStock ? "안 보임" : "보임"}
-            </button>
           </div>
         </div>
 
         <div className="status-stock-stats" role="group" aria-label="재고 요약">
           <Stat label="품목 수" value={`${totalSkus.toLocaleString()}개`} />
           <Stat label="총 재고" value={`${totalQty.toLocaleString()}개`} />
-          <Stat label="재고 0" value={`${zeroStock.toLocaleString()}개`} />
+          <button
+            type="button"
+            className="status-stock-stat status-stock-stat--zero-toggle"
+            aria-pressed={hideZeroStock}
+            aria-label={
+              hideZeroStock
+                ? `재고 0 ${zeroStock.toLocaleString()}개. 목록에서 재고 0 품목 숨김 켜짐. 누르면 다시 표시합니다.`
+                : `재고 0 ${zeroStock.toLocaleString()}개. 재고 0 품목 목록에 표시 중. 누르면 목록에서 숨깁니다.`
+            }
+            title={
+              hideZeroStock
+                ? "재고 0 행 숨김 중 · 클릭하면 목록에 다시 표시"
+                : "클릭하면 목록에서 재고 0 품목 숨김"
+            }
+            onClick={() => setHideZeroStock((v) => !v)}
+          >
+            <span className="status-stock-stat__label">재고 0</span>
+            <span className="status-stock-stat__value">{`${zeroStock.toLocaleString()}개`}</span>
+          </button>
         </div>
         <p className="status-stock-stats-note">
           ※ 검색·카테고리 필터 기준. 재고는 <strong>옵션 수량 합</strong>. CSV 동일 옵션 여러 줄은{" "}

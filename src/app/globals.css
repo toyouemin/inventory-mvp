@@ -2291,39 +2291,51 @@ label {
 
 /* ??? ???: ??? ??? ????? ? ??? 0 ????????????), ???? ?????? ??? */
 .status-stock-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: stretch;
-  gap: 8px;
+  gap: 10px;
   width: 100%;
   margin-bottom: 10px;
   box-sizing: border-box;
 }
 
 .status-stock-stat {
+  flex: 1 1 0;
   min-width: 0;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  text-align: left;
+  border: 1px solid #e5e0d8;
+  border-radius: 12px;
+  padding: 12px 14px;
   box-sizing: border-box;
-  text-align: center;
+  background: #fff;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
 }
 
 .status-stock-stat__label {
-  color: #666;
-  font-size: 11px;
+  color: var(--muted, #666);
+  font-size: 12px;
   line-height: 1.2;
   margin-bottom: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
+  font-weight: 400;
 }
 
 .status-stock-stat__value {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1.2;
   word-break: keep-all;
+  color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 button.status-stock-stat.status-stock-stat--zero-toggle {
@@ -2332,10 +2344,12 @@ button.status-stock-stat.status-stock-stat--zero-toggle {
   font: inherit;
   color: inherit;
   cursor: pointer;
-  text-align: center;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
   -webkit-tap-highlight-color: transparent;
-  grid-column: 1 / -1;
-  width: 100%;
   transition:
     background 0.12s ease,
     border-color 0.12s ease,
@@ -2348,14 +2362,16 @@ button.status-stock-stat.status-stock-stat--zero-toggle:focus-visible {
 }
 
 button.status-stock-stat.status-stock-stat--zero-toggle:hover {
-  border-color: #b8b3ad;
+  border-color: #c4c0ba;
   background: #faf8f5;
 }
 
 button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   border-color: #6366f1;
   background: #eef2ff;
-  box-shadow: inset 0 1px 2px rgba(99, 102, 241, 0.12);
+  box-shadow:
+    inset 0 1px 2px rgba(99, 102, 241, 0.12),
+    0 3px 12px rgba(0, 0, 0, 0.06);
 }
 
 .products-page.status-stock-page button.status-stock-stat.status-stock-stat--zero-toggle:hover {
@@ -2430,8 +2446,9 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: stretch;
     gap: 16px;
     width: 100%;
@@ -2440,6 +2457,7 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stat {
+    flex: 1 1 0;
     min-width: 0;
     padding: 18px 20px;
     text-align: left;
@@ -2632,8 +2650,9 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
     align-items: stretch;
     gap: 10px;
     width: 100%;
@@ -2641,6 +2660,7 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-page.status-stock-page .status-stock-stat {
+    flex: 1 1 0;
     min-width: 0;
     padding: 12px 10px;
     text-align: left;

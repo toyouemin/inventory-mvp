@@ -14,6 +14,8 @@ type StatusRow = {
   memo2: string;
 };
 
+type StockSortMode = "default" | "asc" | "desc";
+
 export function StatusClient({
   rows,
   categories,
@@ -24,6 +26,8 @@ export function StatusClient({
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [stockSort, setStockSort] = useState<StockSortMode>("default");
+  const [hideZeroStock, setHideZeroStock] = useState(false);
 
   const categorySelectRef = useRef<HTMLSelectElement>(null);
   const toolbarSearchRowRef = useRef<HTMLDivElement>(null);
@@ -61,9 +65,43 @@ export function StatusClient({
     );
   }, [rows, categoryFilter, search]);
 
+  const listAfterZeroToggle = useMemo(() => {
+    if (!hideZeroStock) return filtered;
+    return filtered.filter((r) => (Number(r.stock) || 0) !== 0);
+  }, [filtered, hideZeroStock]);
+
+  const displayed = useMemo(() => {
+    if (stockSort === "default") return listAfterZeroToggle;
+    const dir = stockSort === "asc" ? 1 : -1;
+    return [...listAfterZeroToggle].sort((a, b) => {
+      const sa = Number(a.stock) || 0;
+      const sb = Number(b.stock) || 0;
+      if (sa !== sb) return (sa - sb) * dir;
+      return (a.sku ?? "").localeCompare(b.sku ?? "", "ko");
+    });
+  }, [listAfterZeroToggle, stockSort]);
+
   const totalSkus = filtered.length;
   const totalQty = filtered.reduce((sum, r) => sum + (Number(r.stock) || 0), 0);
   const zeroStock = filtered.filter((r) => (Number(r.stock) || 0) === 0).length;
+
+  const cycleStockSort = () => {
+    setStockSort((prev) => (prev === "default" ? "asc" : prev === "asc" ? "desc" : "default"));
+  };
+
+  const stockSortLabel =
+    stockSort === "asc"
+      ? "재고 오름차순"
+      : stockSort === "desc"
+        ? "재고 내림차순"
+        : "재고 기본 순서(페이지 목록 순)";
+
+  const stockSortTitle =
+    stockSort === "default"
+      ? "클릭: 오름차순"
+      : stockSort === "asc"
+        ? "클릭: 내림차순"
+        : "클릭: 기본 순서로";
 
   return (
     <div className="products-page status-stock-page">
@@ -103,6 +141,20 @@ export function StatusClient({
                 ))}
               </select>
             </div>
+            <button
+              type="button"
+              className={`btn btn-compact status-stock-zero-toggle ${hideZeroStock ? "btn-primary" : "btn-secondary"}`}
+              aria-pressed={hideZeroStock}
+              aria-label={
+                hideZeroStock
+                  ? "재고 0 품목 숨김 켜짐. 클릭하면 재고 0도 목록에 표시합니다."
+                  : "재고 0 품목 숨김 꺼짐. 클릭하면 재고 0을 목록에서 숨깁니다."
+              }
+              title={hideZeroStock ? "지금: 재고 0 안 보임 · 클릭하면 보임" : "지금: 재고 0 보임 · 클릭하면 숨김"}
+              onClick={() => setHideZeroStock((v) => !v)}
+            >
+              재고 0 {hideZeroStock ? "안 보임" : "보임"}
+            </button>
           </div>
         </div>
 
@@ -123,7 +175,26 @@ export function StatusClient({
               <tr>
                 <th className="status-stock-table__category">카테고리</th>
                 <th className="status-stock-table__name">품명</th>
-                <th className="status-stock-table__stock">재고</th>
+                <th className="status-stock-table__stock">
+                  <button
+                    type="button"
+                    className="status-stock-table__sort-btn"
+                    onClick={cycleStockSort}
+                    aria-label={stockSortLabel}
+                    title={`${stockSortLabel}. ${stockSortTitle}`}
+                  >
+                    재고
+                    {stockSort === "asc" ? (
+                      <span className="status-stock-table__sort-btn__mark" aria-hidden>
+                        ↑
+                      </span>
+                    ) : stockSort === "desc" ? (
+                      <span className="status-stock-table__sort-btn__mark" aria-hidden>
+                        ↓
+                      </span>
+                    ) : null}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -133,8 +204,14 @@ export function StatusClient({
                     검색 결과가 없습니다.
                   </td>
                 </tr>
+              ) : listAfterZeroToggle.length === 0 ? (
+                <tr>
+                  <td className="status-stock-table__empty" colSpan={3}>
+                    재고가 있는 품목이 없습니다. (재고 0 숨김)
+                  </td>
+                </tr>
               ) : (
-                filtered.map((r) => (
+                displayed.map((r) => (
                   <tr
                     key={r.id}
                     className={(Number(r.stock) || 0) === 0 ? "status-stock-table__row--zero" : undefined}

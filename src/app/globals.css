@@ -2249,6 +2249,41 @@ label {
   text-align: right;
 }
 
+.status-stock-table__sort-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: right;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+.status-stock-table__sort-btn:hover {
+  text-decoration: underline;
+}
+
+.status-stock-table__sort-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.status-stock-table__sort-btn__mark {
+  font-weight: 700;
+  opacity: 0.88;
+  font-size: 0.92em;
+  line-height: 1;
+}
+
 .status-stock-table__empty {
   text-align: center;
   color: var(--muted);

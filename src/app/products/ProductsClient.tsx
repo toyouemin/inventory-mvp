@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, Ref } from "react";
@@ -32,6 +32,7 @@ import { VARIANT_AUDIT_TARGET_SKUS } from "./variantAuditTargets";
 import { ENABLE_BATCH_IMAGE_UPLOAD } from "./featureFlags";
 import { fitCategorySelectWidth } from "./fitCategorySelectWidth";
 import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import { useProductImageExcelDownload } from "@/app/ProductImageExcelDownloadProvider";
 
 type ViewMode = "card" | "list";
 type ListStockUpdatedSort = "default" | "stock_updated_desc";
@@ -764,6 +765,8 @@ export function ProductsClient({
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { stockLoading, priceLoading, downloadStockWithImages, downloadPriceWithImages } =
+    useProductImageExcelDownload();
   const downloadYymmdd = formatDownloadFileNameDateYymmdd(new Date());
   const jumpProductId = (searchParams.get("jumpProductId") ?? "").trim();
   const hasJumpedToProductRef = useRef(false);
@@ -2222,6 +2225,7 @@ export function ProductsClient({
     setListImagePreview({ url, alt: altText });
   }, []);
 
+
   function runSearch() {
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
@@ -2327,6 +2331,19 @@ export function ProductsClient({
         >
           가격표
         </a>
+        <button
+          type="button"
+          role="menuitem"
+          className="download-dropdown__item"
+          disabled={priceLoading}
+          onClick={() => {
+            setDownloadOpen(false);
+            void downloadPriceWithImages();
+          }}
+        >
+          {priceLoading ? "이미지 포함 가격 생성중..." : "이미지 포함 가격"}
+        </button>
+        <div className="download-dropdown__divider--thin" role="presentation" />
         <a
           role="menuitem"
           href="/products/csv/products"
@@ -2334,7 +2351,7 @@ export function ProductsClient({
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
-          상품 CSV
+          상품 재고 CSV
         </a>
         <a
           role="menuitem"
@@ -2343,8 +2360,20 @@ export function ProductsClient({
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
-          상품 Excel
+          상품 재고 엑셀
         </a>
+        <button
+          type="button"
+          role="menuitem"
+          className="download-dropdown__item"
+          disabled={stockLoading}
+          onClick={() => {
+            setDownloadOpen(false);
+            void downloadStockWithImages();
+          }}
+        >
+          {stockLoading ? "이미지 포함 엑셀 생성중..." : "이미지 포함 재고"}
+        </button>
       </div>,
       document.body
     )

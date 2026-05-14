@@ -3,16 +3,17 @@ import { normalizeSkuForMatch } from "./skuNormalize";
 
 /**
  * 상품 CSV: 컬럼값만 사용(상품명·성별·사이즈 추론 없음). color는 trim만 하고 파싱·정규화하지 않음(라벨 전용).
- * 필수 헤더(REQUIRED_HEADERS 14개): SKU,카테고리,상품명,이미지url,color,gender,size,stock,wholesalePrice,msrpPrice,salePrice,extraPrice,memo,memo2
+ * 필수 헤더(15개): SKU, 카테고리, 상품명, 이미지url, color, gender, size, stock, wholesalePrice, msrpPrice,
+ * salePrice, extraPrice, memo, memo2, 수량변경일 — `productStockExportShared` 첫 시트와 동일.
  *
  * --- 헤더 ---
- * 위 14개 이름이 **모두 존재**하면 통과합니다. **순서·총 컬럼 개수는 제한하지 않으며**, 그 외 컬럼은 매핑·파싱에서 사용하지 않습니다.
+ * 위 이름이 **모두 존재**하면 통과합니다. **순서·총 컬럼 개수는 제한하지 않으며**, 그 외 컬럼은 매핑·파싱에서 사용하지 않습니다.
  *
  * --- 재고가 0으로만 저장되는 흔한 원인 (color/gender 공백 행) ---
  * 1) 데이터 행 셀 수가 부족하면 필수 인덱스까지 뒤를 ""로 패딩합니다. color·gender를 비울 때 구분자를 덜 넣으면
  *    값이 밀려 size·stock 인덱스가 어긋날 수 있습니다.
  * 2) 가운데 빈 color/gender는 반드시 `,,` 또는 탭 구분에서 빈 칸을 맞춰야 합니다.
- * 3) **TSV(탭 구분)** 지원: 구분자는 **헤더 줄**에서 `\t` → `,` → `;` 순으로 시도해 필수 14개가 모두 인식되면 채택.
+ * 3) **TSV(탭 구분)** 지원: 구분자는 **헤더 줄**에서 `\t` → `,` → `;` 순으로 시도해 필수 15개가 모두 인식되면 채택.
  *
  * 디버그: .env.local 에 `DEBUG_CSV_SKU=T21AC01NP` (normalizeSkuForMatch 기준으로 비교)
  *        또는 `DEBUG_CSV_PRODUCT_PIPELINE=1` 이면 칸 수 부족 시 원본 라인·cells 요약 로그.
@@ -33,7 +34,10 @@ const REQUIRED_HEADERS = [
   "extraPrice",
   "memo",
   "memo2",
+  "수량변경일",
 ] as const;
+
+export type ColMap = Record<(typeof REQUIRED_HEADERS)[number], number>;
 
 export type ParsedCsvRow = {
   sku: string;
@@ -52,8 +56,6 @@ export type ParsedCsvRow = {
   memo2: string | null;
   dataRowIndex: number;
 };
-
-type ColMap = Record<(typeof REQUIRED_HEADERS)[number], number>;
 
 const EXPECTED_COL_COUNT = REQUIRED_HEADERS.length;
 
@@ -88,7 +90,15 @@ function logPipelineMismatch(
     cells,
   };
   if (col) {
-    console.warn("[csvProductPipeline]", JSON.stringify({ ...base, colIndices: { size: col.size, stock: col.stock }, sizeRaw: cells[col.size], stockRaw: cells[col.stock] }));
+    console.warn(
+      "[csvProductPipeline]",
+      JSON.stringify({
+        ...base,
+        colIndices: { size: col.size, stock: col.stock },
+        sizeRaw: cells[col.size],
+        stockRaw: cells[col.stock],
+      })
+    );
   } else {
     console.warn("[csvProductPipeline]", JSON.stringify(base));
   }
@@ -307,7 +317,7 @@ export function runProductPipelineFromAoa(maybeAoa: unknown[][]): { rows: Parsed
       continue;
     }
 
-    const name = (parsed[col.상품명] ?? "").trim();
+    const name = (parsed[col["상품명"]] ?? "").trim();
     if (!name) {
       skippedRows.push(i + 1);
       continue;
@@ -320,15 +330,15 @@ export function runProductPipelineFromAoa(maybeAoa: unknown[][]): { rows: Parsed
     }
 
     const category = normalizeCategoryLabel((parsed[col.카테고리] ?? "") as string);
-    const imageUrl = (parsed[col.이미지url] ?? "").trim();
+    const imageUrl = String(parsed[col.이미지url] ?? "").trim();
     const color = (parsed[col.color] ?? "").trim();
     const gender = (parsed[col.gender] ?? "").trim();
     const size = (parsed[col.size] ?? "").trim();
     const stockRaw = parsed[col.stock];
     const stock = parseNumberCell(stockRaw, 0);
     const wholesale = parseNumberCell(parsed[col.wholesalePrice], 0);
-    const msrp = parseNumberCell(parsed[col.msrpPrice], 0);
     const sale = parseNumberCell(parsed[col.salePrice], 0);
+    const msrp = parseNumberCell(parsed[col.msrpPrice], 0);
     const extra = parseNumberCell(parsed[col.extraPrice], 0);
     const memoRaw = (parsed[col.memo] ?? "").trim();
     const memo2Raw = (parsed[col.memo2] ?? "").trim();
@@ -386,7 +396,7 @@ export function runProductCsvPipeline(text: string): { rows: ParsedCsvRow[]; ski
       continue;
     }
 
-    const name = (cells[col.상품명] ?? "").trim();
+    const name = (cells[col["상품명"]] ?? "").trim();
     if (!name) {
       skippedRows.push(i + 1);
       continue;
@@ -399,15 +409,15 @@ export function runProductCsvPipeline(text: string): { rows: ParsedCsvRow[]; ski
     }
 
     const category = normalizeCategoryLabel(cells[col.카테고리] ?? "");
-    const imageUrl = (cells[col.이미지url] ?? "").trim();
+    const imageUrl = String(cells[col.이미지url] ?? "").trim();
     const color = (cells[col.color] ?? "").trim();
     const gender = (cells[col.gender] ?? "").trim();
     const size = (cells[col.size] ?? "").trim();
     const stockRaw = cells[col.stock];
     const stock = parseNumberCell(stockRaw, 0);
     const wholesale = parseNumberCell(cells[col.wholesalePrice], 0);
-    const msrp = parseNumberCell(cells[col.msrpPrice], 0);
     const sale = parseNumberCell(cells[col.salePrice], 0);
+    const msrp = parseNumberCell(cells[col.msrpPrice], 0);
     const extra = parseNumberCell(cells[col.extraPrice], 0);
     const memoRaw = (cells[col.memo] ?? "").trim();
     const memo2Raw = (cells[col.memo2] ?? "").trim();

@@ -954,6 +954,89 @@ main {
   color: var(--accent);
 }
 
+/* 이미지 포함 엑셀 다운로드 진행 토스트 — 모바일 하단 툴바·safe-area 위, 데스크톱은 살짝 위 */
+.product-image-excel-download-toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
+  padding: 0.65rem 1rem;
+  background: rgba(30, 30, 30, 0.92);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  min-width: min(280px, calc(100vw - 24px));
+  max-width: min(90vw, 28rem);
+  box-sizing: border-box;
+  pointer-events: none;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .product-image-excel-download-toast {
+    bottom: calc(
+      var(--products-mobile-bottombar-h, 56px) + env(safe-area-inset-bottom, 0px) + 0.75rem
+    );
+  }
+}
+
+@media (min-width: 769px) {
+  .product-image-excel-download-toast {
+    bottom: 2.25rem;
+  }
+}
+
+.product-image-excel-download-toast__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.product-image-excel-download-toast__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.product-image-excel-download-toast__label {
+  min-width: 0;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.product-image-excel-download-toast__cancel {
+  width: max-content;
+  max-width: none;
+  justify-self: end;
+  flex: none;
+  pointer-events: auto;
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #0f172a;
+  background: #f1f5f9;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.product-image-excel-download-toast__cancel:hover {
+  background: #e2e8f0;
+}
+
+.product-image-excel-download-toast__cancel:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
 .app-main-nav > .nav-dropdown {
   overflow: visible;
 }

@@ -1,5 +1,7 @@
 import ExcelJS from "exceljs";
 
+import { stripInvalidOneCellAnchorEditAsFromXlsxBuffer } from "@/lib/excelXlsxStripInvalidOneCellEditAs";
+
 import type { EstimateSheetItem, EstimateSheetSupplier } from "./EstimateSheet";
 import { amountToKoreanText } from "./amountToKoreanText";
 
@@ -417,6 +419,6 @@ export async function exportEstimateExcel(input: ExportEstimateExcelInput): Prom
 
   ws.getCell("A26").alignment = { horizontal: "left", vertical: "middle", wrapText: true };
 
-  const buf = await wb.xlsx.writeBuffer();
-  return new Uint8Array(buf);
+  const raw = new Uint8Array(await wb.xlsx.writeBuffer());
+  return stripInvalidOneCellAnchorEditAsFromXlsxBuffer(raw);
 }

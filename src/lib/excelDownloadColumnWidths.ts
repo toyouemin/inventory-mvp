@@ -45,7 +45,7 @@ export function buildProductStockExcelColumnWidths(
   const cols: { wch: number }[] = [];
 
   for (let col = 0; col < colCount; col++) {
-    if (col === imageUrlColIndex) {
+    if (imageUrlColIndex >= 0 && col === imageUrlColIndex) {
       cols.push({ wch: EXCEL_IMAGE_URL_FIXED_WCH });
       continue;
     }
@@ -83,8 +83,17 @@ export class ExcelColumnWidthAccumulator {
     if (w > this.max[col]) this.max[col] = w;
   }
 
-  /** fixedColWch: 열 인덱스 → 고정 wch (없으면 자동) */
-  toCols(fixedColWch?: ReadonlyMap<number, number>): { wch: number }[] {
+  /**
+   * fixedColWch: 열 인덱스 → 고정 wch (없으면 자동)
+   * auto: 생략 시 `EXCEL_COL_WCH_MIN`·`+2` 패딩(기존 동작). 이미지 시트 등은 `minWch`·`pad`를 줄여 타이트하게.
+   */
+  toCols(
+    fixedColWch?: ReadonlyMap<number, number>,
+    auto?: { minWch?: number; maxWch?: number; pad?: number }
+  ): { wch: number }[] {
+    const minW = auto?.minWch ?? EXCEL_COL_WCH_MIN;
+    const maxW = auto?.maxWch ?? EXCEL_COL_WCH_MAX;
+    const pad = auto?.pad ?? 2;
     const out: { wch: number }[] = [];
     for (let c = 0; c < this.max.length; c++) {
       const fixed = fixedColWch?.get(c);
@@ -92,8 +101,8 @@ export class ExcelColumnWidthAccumulator {
         out.push({ wch: fixed });
         continue;
       }
-      const padded = this.max[c] + 2;
-      out.push({ wch: Math.min(EXCEL_COL_WCH_MAX, Math.max(EXCEL_COL_WCH_MIN, padded)) });
+      const padded = this.max[c] + pad;
+      out.push({ wch: Math.min(maxW, Math.max(minW, padded)) });
     }
     return out;
   }

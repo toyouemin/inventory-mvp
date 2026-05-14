@@ -45,6 +45,42 @@ export const DEV_SOURCE_MAP: Record<DevSourcePageKey, DevSourceItem[]> = {
       file: "src/app/products/csvProductPipeline.ts",
       keywords: ["CSV", "컬럼 매핑", "정규화"],
     },
+    {
+      label: "이미지 포함 엑셀 다운로드(클라이언트)",
+      description: "전역 진행 안내·취소(Abort), 상품 메뉴에서 재고/가격 xlsx 받기 연결",
+      file: "src/app/ProductImageExcelDownloadProvider.tsx",
+      keywords: ["이미지 포함", "엑셀", "다운로드", "취소", "토스트"],
+    },
+    {
+      label: "이미지 포함 재고 엑셀(서버)",
+      description: "ExcelJS 시트·썸네일 fetch·oneCell+ext 앵커, 이미지 시트 생성",
+      file: "src/app/products/xlsx/productStockExcelJsSheets.ts",
+      keywords: ["이미지 포함", "재고", "xlsx", "ExcelJS", "시트"],
+    },
+    {
+      label: "엑셀용 상품 이미지 썸네일",
+      description: "이미지 URL 정규화, sharp JPEG, 행 높이·앵커 픽셀 계산",
+      file: "src/app/products/xlsx/productStockExcelImageFetch.ts",
+      keywords: ["썸네일", "sharp", "이미지", "엑셀", "앵커"],
+    },
+    {
+      label: "이미지 포함 재고 xlsx API",
+      description: "GET 응답으로 통합 문서 스트림(일반 시트+이미지 시트)",
+      file: "src/app/products/xlsx/products/with-images/route.ts",
+      keywords: ["이미지 포함", "재고", "API", "xlsx"],
+    },
+    {
+      label: "이미지 포함 가격 xlsx API",
+      description: "가격표+이미지 시트 통합 엑셀",
+      file: "src/app/products/xlsx/price-list/with-images/route.ts",
+      keywords: ["이미지 포함", "가격", "가격표", "API", "xlsx"],
+    },
+    {
+      label: "엑셀 drawing OOXML 보정",
+      description: "ExcelJS가 쓴 잘못된 oneCellAnchor editAs 제거 후 ZIP 재압축",
+      file: "src/lib/excelXlsxStripInvalidOneCellEditAs.ts",
+      keywords: ["drawing", "OOXML", "xlsx", "복구", "이미지"],
+    },
   ],
 
   sizeAnalysis: [
@@ -86,6 +122,12 @@ export const DEV_SOURCE_MAP: Record<DevSourcePageKey, DevSourceItem[]> = {
       description: "견적서 입력 화면, 미리보기, JPG 저장 흐름의 시작점",
       file: "src/app/transaction-statement/page.tsx",
       keywords: ["견적서", "미리보기", "JPG", "품목"],
+    },
+    {
+      label: "견적서 엑셀(도장 이미지)",
+      description: "ExcelJS 출력, 도장 삽입 시 drawing OOXML 보정(strip) 포함",
+      file: "src/features/transactionStatement/exportEstimateExcel.ts",
+      keywords: ["견적서", "엑셀", "도장", "drawing"],
     },
     {
       label: "견적서 출력 템플릿",

@@ -1,8 +1,14 @@
 /**
- * thumbnail_url 비어 있고 image_url 있는 기존 상품에 대해
  * `product-images/thumbs/{SKU}.jpg` 생성 후 DB `thumbnail_url` 갱신.
  *
- * 사용: npm run rebuild-thumbnails
+ * 기본: `thumbnail_url` IS NULL 이고 `image_url` 있는 상품만
+ * 재생성: `--force` — `thumbnail_url` 있어도 `image_url` 있으면 전부 덮어씀
+ *
+ * 사용:
+ *   npm run rebuild-thumbnails
+ *   npm run rebuild-thumbnails:force
+ *   npx tsx scripts/rebuild-product-thumbnails.mts --force
+ *
  * 필요: .env / .env.local — NEXT_PUBLIC_SUPABASE_URL, Storage 업로드 가능한 키(권장 SUPABASE_SERVICE_ROLE_KEY)
  */
 
@@ -18,6 +24,8 @@ const FETCH_TIMEOUT_MS = 20_000;
 const MIN_IMAGE_BYTES = 100;
 /** 스크립트는 순차 처리(상품별 try/catch) */
 const PRODUCTS_PAGE_SIZE = 200;
+
+const forceMode = process.argv.includes("--force") || process.env.REBUILD_THUMBNAILS_FORCE === "1";
 
 function loadEnvFiles(): void {
   for (const name of [".env.local", ".env"]) {
@@ -96,7 +104,7 @@ async function fetchImageBuffer(absUrl: string): Promise<{ buf: Buffer; contentT
   }
 }
 
-async function processOneProduct(row: ProductRow): Promise<"ok" | "skip" | "fail"> {
+async function processOneProduct(row: ProductRow, force: boolean): Promise<"ok" | "skip" | "fail"> {
   const id = String(row.id ?? "").trim();
   const imageUrl = String(row.image_url ?? "").trim();
   if (!id || !imageUrl) return "skip";
@@ -146,30 +154,40 @@ async function processOneProduct(row: ProductRow): Promise<"ok" | "skip" | "fail
     data: { publicUrl: thumbnailPublicUrl },
   } = supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(thumbPath);
 
-  const { error: dbErr } = await supabaseServer
-    .from("products")
-    .update({ thumbnail_url: thumbnailPublicUrl })
-    .eq("id", id)
-    .is("thumbnail_url", null);
+  let dbQuery = supabaseServer.from("products").update({ thumbnail_url: thumbnailPublicUrl }).eq("id", id);
+  if (!force) {
+    dbQuery = dbQuery.is("thumbnail_url", null);
+  }
+  const { error: dbErr } = await dbQuery;
 
   if (dbErr) {
     console.error(`[fail] DB 업데이트 id=${id} sku=${skuBase}`, dbErr.message);
     return "fail";
   }
 
-  console.log(`[ok] id=${id} sku=${skuBase} thumb=${thumbPath}`);
+  console.log(`${force ? "[ok][force] " : "[ok] "}${id} sku=${skuBase} thumb=${thumbPath}`);
   return "ok";
 }
 
-async function fetchNextBatch(): Promise<{ rows: ProductRow[]; error: Error | null }> {
-  const offset = 0;
-  const { data, error } = await supabaseServer
+/**
+ * force: id 커서 페이지네이션(같은 행을 반복 처리하지 않음)
+ * 미force: 첫 페이지만 반복 조회(thumbnail 채워지면 결과에서 빠짐)
+ */
+async function fetchProductBatch(force: boolean, idAfter: string | null): Promise<{ rows: ProductRow[]; error: Error | null }> {
+  let q = supabaseServer
     .from("products")
     .select("id, sku, image_url")
-    .is("thumbnail_url", null)
     .not("image_url", "is", null)
     .order("id", { ascending: true })
-    .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);
+    .limit(PRODUCTS_PAGE_SIZE);
+
+  if (!force) {
+    q = q.is("thumbnail_url", null);
+  } else if (idAfter) {
+    q = q.gt("id", idAfter);
+  }
+
+  const { data, error } = await q;
 
   if (error) {
     return { rows: [], error: new Error(error.message) };
@@ -178,36 +196,63 @@ async function fetchNextBatch(): Promise<{ rows: ProductRow[]; error: Error | nu
   return { rows, error: null };
 }
 
-console.log("[rebuild-thumbnails] 시작 (순차 처리, 상품 단위 예외 무시)");
+console.log(`[rebuild-thumbnails] 시작 — 모드: ${forceMode ? "--force (기존 썸네일 포함 전부 재생성)" : "미생성 분만"} (순차 처리)`);
 
 let ok = 0;
 let skipped = 0;
 let failed = 0;
 let scanned = 0;
 
-/**
- * DB를 갱신하면 행이 필터에서 빠지므로, offset 페이지네이션 대신 항상 첫 페이지만 읽어 반복합니다.
- */
-for (;;) {
-  const { rows, error } = await fetchNextBatch();
-  if (error) {
-    console.error("[rebuild-thumbnails] 페이지 조회 실패", error.message);
-    process.exit(1);
+if (forceMode) {
+  let idAfter: string | null = null;
+  for (;;) {
+    const { rows, error } = await fetchProductBatch(true, idAfter);
+    if (error) {
+      console.error("[rebuild-thumbnails] 페이지 조회 실패", error.message);
+      process.exit(1);
+    }
+    const filtered = rows.filter((r) => String(r.image_url ?? "").trim() !== "");
+
+    if (filtered.length === 0) break;
+
+    for (const row of filtered) {
+      scanned++;
+      try {
+        const r = await processOneProduct(row, true);
+        if (r === "ok") ok++;
+        else if (r === "skip") skipped++;
+        else failed++;
+      } catch (e) {
+        failed++;
+        console.error("[fail] 처리 중 예외", row.id, e instanceof Error ? e.message : e);
+      }
+    }
+
+    idAfter = String(filtered[filtered.length - 1]?.id ?? "");
+    if (!idAfter || filtered.length < PRODUCTS_PAGE_SIZE) break;
   }
-  const filtered = rows.filter((r) => String(r.image_url ?? "").trim() !== "");
+} else {
+  for (;;) {
+    const { rows, error } = await fetchProductBatch(false, null);
+    if (error) {
+      console.error("[rebuild-thumbnails] 페이지 조회 실패", error.message);
+      process.exit(1);
+    }
+    const filtered = rows.filter((r) => String(r.image_url ?? "").trim() !== "");
 
-  if (filtered.length === 0) break;
+    if (filtered.length === 0) break;
 
-  for (const row of filtered) {
-    scanned++;
-    try {
-      const r = await processOneProduct(row);
-      if (r === "ok") ok++;
-      else if (r === "skip") skipped++;
-      else failed++;
-    } catch (e) {
-      failed++;
-      console.error("[fail] 처리 중 예외", row.id, e instanceof Error ? e.message : e);
+    for (const row of filtered) {
+      scanned++;
+      try {
+        const r = await processOneProduct(row, false);
+        if (r === "ok") ok++;
+        else if (r === "skip") skipped++;
+        else failed++;
+      } catch (e) {
+        failed++;
+        console.error("[fail] 처리 중 예외", row.id, e instanceof Error ? e.message : e);
+      }
     }
   }
 }

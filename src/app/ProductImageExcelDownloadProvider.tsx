@@ -316,7 +316,7 @@ export function ProductImageExcelDownloadProvider({ children }: { children: Reac
                     {progressMeta(
                       stockStartedAtRef.current,
                       stockProgress,
-                      "서버에서 파일을 만드는 중…"
+                      "파일을 만드는 중.."
                     )}
                   </span>
                 </div>
@@ -337,7 +337,7 @@ export function ProductImageExcelDownloadProvider({ children }: { children: Reac
                     {progressMeta(
                       priceStartedAtRef.current,
                       priceProgress,
-                      "서버에서 파일을 만드는 중…"
+                      "파일을 만드는 중.."
                     )}
                   </span>
                 </div>

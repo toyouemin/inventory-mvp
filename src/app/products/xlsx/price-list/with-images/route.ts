@@ -47,6 +47,7 @@ type DbProduct = {
   category: string | null;
   name: string | null;
   image_url: string | null;
+  thumbnail_url: string | null;
   wholesale_price: number | null;
   sale_price: number | null;
   extra_price: number | null;
@@ -153,7 +154,7 @@ async function fetchAllProducts(): Promise<{ rows: DbProduct[]; error: { message
   for (let offset = 0; ; offset += PRODUCTS_PAGE_SIZE) {
     const { data, error } = await supabaseServer
       .from("products")
-      .select("id, sku, category, name, image_url, wholesale_price, sale_price, extra_price, stock, created_at, updated_at")
+      .select("id, sku, category, name, image_url, thumbnail_url, wholesale_price, sale_price, extra_price, stock, created_at, updated_at")
       .order("sku", { ascending: true })
       .order("created_at", { ascending: false })
       .range(offset, offset + PRODUCTS_PAGE_SIZE - 1);

@@ -80,6 +80,34 @@ function normalizeStorageObjectPath(path: string): string | null {
  * - product-images/<path>
  * - <path> (상대 경로)
  */
+/** Storage object path에서 파일명 stem (확장자 제거). `thumbs/`·`original/` 모두 허용 */
+export function stemFromProductImagesFilename(objectPath: string): string | null {
+  const base = (objectPath.split("/").pop() ?? "").trim();
+  if (!base || base.startsWith(".")) return null;
+  const stem = base.replace(/\.(jpe?g|png|webp)$/i, "").trim();
+  if (!stem || stem.includes("/")) return null;
+  return stem;
+}
+
+export function thumbnailObjectPathFromStem(stem: string): string {
+  return `thumbs/${stem}.jpg`;
+}
+
+/** `original/{stem}.(jpg|png|webp)` 저장 정책일 때 대응하는 엑셀용 썸네일 공개 URL */
+export function thumbnailPublicUrlFromOriginalObjectPath(originalPath: string): string | null {
+  if (!originalPath.startsWith("original/")) return null;
+  const stem = stemFromProductImagesFilename(originalPath);
+  if (!stem) return null;
+  const { data } = supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(thumbnailObjectPathFromStem(stem));
+  return data.publicUrl;
+}
+
+export function thumbnailPublicUrlFromOriginalPublicUrl(imagePublicUrl: string): string | null {
+  const path = extractProductImagesObjectPathFromAnyRef(imagePublicUrl);
+  if (!path) return null;
+  return thumbnailPublicUrlFromOriginalObjectPath(path);
+}
+
 export function extractProductImagesObjectPathFromAnyRef(rawRef: string): string | null {
   const raw = String(rawRef ?? "").trim();
   if (!raw) return null;
@@ -296,8 +324,15 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
     }
 
     const url = publicUrlForProductImagesPath(hitPath);
+    const thumbUrl = thumbnailPublicUrlFromOriginalObjectPath(hitPath);
     try {
-      const { error: upErr } = await supabaseServer.from("products").update({ image_url: url }).eq("id", productId);
+      const { error: upErr } = await supabaseServer
+        .from("products")
+        .update({
+          image_url: url,
+          ...(thumbUrl ? { thumbnail_url: thumbUrl } : { thumbnail_url: null }),
+        })
+        .eq("id", productId);
       if (upErr) throw new Error(upErr.message);
       result.updatedCount++;
     } catch (e) {
@@ -352,24 +387,25 @@ export async function cleanupProductImageOrphans(options?: {
 
   const { data: rows, error: pe } = await supabaseServer
     .from("products")
-    .select("id, image_url")
-    .not("image_url", "is", null);
+    .select("id, image_url, thumbnail_url");
   if (pe) throw new Error(`[products.image_url 조회 실패] ${pe.message}`);
 
   const parseFailures: Array<{ imageUrl: string; reason: string }> = [];
   const referenced = new Set<string>();
   for (const row of rows ?? []) {
-    const raw = String((row as { image_url?: string | null }).image_url ?? "").trim();
-    if (!raw) continue;
-    const p = extractProductImagesObjectPathFromAnyRef(raw);
-    if (!p) {
-      parseFailures.push({
-        imageUrl: raw,
-        reason: "product-images 경로로 해석 불가(외부 URL/다른 버킷/비정상 형식 포함)",
-      });
-      continue;
+    const r = row as { image_url?: string | null; thumbnail_url?: string | null };
+    for (const rawRef of [String(r.image_url ?? "").trim(), String(r.thumbnail_url ?? "").trim()]) {
+      if (!rawRef) continue;
+      const p = extractProductImagesObjectPathFromAnyRef(rawRef);
+      if (!p) {
+        parseFailures.push({
+          imageUrl: rawRef,
+          reason: "product-images 경로로 해석 불가(외부 URL/다른 버킷/비정상 형식 포함)",
+        });
+        continue;
+      }
+      referenced.add(p);
     }
-    referenced.add(p);
   }
 
   const storagePaths = await listAllProductImagesObjectPaths();
@@ -420,15 +456,27 @@ export async function removeReplacedProductImageFromStorage(params: {
   if (!prev || prev === next) {
     return { deleteCalled: false };
   }
-  const objectPath = extractProductImagesObjectPathFromAnyRef(prev);
-  if (!objectPath) {
+  const prevPath = extractProductImagesObjectPathFromAnyRef(prev);
+  if (!prevPath) {
     return { deleteCalled: false };
   }
 
-  const { error } = await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove([objectPath]);
+  const nextPath = extractProductImagesObjectPathFromAnyRef(next);
+  const prevStem = stemFromProductImagesFilename(prevPath);
+  const nextStem = nextPath ? stemFromProductImagesFilename(nextPath) : null;
+
+  const toRemove = new Set<string>();
+  toRemove.add(prevPath);
+  /** 같은 stem이면 새 업로드에서 `thumbs/{stem}.jpg`가 이미 덮어썼으므로 삭제하면 안 됨 */
+  if (prevStem && prevStem !== nextStem) {
+    toRemove.add(thumbnailObjectPathFromStem(prevStem));
+  }
+
+  const list = [...toRemove];
+  const { error } = await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove(list);
   if (error) {
     console.error("[product-images] 교체 후 이전 객체 삭제 실패(DB는 이미 갱신됨)", {
-      objectPath,
+      paths: list,
       message: error.message,
     });
     return { deleteCalled: true, errorMessage: error.message };

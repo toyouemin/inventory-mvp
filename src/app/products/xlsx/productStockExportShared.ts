@@ -9,6 +9,8 @@ export type ProductStockExportProductRow = {
   category: string | null;
   name: string | null;
   image_url: string | null;
+  /** 엑셀 삽입용 `product-images/thumbs/{stem}.jpg` 공개 URL — 없으면 `image_url`로 폴백 */
+  thumbnail_url: string | null;
   wholesale_price: number | null;
   msrp_price: number | null;
   sale_price: number | null;
@@ -87,7 +89,7 @@ export async function loadProductStockExportBundle(options: {
 }> {
   const categoryOrderFromDb = await fetchCategoryOrderMap();
   const { rows: products, error: productsErr } = await fetchAllProductsPaged<ProductStockExportProductRow>(
-    "id, sku, category, name, image_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
+    "id, sku, category, name, image_url, thumbnail_url, wholesale_price, msrp_price, sale_price, extra_price, memo, memo2, stock, created_at, updated_at, stock_updated_at"
   );
 
   if (productsErr) {

@@ -77,6 +77,8 @@ export function productStockExcelImageOneCellTlNative(
 }
 
 const MIN_IMAGE_BYTES = 100;
+/** 사전 생성 JPEG 썸네일 비정상 대용량 방지 */
+const MAX_PREFETCH_THUMB_BYTES = 512 * 1024;
 
 function withCacheVersionOnUrl(href: string, version: string | null | undefined): string {
   if (!version?.trim()) return href;
@@ -148,9 +150,38 @@ export function toSupabaseThumbnailRenderUrlIfApplicable(publicObjectUrl: string
 }
 
 /**
- * 응답이 이미지인지 검사한 뒤 sharp로 JPEG(`extension: 'jpeg'` 전용)로 정규화합니다.
+ * Storage에 미리 올린 JPEG 썸네일을 그대로 가져옵니다(fetch만, sharp 없음).
+ * JPEG 시그니처·크기 검증 후 버퍼 반환.
+ */
+async function fetchUrlAsPrecomputedExcelThumbBuffer(absUrl: string): Promise<Buffer | null> {
+  if (!absUrl.trim()) return null;
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), IMAGE_FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(absUrl, { signal: ac.signal, cache: "no-store" });
+    if (!res.ok) return null;
+
+    const contentType = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    if (!contentType.startsWith("image/")) return null;
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (!buf || buf.length < MIN_IMAGE_BYTES || buf.length > MAX_PREFETCH_THUMB_BYTES) {
+      return null;
+    }
+    if (buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff) {
+      return null;
+    }
+    return buf;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/**
+ * 썸네일이 없거나 외부 URL 등 폴백 시에만 사용: sharp로 JPEG(`extension: 'jpeg'` 전용) 정규화.
  * 픽셀은 `PRODUCT_STOCK_EXCEL_THUMB_PIXEL` 정사각(레터박스 없음 · contain + 흰 배경).
- * HTML·빈 응답·비이미지 Content-Type·metadata 불가 데이터는 null.
  */
 async function fetchUrlAndNormalizeToJpegThumb(absUrl: string): Promise<Buffer | null> {
   if (!absUrl.trim()) return null;
@@ -201,13 +232,21 @@ async function fetchUrlAndNormalizeToJpegThumb(absUrl: string): Promise<Buffer |
 }
 
 /**
- * 상품 대표 이미지를 순차적으로 받아 썸네일 버퍼를 만듭니다(Promise.all 미사용).
- * 원본·Supabase contain 변환 URL 순으로 시도합니다.
+ * `thumbnail_url` 우선(미리 생성 JPEG · sharp 없음), 없거나 실패 시 `image_url` 폴백·sharp 정규화.
  */
 export async function fetchProductImageThumbnailForExcel(
   product: ProductStockExportProductRow,
   requestOrigin: string
 ): Promise<Buffer | null> {
+  const thumbRaw = (product.thumbnail_url ?? "").trim();
+  if (thumbRaw) {
+    let absThumb = absolutizeProductImageUrl(thumbRaw, requestOrigin);
+    absThumb = withCacheVersionOnUrl(absThumb, product.updated_at);
+    const thumbObjectUrl = toSupabasePublicObjectUrl(absThumb);
+    const pre = await fetchUrlAsPrecomputedExcelThumbBuffer(thumbObjectUrl);
+    if (pre && pre.length > 0) return pre;
+  }
+
   const raw = (product.image_url ?? "").trim();
   if (!raw) return null;
   let abs = absolutizeProductImageUrl(raw, requestOrigin);

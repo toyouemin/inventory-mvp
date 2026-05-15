@@ -15,7 +15,8 @@
     "debug:stock-e2e": "node scripts/stock-adjust-e2e.mjs",
     "test:amount-to-korean": "npx tsx src/features/transactionStatement/amountToKoreanText.test.ts",
     "test:size-analysis-unknown": "npx tsx src/features/sizeAnalysis/unknownManualItem.test.mts",
-    "test:size-analysis-single-row": "npx tsx src/features/sizeAnalysis/singleRowPerson.test.mts"
+    "test:size-analysis-single-row": "npx tsx src/features/sizeAnalysis/singleRowPerson.test.mts",
+    "rebuild-thumbnails": "npx tsx scripts/rebuild-product-thumbnails.mts"
   },
   "dependencies": {
     "@prisma/client": "^5.20.0",

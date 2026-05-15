@@ -3168,12 +3168,12 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
 }
 
 .products-count-bar {
-  display: grid;
-  grid-template-columns: max-content max-content max-content max-content;
+  display: flex;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: start;
+  justify-content: flex-start;
   column-gap: 8px;
-  row-gap: 4px;
+  row-gap: 0;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -3182,6 +3182,7 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
 
 .products-count-bar__count {
   min-width: 0;
+  flex: 0 1 auto;
   white-space: nowrap;
 }
 
@@ -3195,15 +3196,30 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
 }
 
 .products-count-bar__toggle-slot--soldout {
-  justify-self: start;
+  flex-shrink: 0;
 }
 
 .products-count-bar__toggle-slot--option0 {
-  justify-self: start;
+  flex-shrink: 0;
 }
 
 .products-count-bar__toggle-slot--memo {
-  justify-self: start;
+  flex-shrink: 0;
+}
+
+.products-count-bar__toggles {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  column-gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/** 옵션 토글은 묶음 안에서 메모와 인접; 우측 정렬은 __toggles에 margin-left:auto */
+.products-count-bar__toggle-slot--card-options {
+  flex-shrink: 0;
 }
 
 .products-count {
@@ -3289,7 +3305,11 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   }
 
   .products-count-bar {
-    column-gap: 8px;
+    column-gap: 5px;
+  }
+
+  .products-count-bar__toggles {
+    column-gap: 4px;
   }
 
   .products-count--bar {
@@ -4326,10 +4346,17 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
     column-gap: 16px;
   }
 
-  /* ??? ???????, ???? 3?? ???????(??????????????? ???) ???????? ??? */
+  /* 모바일: 왼쪽 개수 · 오른쪽 토글 묶음(품절~옵션) */
   .products-sticky-controls .products-count-bar {
-    grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
-    column-gap: 6px;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    column-gap: 4px;
+    min-width: 0;
+  }
+
+  .products-sticky-controls .products-count-bar__toggles {
+    column-gap: 4px;
   }
 
   .product-card__option-list {

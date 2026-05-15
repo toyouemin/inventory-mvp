@@ -69,6 +69,8 @@ export type ProductCardProps = {
   /** 툴바·카드 공통: 메모 본문 전체 표시 여부 */
   memoShowAll: boolean;
   onMemoShowAllChange: (next: boolean) => void;
+  /** 모바일 옵션 축소: false면 옵션 목록·재고 행만 숨김(가격·이미지 유지) */
+  optionRowsVisible?: boolean;
 };
 
 export const ProductCard = memo(function ProductCard({
@@ -88,6 +90,7 @@ export const ProductCard = memo(function ProductCard({
   showNoVisibleOptionsHint = false,
   memoShowAll,
   onMemoShowAllChange,
+  optionRowsVisible = true,
 }: ProductCardProps) {
   const debugInstanceId = useRef(
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -394,7 +397,7 @@ export const ProductCard = memo(function ProductCard({
               메모
             </button>
           ) : null}
-          {showNoVisibleOptionsHint ? (
+          {optionRowsVisible && showNoVisibleOptionsHint ? (
             <div
               className="product-card__option-list product-card__option-list--novis"
               role="status"
@@ -402,7 +405,7 @@ export const ProductCard = memo(function ProductCard({
             >
               <p className="product-card__no-visible-options muted">재고 없음</p>
             </div>
-          ) : hasVariants ? (
+          ) : optionRowsVisible && hasVariants ? (
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               {sortedVariants.map((variant) => {
                 const qtyRaw = Number(variant?.stock);
@@ -507,7 +510,7 @@ export const ProductCard = memo(function ProductCard({
                 );
               })}
             </div>
-          ) : (
+          ) : optionRowsVisible ? (
             <div className="product-card__option-list" role="list" aria-label="옵션 목록">
               <div className="product-card__option-item" role="listitem">
                 <div className="product-card__option-row">
@@ -563,8 +566,8 @@ export const ProductCard = memo(function ProductCard({
                 </div>
               </div>
             </div>
-          )}
-          {!hasVariants && editingProductMemo ? (
+          ) : null}
+          {optionRowsVisible && !hasVariants && editingProductMemo ? (
             <div className="product-card__memo-editor">
               <input
                 type="text"

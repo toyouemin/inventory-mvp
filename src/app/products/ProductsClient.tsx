@@ -759,8 +759,12 @@ export function ProductsClient({
   const [categoryFilter, setCategoryFilter] = useState<string>("");
   const [hideZeroStock, setHideZeroStock] = useState(false);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
-  /** 카드 메모 본문 전역 표시(툴바 메모ON·카드 메모 버튼 공유). PC/모바일 공통 ON으로 시작 */
+  /** 카드 메모 본문 전역 표시(툴바 메모·카드 메모 버튼 공유). PC/모바일 공통 ON으로 시작 */
   const [cardsMemoVisible, setCardsMemoVisible] = useState(true);
+  /** 모바일 전용: 카드 옵션(재고) 블록 표시 — 원형 토글과 연동 */
+  const [mobileCardOptionRowsVisible, setMobileCardOptionRowsVisible] = useState(true);
+  /** max-width 768px — 옵션 토글·축소는 모바일에서만 */
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
@@ -917,6 +921,7 @@ export function ProductsClient({
           ? prev
           : { stickyTop, topBarHeight, bottomBarHeight }
       );
+      setIsMobileViewport(mq.matches);
     };
 
     update();
@@ -2432,10 +2437,13 @@ export function ProductsClient({
           <div className="products-count-bar">
           <div className="products-count-bar__count">
             <p className="products-count products-count--bar">
-              {skuDisplayGroupsForView.length}개 상품
+              {isMobileViewport
+                ? `${skuDisplayGroupsForView.length}개`
+                : `${skuDisplayGroupsForView.length}개 상품`}
               {search && ` (총${localProducts.length})`}
             </p>
           </div>
+          <div className="products-count-bar__toggles">
           <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--soldout">
             <label className="products-hide-zero">
               <span className="products-hide-zero__label">품절</span>
@@ -2468,7 +2476,7 @@ export function ProductsClient({
           </div>
           <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--memo">
             <label className="products-hide-zero">
-              <span className="products-hide-zero__label">메모ON</span>
+              <span className="products-hide-zero__label">메모</span>
               <input
                 type="checkbox"
                 className="products-hide-zero__input"
@@ -2480,6 +2488,24 @@ export function ProductsClient({
               />
               <span className="products-hide-zero__track" aria-hidden />
             </label>
+          </div>
+          {isMobileViewport ? (
+            <div className="products-count-bar__toggle-slot products-count-bar__toggle-slot--card-options">
+              <label className="products-hide-zero">
+                <span className="products-hide-zero__label">옵션</span>
+                <input
+                  type="checkbox"
+                  className="products-hide-zero__input"
+                  role="switch"
+                  checked={mobileCardOptionRowsVisible}
+                  onChange={(e) => setMobileCardOptionRowsVisible(e.target.checked)}
+                  aria-checked={mobileCardOptionRowsVisible}
+                  aria-label="카드에 옵션·재고 줄 표시"
+                />
+                <span className="products-hide-zero__track" aria-hidden />
+              </label>
+            </div>
+          ) : null}
           </div>
           </div>
 
@@ -2711,6 +2737,7 @@ export function ProductsClient({
                   showNoVisibleOptionsHint={showNoVisibleOptionsHint}
                   memoShowAll={cardsMemoVisible}
                   onMemoShowAllChange={setCardsMemoVisible}
+                  optionRowsVisible={!isMobileViewport || mobileCardOptionRowsVisible}
                   onEditClick={openEditById}
                   onProductStockDelta={onProductStockDelta}
                   onVariantStockDelta={onVariantStockDelta}

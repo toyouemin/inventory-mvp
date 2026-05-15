@@ -4369,6 +4369,11 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
     border-radius: 10px;
   }
 
+  /** 전역 옵션 숨김 시 탭으로 펼침 유도 */
+  .product-card--mobile-peekable {
+    cursor: pointer;
+  }
+
   .product-card__image {
     display: none;
   }

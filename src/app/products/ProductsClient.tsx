@@ -761,8 +761,10 @@ export function ProductsClient({
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   /** 카드 메모 본문 전역 표시(툴바 메모·카드 메모 버튼 공유). PC/모바일 공통 ON으로 시작 */
   const [cardsMemoVisible, setCardsMemoVisible] = useState(true);
-  /** 모바일 전용: 카드 옵션(재고) 블록 표시 — 원형 토글과 연동 */
+  /** 모바일 전용: 툴바 「옵션」으로 카드 옵션(재고) 블록 전체 표시 */
   const [mobileCardOptionRowsVisible, setMobileCardOptionRowsVisible] = useState(true);
+  /** 모바일+전역 옵션 숨김일 때 카드 탭으로만 펼친 normSku(한 카드) */
+  const [mobileOptionPeekNormSku, setMobileOptionPeekNormSku] = useState<string | null>(null);
   /** max-width 768px — 옵션 토글·축소는 모바일에서만 */
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -902,6 +904,14 @@ export function ProductsClient({
       console.log("[ProductsClient] unmount (useEffect)", { instanceId: id });
     };
   }, [debugClientLifecycle]);
+
+  useEffect(() => {
+    if (mobileCardOptionRowsVisible) setMobileOptionPeekNormSku(null);
+  }, [mobileCardOptionRowsVisible]);
+
+  useEffect(() => {
+    if (!isMobileViewport) setMobileOptionPeekNormSku(null);
+  }, [isMobileViewport]);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
@@ -2737,7 +2747,17 @@ export function ProductsClient({
                   showNoVisibleOptionsHint={showNoVisibleOptionsHint}
                   memoShowAll={cardsMemoVisible}
                   onMemoShowAllChange={setCardsMemoVisible}
-                  optionRowsVisible={!isMobileViewport || mobileCardOptionRowsVisible}
+                  optionRowsVisible={
+                    !isMobileViewport ||
+                    mobileCardOptionRowsVisible ||
+                    mobileOptionPeekNormSku === normSku
+                  }
+                  onMobileOptionPeekInteract={
+                    isMobileViewport && !mobileCardOptionRowsVisible
+                      ? () =>
+                          setMobileOptionPeekNormSku((prev) => (prev === normSku ? null : normSku))
+                      : undefined
+                  }
                   onEditClick={openEditById}
                   onProductStockDelta={onProductStockDelta}
                   onVariantStockDelta={onVariantStockDelta}

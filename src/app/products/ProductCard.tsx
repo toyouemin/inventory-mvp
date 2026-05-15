@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import dayjs from "dayjs";
 import { updateProductMemo, updateVariantMemo } from "./actions";
 import { useProductImageSrc } from "./useProductImageSrc";
@@ -71,6 +71,8 @@ export type ProductCardProps = {
   onMemoShowAllChange: (next: boolean) => void;
   /** 모바일 옵션 축소: false면 옵션 목록·재고 행만 숨김(가격·이미지 유지) */
   optionRowsVisible?: boolean;
+  /** 모바일+전역 옵션 숨김일 때 카드 탭으로 이 카드만 옵션 펼침/접기(±·버튼·옵션 행 내부 탭 제외) */
+  onMobileOptionPeekInteract?: () => void;
 };
 
 export const ProductCard = memo(function ProductCard({
@@ -91,6 +93,7 @@ export const ProductCard = memo(function ProductCard({
   memoShowAll,
   onMemoShowAllChange,
   optionRowsVisible = true,
+  onMobileOptionPeekInteract,
 }: ProductCardProps) {
   const debugInstanceId = useRef(
     typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -277,8 +280,22 @@ export const ProductCard = memo(function ProductCard({
    * DOM에 `article.product-card`는 이 컴포넌트 호출당 정확히 1개.
    * 옵션 행은 `sortedVariants.map` → `div.product-card__option-item`만 생성(카드 전체 반복 없음).
    */
+  function handleMobilePeekCardClick(e: MouseEvent<HTMLElement>) {
+    if (!onMobileOptionPeekInteract) return;
+    const t = e.target as HTMLElement;
+    if (t.closest("button, a, input, textarea, select, label")) return;
+    if (t.closest(".product-card__option-list")) return;
+    if (t.closest(".product-card__memo-editor")) return;
+    if (t.closest(".product-image-modal")) return;
+    onMobileOptionPeekInteract();
+  }
+
   return (
-    <article className="product-card" data-product-id={product.id}>
+    <article
+      className={`product-card${onMobileOptionPeekInteract ? " product-card--mobile-peekable" : ""}`}
+      data-product-id={product.id}
+      onClick={onMobileOptionPeekInteract ? handleMobilePeekCardClick : undefined}
+    >
       {!imgDead && imgSrc ? (
         <button
           type="button"

@@ -302,31 +302,6 @@ export function ProductImageExcelDownloadProvider({ children }: { children: Reac
     return `경과 ${elapsed} · ${formatBytes(p.received)} 받는 중…`;
   }
 
-  function ProgressBar({ p }: { p: DownloadProgress | null }) {
-    const waitingNoBytes = p == null || p.received === 0;
-    const unknownTotalStreaming =
-      !!p &&
-      p.received > 0 &&
-      (p.total == null || p.total <= 0) &&
-      (p.pct == null || p.pct < 100);
-    const indeterminate = waitingNoBytes || unknownTotalStreaming;
-    const pct = p?.pct ?? null;
-    const widthPct =
-      !indeterminate && pct != null ? Math.min(100, Math.max(3, pct)) : undefined;
-
-    return (
-      <div
-        className={`product-image-excel-download-toast__bar-track${indeterminate ? " product-image-excel-download-toast__bar-track--indeterminate" : ""}`}
-        aria-hidden
-      >
-        <div
-          className="product-image-excel-download-toast__bar-fill"
-          style={widthPct != null ? { width: `${widthPct}%` } : undefined}
-        />
-      </div>
-    );
-  }
-
   return (
     <ProductImageExcelDownloadContext.Provider value={value}>
       {children}
@@ -337,7 +312,6 @@ export function ProductImageExcelDownloadProvider({ children }: { children: Reac
               <div className="product-image-excel-download-toast__row">
                 <div className="product-image-excel-download-toast__main">
                   <span className="product-image-excel-download-toast__title">이미지 포함 재고 엑셀</span>
-                  <ProgressBar p={stockProgress} />
                   <span className="product-image-excel-download-toast__meta">
                     {progressMeta(
                       stockStartedAtRef.current,
@@ -359,7 +333,6 @@ export function ProductImageExcelDownloadProvider({ children }: { children: Reac
               <div className="product-image-excel-download-toast__row">
                 <div className="product-image-excel-download-toast__main">
                   <span className="product-image-excel-download-toast__title">이미지 포함 가격 엑셀</span>
-                  <ProgressBar p={priceProgress} />
                   <span className="product-image-excel-download-toast__meta">
                     {progressMeta(
                       priceStartedAtRef.current,

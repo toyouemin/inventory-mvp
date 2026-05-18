@@ -3549,6 +3549,20 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   font-size: 13px;
 }
 
+.orphan-cleanup-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.orphan-cleanup-panel__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .orphan-cleanup-panel__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -8101,6 +8115,20 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
 
 .size-analysis-run-card--ready {
   border-color: #93c5fd;
+}
+
+.size-analysis-run-card--done {
+  border-color: #86efac;
+}
+
+.size-analysis-run-card .btn .size-analysis-run-card__cta-hint {
+  font-weight: 600;
+  margin-left: 0.15em;
+}
+
+.size-analysis-run-card .btn .size-analysis-run-card__cta-hint--done {
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .size-analysis-summary-cards {

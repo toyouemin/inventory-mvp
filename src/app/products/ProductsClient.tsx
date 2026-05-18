@@ -2677,6 +2677,42 @@ export function ProductsClient({
                 ) : null}
               </p>
 
+              <div className="orphan-cleanup-panel__actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-compact"
+                  disabled={orphanWorkingMode !== null}
+                  onClick={() => {
+                    void scanStorageOrphans();
+                  }}
+                >
+                  {orphanWorkingMode === "scan" ? "점검 중…" : "다시 점검"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-compact"
+                  disabled={orphanDeleteDisabled}
+                  title={
+                    orphanResult.parseFailures.length
+                      ? "일부 image_url 경로 해석 실패가 있어 삭제할 수 없습니다."
+                      : orphanResult.orphanCount === 0
+                        ? "삭제할 불필요 이미지가 없습니다."
+                        : undefined
+                  }
+                  onClick={() => {
+                    void deleteStorageOrphans();
+                  }}
+                >
+                  {orphanWorkingMode === "delete" ? "삭제 중…" : "불필요 이미지 삭제"}
+                </button>
+              </div>
+              {orphanResult.parseFailures.length > 0 ? (
+                <p className="orphan-cleanup-panel__hint muted">
+                  일부 상품의 image_url을 스토리지 경로로 읽지 못해 자동 삭제가 막혀 있습니다.
+                  해당 URL을 정리한 뒤 「다시 점검」하세요.
+                </p>
+              ) : null}
+
               <div className="orphan-cleanup-panel__grid">
                 <div className="orphan-cleanup-panel__box">
                   <p className="orphan-cleanup-panel__label">

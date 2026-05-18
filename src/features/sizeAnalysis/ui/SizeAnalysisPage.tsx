@@ -386,6 +386,8 @@ export function SizeAnalysisPage() {
   /** 분석 엑셀 다운로드 파일명에 사용(업로드 시 설정) */
   const [uploadedSourceFileName, setUploadedSourceFileName] = useState<string | null>(null);
   const [helpModalOpen, setHelpModalOpen] = useState(false);
+  /** 분석 실행 API 성공 후 버튼 안내 문구 (클릭) → (완료) */
+  const [analysisRunComplete, setAnalysisRunComplete] = useState(false);
   const autoDetectedKeyRef = useRef<string>("");
 
   const structureTypeForDup: StructureType | undefined =
@@ -467,6 +469,7 @@ export function SizeAnalysisPage() {
     setError("");
     setMappingSaved(false);
     setAutoMappingNeedsReview(false);
+    setAnalysisRunComplete(false);
     setLoading("upload");
     try {
       const fd = new FormData();
@@ -492,6 +495,7 @@ export function SizeAnalysisPage() {
     setError("");
     setMappingSaved(false);
     setAutoMappingNeedsReview(false);
+    setAnalysisRunComplete(false);
     try {
       const res = await fetch("/api/size-analysis/detect-structure", {
         method: "POST",
@@ -572,6 +576,7 @@ export function SizeAnalysisPage() {
       const runJson = await runRes.json();
       if (!runRes.ok) throw new Error(runJson.error ?? "실행 실패");
       await refreshResult(jobId, statusFilter);
+      setAnalysisRunComplete(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "실행 실패");
     } finally {
@@ -751,6 +756,7 @@ export function SizeAnalysisPage() {
                 onChange={(next) => {
                   setMapping(next);
                   setMappingSaved(false);
+                  setAnalysisRunComplete(false);
                 }}
                 onSave={saveMappingAction}
                 loading={loading === "mapping"}
@@ -771,6 +777,7 @@ export function SizeAnalysisPage() {
             "size-analysis-card",
             "size-analysis-run-card",
             allSetupStepsComplete && "size-analysis-run-card--ready",
+            analysisRunComplete && "size-analysis-run-card--done",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -786,7 +793,25 @@ export function SizeAnalysisPage() {
                 : "필수 매핑을 완료해주세요"
             }
           >
-            {loading === "run" ? "분석 실행 중..." : allSetupStepsComplete ? "분석실행(클릭)" : "분석실행"}
+            {loading === "run" ? (
+              "분석 실행 중..."
+            ) : allSetupStepsComplete ? (
+              <>
+                분석실행
+                <span
+                  className={[
+                    "size-analysis-run-card__cta-hint",
+                    analysisRunComplete && "size-analysis-run-card__cta-hint--done",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  ({analysisRunComplete ? "완료" : "클릭"})
+                </span>
+              </>
+            ) : (
+              "분석실행"
+            )}
           </button>
           {!allSetupStepsComplete ? (
             <p className="size-analysis-muted size-analysis-run-card__note" role="note">

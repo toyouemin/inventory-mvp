@@ -308,8 +308,8 @@ function SizeAnalysisHelpModal({ onClose }: { onClose: () => void }) {
             <h3 className="size-analysis-help-section__title">1. 업로드 파일 준비</h3>
             <ul className="size-analysis-help-list">
               <li>첫 줄은 단일 셀로 각각 제목(헤더)을 구성.</li>
-              <li>기본 형식: 이름 / 성별 / 사이즈 / 수량</li>
-              <li>다품목: 이름 / 상품별 열(바람막이, 반바지 등)</li>
+              <li>기본형식: 이름 | 성별 | 사이즈 | 수량 .. 기타</li>
+              <li>다품목: 이름 | 성별 | 바람막이 | 경기복 .. 등등</li>
               <li>
                 불필요 열이 있어도 가능
                 <br />

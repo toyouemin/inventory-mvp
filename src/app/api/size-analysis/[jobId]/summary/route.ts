@@ -1,3 +1,4 @@
+import { matrixAggGenderAndSizeFromRow } from "@/features/sizeAnalysis/clubSizeAggModes";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +13,11 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
       qtyParsed: true,
       excluded: true,
       standardizedSize: true,
+      sizeRaw: true,
+      itemRaw: true,
       clubNameNormalized: true,
       genderNormalized: true,
+      genderRaw: true,
     },
   });
 
@@ -47,13 +51,14 @@ export async function GET(_: Request, ctx: { params: { jobId: string } }) {
     if (includeInAggregation) {
       aggregatedTotalQty += qty;
       const club = row.clubNameNormalized || "미분류";
-      const gender = String(row.genderNormalized ?? "").trim();
-      const size = row.standardizedSize || "미분류";
+      const { gender, size: sizeDisp } = matrixAggGenderAndSizeFromRow(row);
+      const genderKey = String(gender ?? "").trim();
+      const size = String(sizeDisp ?? "").trim() || "미분류";
       clubSize[club] = clubSize[club] ?? {};
       clubSize[club][size] = (clubSize[club][size] ?? 0) + qty;
 
-      const key = `${club}\0${gender}\0${size}`;
-      const cur = clubGenderSize.get(key) ?? { club, gender, size, qty: 0 };
+      const key = `${club}\0${genderKey}\0${size}`;
+      const cur = clubGenderSize.get(key) ?? { club, gender: genderKey, size, qty: 0 };
       cur.qty += qty;
       clubGenderSize.set(key, cur);
     }

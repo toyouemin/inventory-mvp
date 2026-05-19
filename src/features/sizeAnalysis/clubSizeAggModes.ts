@@ -125,21 +125,57 @@ export function rowKeyGenderForAgg(g: string | null | undefined): "여" | "남" 
   return "공용";
 }
 
+/** 공용 상품·성별 정규화 행 → 매트릭스 열(숫자) 라벨 */
+export function normalizeUnisexSizeLabel(raw: string | null | undefined): string {
+  const t = String(raw ?? "").trim();
+  if (!t) return "미분류";
+  const mw = t.match(/^[MW]\s*(\d{2,3})$/i);
+  if (mw?.[1]) return mw[1];
+  const num = t.match(/(?:^|[^0-9])(80|85|90|95|100|105|110|115|120)(?![0-9])/);
+  if (num?.[1]) return num[1];
+  return "미분류";
+}
+
+function isUnisexAggRow(r: {
+  itemRaw?: string | null;
+  genderNormalized?: string | null;
+  genderRaw?: string | null;
+}): boolean {
+  if (/공용/i.test(String(r?.itemRaw ?? "").trim())) return true;
+  const g = String(r?.genderNormalized ?? r?.genderRaw ?? "").trim();
+  return g === "공용";
+}
+
 /**
  * 클럽 집계·매트릭스 **표시**용. `matrixSizeDisplay`에서
  * 남95·여90·95남·M100·남자 100·100(여자) 등 → 행(남/여)·열(숫자) 분리. 내부 `standardizedSize`는 DB 그대로.
+ * 공용 상품 헤더·genderNormalized=공용 인 행은 W90/M90 접두를 무시하고 공용+숫자로 집계합니다.
  */
 export function matrixAggGenderAndSizeFromRow(r: {
   standardizedSize?: string | null;
   sizeRaw?: string | null;
   genderNormalized?: string | null;
   genderRaw?: string | null;
+  itemRaw?: string | null;
 }): { gender: string; size: string } {
+  if (isUnisexAggRow(r)) {
+    return {
+      gender: "공용",
+      size: normalizeUnisexSizeLabel(String(r?.standardizedSize ?? r?.sizeRaw ?? "")),
+    };
+  }
   return matrixDisplayFromSizeFields(
     r.standardizedSize,
     r.sizeRaw,
     r.genderNormalized ?? r.genderRaw
   );
+}
+
+/** 상품별 집계·다품목 UI — `matrixAggGenderAndSizeFromRow`와 동일 */
+export function productAggGenderAndSizeFromRow(
+  r: Parameters<typeof matrixAggGenderAndSizeFromRow>[0]
+): { gender: string; size: string } {
+  return matrixAggGenderAndSizeFromRow(r);
 }
 
 /** 클럽 요약(총 인원 / 사이즈 수량 / 미입력) — 표시 사이즈가 비었거나 미분류면 제외 */

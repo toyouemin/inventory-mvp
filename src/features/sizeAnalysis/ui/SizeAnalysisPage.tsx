@@ -15,6 +15,7 @@ import {
   computeClubDisplaySummaryStats,
   matrixGenderRowKeys,
   matrixAggGenderAndSizeFromRow,
+  productAggGenderAndSizeFromRow,
   normClubFromNormRow,
   rowKeyGenderForAgg,
   rowIncludedInFinalAggregation,
@@ -783,7 +784,7 @@ export function SizeAnalysisPage() {
             .join(" ")}
         >
           <button
-            className="btn btn-primary"
+            className="btn btn-danger btn-strong"
             type="button"
             onClick={runAction}
             disabled={!allSetupStepsComplete || loading !== ""}
@@ -2940,25 +2941,6 @@ function groupClubAggRows(rows: Array<{ club: string; gender: string; size: stri
     by.get(c)!.push(r);
   }
   return by;
-}
-
-function normalizeUnisexSizeLabel(raw: string): string {
-  const t = String(raw ?? "").trim();
-  if (!t) return "미분류";
-  const mw = t.match(/^[MW]\s*(\d{2,3})$/i);
-  if (mw?.[1]) return mw[1];
-  const num = t.match(/(?:^|[^0-9])(80|85|90|95|100|105|110|115|120)(?![0-9])/);
-  if (num?.[1]) return num[1];
-  return "미분류";
-}
-
-function productAggGenderAndSizeFromRow(r: any): { gender: string; size: string } {
-  const productName = String(r?.itemRaw ?? "").trim();
-  if (/공용/i.test(productName)) {
-    const size = normalizeUnisexSizeLabel(String(r?.standardizedSize ?? r?.sizeRaw ?? ""));
-    return { gender: "공용", size };
-  }
-  return matrixAggGenderAndSizeFromRow(r);
 }
 
 function matrixRowKeysForProductRows(rows: Array<{ gender: string }>): Array<"여" | "남" | "공용"> {

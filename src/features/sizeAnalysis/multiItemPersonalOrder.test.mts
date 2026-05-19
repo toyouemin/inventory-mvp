@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 
+import { matrixAggGenderAndSizeFromRow } from "./clubSizeAggModes";
 import { matrixDisplayFromSizeFields } from "./matrixSizeDisplay";
 import { parseMultiItemPersonalOrder } from "./multiItemPersonalOrder";
 import type { FieldMapping, SheetSnapshot } from "./types";
@@ -61,5 +62,20 @@ assert.equal(topRows.map((r) => r.standardizedSize).join(","), "90,95", "성별 
 const matrixParsed = matrixDisplayFromSizeFields("공용90", "공용90", "공용");
 assert.equal(matrixParsed.gender, "공용");
 assert.equal(matrixParsed.size, "90");
+
+const unisexWindRow = windRows.find((r) => r.memberNameRaw === "김영희")!;
+assert.equal(unisexWindRow.sizeRaw, "여100");
+const clubAgg = matrixAggGenderAndSizeFromRow(unisexWindRow);
+assert.equal(clubAgg.gender, "공용", "8) 클럽 집계: 공용 헤더는 공용 행");
+assert.equal(clubAgg.size, "100", "8) 클럽 집계: W/M 접두 제거");
+
+const w90Agg = matrixAggGenderAndSizeFromRow({
+  itemRaw: "바람막이(공용)",
+  standardizedSize: "W90",
+  sizeRaw: "여95",
+  genderNormalized: "공용",
+});
+assert.equal(w90Agg.gender, "공용", "W90+공용 정규화는 여90이 아닌 공용90");
+assert.equal(w90Agg.size, "90");
 
 console.log("multiItemPersonalOrder test passed", { totalRows: rows.length });

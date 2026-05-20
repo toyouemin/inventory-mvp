@@ -430,6 +430,15 @@ export async function cleanupProductImageOrphans(options?: {
         continue;
       }
       referenced.add(p);
+      /* DB가 `thumbs/{stem}.jpg`만 가리킬 때 같은 stem의 `original/*`가 고아로 오인·삭제되지 않게 함 */
+      if (p.startsWith("thumbs/")) {
+        const stem = stemFromProductImagesFilename(p);
+        if (stem) {
+          for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {
+            referenced.add(`original/${stem}.${ext}`);
+          }
+        }
+      }
     }
   }
 

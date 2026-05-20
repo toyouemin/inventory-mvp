@@ -21,6 +21,7 @@ import {
   PRODUCT_IMAGES_BUCKET,
   reconnectProductsImageUrlsFromStorageBySku,
   removeReplacedProductImageFromStorage,
+  stemFromProductImagesFilename,
   thumbnailPublicUrlFromOriginalPublicUrl,
 } from "@/lib/productImagesStorage";
 import { decodeWithFallback } from "@/lib/csvDecodeWithFallback";
@@ -1725,7 +1726,15 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
     );
     if (finalRefsErr) throw new Error(finalRefsErr.message);
     const newPathsRef = collectReferencedProductImagesStoragePaths(finalProductRows);
-    const stalePaths = [...oldPathsRef].filter((p) => !newPathsRef.has(p));
+    const stalePaths = [...oldPathsRef].filter((p) => {
+      if (newPathsRef.has(p)) return false;
+      /* 재연결이 원본 대신 thumbs만 새 DB에 두면 원본 경로가 `stale`로 오인·삭제되는 것 방지 */
+      if (p.startsWith("original/")) {
+        const stem = stemFromProductImagesFilename(p);
+        if (stem && newPathsRef.has(`thumbs/${stem}.jpg`)) return false;
+      }
+      return true;
+    });
     await removeProductImagesBucketPaths(stalePaths);
     if (stalePaths.length > 0) {
       console.info("[CSV reset] 스냅샷 대비 더 이상 참조 없는 이미지 Storage 정리 시도 완료", {

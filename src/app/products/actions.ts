@@ -980,6 +980,35 @@ function chunkArray<T>(arr: T[], chunkSize: number) {
   return out;
 }
 
+/** `products` 행 목록에서 `product-images` 객체 경로(우리 버킷으로 해석되는 경우만)를 수집 */
+function collectReferencedProductImagesStoragePaths(rows: readonly Record<string, unknown>[]): Set<string> {
+  const out = new Set<string>();
+  for (const row of rows) {
+    for (const key of ["image_url", "thumbnail_url"] as const) {
+      const ref = String((row[key] as string | null | undefined) ?? "").trim();
+      if (!ref) continue;
+      const p = extractProductImagesObjectPathFromAnyRef(ref);
+      if (p) out.add(p);
+    }
+  }
+  return out;
+}
+
+/** CSV reset·통합 삭제 등: DB 갱신은 이미 된 뒤 호출 가능. 삭제 실패는 로그만 남기고 진행 */
+async function removeProductImagesBucketPaths(paths: Iterable<string>): Promise<void> {
+  const unique = [...new Set([...paths].filter(Boolean))];
+  if (unique.length === 0) return;
+  for (const chunk of chunkArray(unique, 100)) {
+    const { error } = await supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).remove(chunk);
+    if (error) {
+      console.warn("[CSV] product-images 객체 삭제 실패(작업은 계속 진행합니다)", {
+        paths: chunk,
+        message: error.message,
+      });
+    }
+  }
+}
+
 const CSV_SNAPSHOT_PAGE_SIZE = 1000;
 type CsvSnapshotTable = "products" | "product_variants";
 
@@ -1315,6 +1344,16 @@ async function consolidateDuplicateProductsByNormalizedSku(): Promise<void> {
     const { error: pUpErr } = await supabaseServer.from("products").update({ sku: canonicalSku }).eq("id", keepId);
     if (pUpErr) throw new Error(pUpErr.message);
 
+    if (dropIds.length > 0) {
+      const { data: dropImgRows, error: dropImgErr } = await supabaseServer
+        .from("products")
+        .select("image_url, thumbnail_url")
+        .in("id", dropIds);
+      if (dropImgErr) throw new Error(dropImgErr.message);
+      const refs = ((dropImgRows ?? []) as Array<Record<string, unknown>>).map((r) => r);
+      await removeProductImagesBucketPaths(collectReferencedProductImagesStoragePaths(refs));
+    }
+
     for (const did of dropIds) {
       const { error: dErr } = await supabaseServer.from("products").delete().eq("id", did);
       if (dErr) throw new Error(dErr.message);
@@ -1386,6 +1425,19 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
       skuToProductId.set(normSku, productId);
     } else {
       const nextImageUrl = resolveProductImageUrl(normSku, row0.imageUrl || null);
+      let prevImageUrlTrim = "";
+      if (hasExplicitImageUrl(row0.imageUrl)) {
+        const { data: prevImgRow, error: prevImgErr } = await supabaseServer
+          .from("products")
+          .select("image_url")
+          .eq("id", productId)
+          .maybeSingle();
+        if (prevImgErr) throw new Error(prevImgErr.message);
+        prevImageUrlTrim = String(
+          ((prevImgRow as { image_url?: string | null } | null)?.image_url ?? "") as string
+        ).trim();
+      }
+
       const { error: upErr } = await supabaseServer
         .from("products")
         .update({
@@ -1401,6 +1453,20 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
         })
         .eq("id", productId);
       if (upErr) throw new Error(upErr.message);
+
+      if (hasExplicitImageUrl(row0.imageUrl)) {
+        const rm = await removeReplacedProductImageFromStorage({
+          previousPublicUrl: prevImageUrlTrim,
+          newPublicUrl: String(nextImageUrl ?? "").trim(),
+        });
+        if (rm.errorMessage) {
+          console.warn("[CSV merge] Storage 이전 이미지 삭제 실패(DB URL은 이미 갱신됨)", {
+            normSku,
+            productId,
+            message: rm.errorMessage,
+          });
+        }
+      }
     }
 
     productIdsTouched.add(productId);
@@ -1649,6 +1715,22 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
           message: f.message,
         });
       }
+    }
+
+    /** reset 직전 DB가 가리키던 경로 중, 최종 DB 어디에서도 참조하지 않게 된 것만 제거(URL 재사용 행 보호). */
+    const oldPathsRef = collectReferencedProductImagesStoragePaths(oldProducts);
+    const { rows: finalProductRows, error: finalRefsErr } = await fetchAllRowsFromTablePaged(
+      "products",
+      "image_url, thumbnail_url"
+    );
+    if (finalRefsErr) throw new Error(finalRefsErr.message);
+    const newPathsRef = collectReferencedProductImagesStoragePaths(finalProductRows);
+    const stalePaths = [...oldPathsRef].filter((p) => !newPathsRef.has(p));
+    await removeProductImagesBucketPaths(stalePaths);
+    if (stalePaths.length > 0) {
+      console.info("[CSV reset] 스냅샷 대비 더 이상 참조 없는 이미지 Storage 정리 시도 완료", {
+        staleCount: stalePaths.length,
+      });
     }
   } catch (err) {
     await restoreProductsAndVariantsSnapshot(snapshot);

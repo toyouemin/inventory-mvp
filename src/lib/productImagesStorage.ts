@@ -248,6 +248,35 @@ export type ResetSkuImageReconnectResult = {
 };
 
 /**
+ * CSV reset 등 `reconnectProductsImageUrlsFromStorageBySku`용:
+ * 확장자 우선순위가 `jpg`라 `thumbs/{sku}.jpg`가 `original/{sku}.webp`보다 먼저 매칭되며
+ * 저해상도 썸네일만 `image_url`로 들어가는 문제를 막기 위해 경로 선택 순서를 둔다.
+ * 1) `original/` 아래 파일만 우선 · 2) thumbs가 아닌 경로 · 3) 마지막에 thumbs
+ */
+function pickReconnectObjectPathForSku(
+  skuTrim: string,
+  byFileNameLower: Map<string, string>,
+  byFileNameLowerOriginalOnly: Map<string, string>
+): string | null {
+  for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
+    const wanted = `${skuTrim}.${ext}`.toLowerCase();
+    const inOriginal = byFileNameLowerOriginalOnly.get(wanted);
+    if (inOriginal) return inOriginal;
+  }
+  for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
+    const wanted = `${skuTrim}.${ext}`.toLowerCase();
+    const found = byFileNameLower.get(wanted);
+    if (found && !found.startsWith("thumbs/")) return found;
+  }
+  for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
+    const wanted = `${skuTrim}.${ext}`.toLowerCase();
+    const found = byFileNameLower.get(wanted);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
  * Reset 후 보정용:
  * products.sku를 normalizeSkuForMatch로 맞춰 product-images 파일명 stem과 매칭해 image_url 재연결.
  * 기본은 image_url이 비어 있는 상품만 갱신.
@@ -271,12 +300,16 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
   const storagePaths = await listAllProductImagesObjectPaths();
   storagePaths.sort((a, b) => a.localeCompare(b, "ko"));
   const byFileNameLower = new Map<string, string>();
+  const byFileNameLowerOriginalOnly = new Map<string, string>();
   for (const p of storagePaths) {
     const info = splitImageObjectPath(p);
     if (!info) continue;
     // 같은 파일명이 여러 경로에 있으면 정렬상 앞선(안정적인) 경로를 사용
     if (!byFileNameLower.has(info.fileNameLower)) {
       byFileNameLower.set(info.fileNameLower, p);
+    }
+    if (p.startsWith("original/") && !byFileNameLowerOriginalOnly.has(info.fileNameLower)) {
+      byFileNameLowerOriginalOnly.set(info.fileNameLower, p);
     }
   }
 
@@ -304,15 +337,7 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
       continue;
     }
 
-    let hitPath: string | null = null;
-    for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
-      const wanted = `${skuTrim}.${ext}`.toLowerCase();
-      const found = byFileNameLower.get(wanted);
-      if (found) {
-        hitPath = found;
-        break;
-      }
-    }
+    const hitPath = pickReconnectObjectPathForSku(skuTrim, byFileNameLower, byFileNameLowerOriginalOnly);
     if (!hitPath) {
       result.skippedNonMatchedCount++;
       continue;

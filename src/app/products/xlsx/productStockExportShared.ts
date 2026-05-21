@@ -84,6 +84,8 @@ export function formatProductStockUpdatedAt(value: string | null | undefined): s
 
 export async function loadProductStockExportBundle(options: {
   debugVariantRows: boolean;
+  /** 이미지 포함 XLSX 등 셀 삽입용 `thumbs/` 준비 — 일반 CSV/XLSX는 false(기본) */
+  ensureExcelThumbnails?: boolean;
 }): Promise<{
   aoa: (string | number)[][];
   imageLines: ProductStockExportImageLine[];
@@ -105,17 +107,19 @@ export async function loadProductStockExportBundle(options: {
     });
   }
 
-  const thumbById = await ensureProductExcelThumbnailsForExport(
-    list.map((p) => ({
-      id: p.id,
-      sku: p.sku,
-      image_url: p.image_url,
-      thumbnail_url: p.thumbnail_url,
-    }))
-  );
-  for (const p of list) {
-    const t = thumbById.get(p.id);
-    if (t) p.thumbnail_url = t;
+  if (options.ensureExcelThumbnails) {
+    const thumbById = await ensureProductExcelThumbnailsForExport(
+      list.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        image_url: p.image_url,
+        thumbnail_url: p.thumbnail_url,
+      }))
+    );
+    for (const p of list) {
+      const t = thumbById.get(p.id);
+      if (t) p.thumbnail_url = t;
+    }
   }
 
   const categoryOrder = mergeCategoryOrderMapForDisplay(

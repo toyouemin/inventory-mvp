@@ -11,7 +11,10 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   noStore();
   const debugVariantRows = new URL(req.url).searchParams.get("debugVariants") === "1";
-  const { aoa, imageLines, error } = await loadProductStockExportBundle({ debugVariantRows });
+  const { aoa, imageLines, error } = await loadProductStockExportBundle({
+    debugVariantRows,
+    ensureExcelThumbnails: true,
+  });
 
   if (error) {
     return new Response(`XLSX export failed: ${error.message}`, { status: 500 });

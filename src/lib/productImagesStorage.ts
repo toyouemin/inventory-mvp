@@ -80,7 +80,7 @@ function normalizeStorageObjectPath(path: string): string | null {
  * - product-images/<path>
  * - <path> (상대 경로)
  */
-/** Storage object path에서 파일명 stem (확장자 제거). `thumbs/`·`original/` 모두 허용 */
+/** Storage object path에서 파일명 stem (확장자 제거). `thumbs/` 포함 경로 허용 */
 export function stemFromProductImagesFilename(objectPath: string): string | null {
   const base = (objectPath.split("/").pop() ?? "").trim();
   if (!base || base.startsWith(".")) return null;
@@ -97,21 +97,6 @@ export function thumbnailObjectPathFromStem(stem: string): string {
 export function thumbnailPublicUrlForProductImageStem(stem: string): string {
   const { data } = supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(thumbnailObjectPathFromStem(stem));
   return data.publicUrl;
-}
-
-/** `original/{stem}.(jpg|png|webp)` 저장 정책일 때 대응하는 엑셀용 썸네일 공개 URL */
-export function thumbnailPublicUrlFromOriginalObjectPath(originalPath: string): string | null {
-  if (!originalPath.startsWith("original/")) return null;
-  const stem = stemFromProductImagesFilename(originalPath);
-  if (!stem) return null;
-  const { data } = supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(thumbnailObjectPathFromStem(stem));
-  return data.publicUrl;
-}
-
-export function thumbnailPublicUrlFromOriginalPublicUrl(imagePublicUrl: string): string | null {
-  const path = extractProductImagesObjectPathFromAnyRef(imagePublicUrl);
-  if (!path) return null;
-  return thumbnailPublicUrlFromOriginalObjectPath(path);
 }
 
 export function extractProductImagesObjectPathFromAnyRef(rawRef: string): string | null {
@@ -161,9 +146,26 @@ export function extractProductImagesObjectPathFromAnyRef(rawRef: string): string
   return null;
 }
 
+/** 삭제 판단 시 같은 SKU의 루트·thumbs 후보를 함께 보호 */
+function addReferencedAliasesForOrphanCleanup(referencedForCleanup: Set<string>, objectPath: string): void {
+  const stem = stemFromProductImagesFilename(objectPath);
+  if (!stem) return;
+  if (objectPath.startsWith("thumbs/")) {
+    for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {
+      referencedForCleanup.add(`${stem}.${ext}`);
+    }
+  }
+  if (isProductImagesRootSkuObjectPath(objectPath)) {
+    referencedForCleanup.add(thumbnailObjectPathFromStem(stem));
+  }
+}
+
 export type ProductImageOrphanCleanupResult = {
   bucket: string;
+  /** DB `image_url`·`thumbnail_url`에서 해석한 실제 Storage 경로 수(표시용) */
   referencedCount: number;
+  /** 위 URL이 하나라도 있는 상품(products 행) 수 */
+  productsWithImageRefCount: number;
   /** 버킷 내 삭제 가능한 이미지 확장자 파일 수(.emptyFolderPlaceholder·비이미지 제외) */
   storageFileCount: number;
   orphanCount: number;
@@ -253,31 +255,19 @@ export type ResetSkuImageReconnectResult = {
   failedSamples: Array<{ productId: string; sku: string; message: string }>;
 };
 
-/** 버킷 루트의 `{SKU}.{ext}` (폴더 없음, thumbs/original 제외) */
+/** 버킷 루트의 `{SKU}.{ext}` (폴더 없음, thumbs 제외) */
 export function isProductImagesRootSkuObjectPath(path: string): boolean {
   const p = String(path ?? "").trim();
   if (!p || p.includes("/")) return false;
   return isDeletableImageObjectPath(p);
 }
 
-/**
- * CSV reset 등 `reconnectProductsImageUrlsFromStorageBySku`용:
- * 1) 버킷 루트 `{SKU}.{ext}` 우선 · 2) 레거시 `original/{SKU}.{ext}` · thumbs는 image_url에 사용 안 함
- */
-function pickReconnectObjectPathForSku(
-  skuTrim: string,
-  byFileNameLowerRoot: Map<string, string>,
-  byFileNameLowerOriginalOnly: Map<string, string>
-): string | null {
+/** CSV reset 등 `reconnectProductsImageUrlsFromStorageBySku`용: 버킷 루트 `{SKU}.{ext}` 만 (thumbs는 image_url에 사용 안 함) */
+function pickReconnectObjectPathForSku(skuTrim: string, byFileNameLowerRoot: Map<string, string>): string | null {
   for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
     const wanted = `${skuTrim}.${ext}`.toLowerCase();
     const atRoot = byFileNameLowerRoot.get(wanted);
     if (atRoot) return atRoot;
-  }
-  for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
-    const wanted = `${skuTrim}.${ext}`.toLowerCase();
-    const inOriginal = byFileNameLowerOriginalOnly.get(wanted);
-    if (inOriginal) return inOriginal;
   }
   return null;
 }
@@ -306,15 +296,11 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
   const storagePaths = await listAllProductImagesObjectPaths();
   storagePaths.sort((a, b) => a.localeCompare(b, "ko"));
   const byFileNameLowerRoot = new Map<string, string>();
-  const byFileNameLowerOriginalOnly = new Map<string, string>();
   for (const p of storagePaths) {
     const info = splitImageObjectPath(p);
     if (!info) continue;
     if (isProductImagesRootSkuObjectPath(p) && !byFileNameLowerRoot.has(info.fileNameLower)) {
       byFileNameLowerRoot.set(info.fileNameLower, p);
-    }
-    if (p.startsWith("original/") && !byFileNameLowerOriginalOnly.has(info.fileNameLower)) {
-      byFileNameLowerOriginalOnly.set(info.fileNameLower, p);
     }
   }
 
@@ -342,7 +328,7 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
       continue;
     }
 
-    const hitPath = pickReconnectObjectPathForSku(skuTrim, byFileNameLowerRoot, byFileNameLowerOriginalOnly);
+    const hitPath = pickReconnectObjectPathForSku(skuTrim, byFileNameLowerRoot);
     if (!hitPath) {
       result.skippedNonMatchedCount++;
       continue;
@@ -420,9 +406,13 @@ export async function cleanupProductImageOrphans(options?: {
   if (pe) throw new Error(`[products.image_url 조회 실패] ${pe.message}`);
 
   const parseFailures: Array<{ imageUrl: string; reason: string }> = [];
-  const referenced = new Set<string>();
+  const referencedDirect = new Set<string>();
+  const referencedForCleanup = new Set<string>();
+  let productsWithImageRefCount = 0;
+
   for (const row of rows ?? []) {
     const r = row as { image_url?: string | null; thumbnail_url?: string | null };
+    let productHasDirectRef = false;
     for (const rawRef of [String(r.image_url ?? "").trim(), String(r.thumbnail_url ?? "").trim()]) {
       if (!rawRef) continue;
       const p = extractProductImagesObjectPathFromAnyRef(rawRef);
@@ -433,29 +423,18 @@ export async function cleanupProductImageOrphans(options?: {
         });
         continue;
       }
-      referenced.add(p);
-      const stem = stemFromProductImagesFilename(p);
-      if (stem) {
-        /* 루트 원본 ↔ 엑셀용 thumbs / 레거시 original 상호 보호 */
-        if (p.startsWith("thumbs/") || p.startsWith("original/")) {
-          for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {
-            referenced.add(`${stem}.${ext}`);
-          }
-        }
-        if (isProductImagesRootSkuObjectPath(p)) {
-          referenced.add(thumbnailObjectPathFromStem(stem));
-          for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {
-            referenced.add(`original/${stem}.${ext}`);
-          }
-        }
-      }
+      productHasDirectRef = true;
+      referencedDirect.add(p);
+      referencedForCleanup.add(p);
+      addReferencedAliasesForOrphanCleanup(referencedForCleanup, p);
     }
+    if (productHasDirectRef) productsWithImageRefCount++;
   }
 
   const storagePaths = await listAllProductImagesObjectPaths();
   const imageStoragePaths = storagePaths.filter((p) => isDeletableImageObjectPath(p));
   const orphanPaths = imageStoragePaths
-    .filter((p) => !referenced.has(p))
+    .filter((p) => !referencedForCleanup.has(p))
     .sort((a, b) => a.localeCompare(b, "ko"));
 
   let deletedPaths: string[] = [];
@@ -476,7 +455,8 @@ export async function cleanupProductImageOrphans(options?: {
 
   return {
     bucket: PRODUCT_IMAGES_BUCKET,
-    referencedCount: referenced.size,
+    referencedCount: referencedDirect.size,
+    productsWithImageRefCount,
     storageFileCount: imageStoragePaths.length,
     orphanCount: orphanPaths.length,
     orphanPaths,

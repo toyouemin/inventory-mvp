@@ -56,6 +56,7 @@ function variantsAfterZeroStockFilter(variants: ProductVariant[], hideZeroStock:
 type StorageOrphanCleanupResult = {
   bucket: string;
   referencedCount: number;
+  productsWithImageRefCount: number;
   storageFileCount: number;
   orphanCount: number;
   orphanPaths: string[];
@@ -2144,6 +2145,7 @@ export function ProductsClient({
       setOrphanResult({
         bucket: String(json.bucket ?? ""),
         referencedCount: Number(json.referencedCount ?? 0),
+        productsWithImageRefCount: Number(json.productsWithImageRefCount ?? 0),
         storageFileCount: Number(json.storageFileCount ?? 0),
         orphanCount: Number(json.orphanCount ?? 0),
         orphanPaths: Array.isArray(json.orphanPaths) ? json.orphanPaths.map((x) => String(x)) : [],
@@ -2199,6 +2201,9 @@ export function ProductsClient({
       const next: StorageOrphanCleanupResult = {
         bucket: String(json.bucket ?? orphanResult.bucket),
         referencedCount: Number(json.referencedCount ?? orphanResult.referencedCount),
+        productsWithImageRefCount: Number(
+          json.productsWithImageRefCount ?? orphanResult.productsWithImageRefCount
+        ),
         storageFileCount: Number(json.storageFileCount ?? orphanResult.storageFileCount),
         orphanCount: Number(json.orphanCount ?? 0),
         orphanPaths: Array.isArray(json.orphanPaths) ? json.orphanPaths.map((x) => String(x)) : [],
@@ -2665,7 +2670,8 @@ export function ProductsClient({
           {orphanResult ? (
             <>
               <p className="orphan-cleanup-panel__summary">
-                저장소 <strong>{orphanResult.bucket || "-"}</strong> · DB에서 사용 중{" "}
+                저장소 <strong>{orphanResult.bucket || "-"}</strong> · 이미지 있는 상품{" "}
+                <strong>{orphanResult.productsWithImageRefCount}건</strong> · DB URL 경로(실제){" "}
                 <strong>{orphanResult.referencedCount}개</strong> · 스토리지 이미지 파일{" "}
                 <strong>{orphanResult.storageFileCount}개</strong> · 불필요 이미지{" "}
                 <strong>{orphanResult.orphanCount}개</strong>

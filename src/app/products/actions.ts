@@ -487,10 +487,9 @@ function safeSkuForImageFilename(rawSku: string): string {
 }
 
 async function removeOtherSkuImageExtensions(skuBase: string, keepExt: string): Promise<void> {
-  const removeTargets = SKU_IMAGE_CLEANUP_EXTENSIONS.filter((ext) => ext !== keepExt).flatMap((ext) => [
-    `${skuBase}.${ext}`,
-    `original/${skuBase}.${ext}`,
-  ]);
+  const removeTargets = SKU_IMAGE_CLEANUP_EXTENSIONS.filter((ext) => ext !== keepExt).map(
+    (ext) => `${skuBase}.${ext}`
+  );
   if (removeTargets.length === 0) return;
   const { error } = await supabaseServer.storage.from("product-images").remove(removeTargets);
   if (error) {
@@ -1740,8 +1739,8 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
     const newPathsRef = collectReferencedProductImagesStoragePaths(finalProductRows);
     const stalePaths = [...oldPathsRef].filter((p) => {
       if (newPathsRef.has(p)) return false;
-      /* 스냅샷의 original/thumbs 경로 — 새 DB가 루트 `{stem}.*`를 쓰면 루트 파일을 stale로 지우지 않음 */
-      if (p.startsWith("original/") || p.startsWith("thumbs/")) {
+      /* 스냅샷의 thumbs 경로 — 새 DB가 루트 `{stem}.*`를 쓰면 루트 파일을 stale로 지우지 않음 */
+      if (p.startsWith("thumbs/")) {
         const stem = stemFromProductImagesFilename(p);
         if (stem) {
           for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {

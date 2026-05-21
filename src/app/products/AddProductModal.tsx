@@ -87,6 +87,7 @@ export function AddProductModal({
     setPending(true);
     try {
       let finalImageUrl = imageUrl.trim() || null;
+      let thumbnailUrl: string | null | undefined;
       if (imageFile) {
         if (!sku.trim()) {
           throw new Error("SKU를 먼저 입력한 뒤 이미지를 업로드해 주세요.");
@@ -95,8 +96,9 @@ export function AddProductModal({
         const fd = new FormData();
         fd.append("file", resized);
         fd.append("sku", sku.trim());
-        const { url } = await uploadProductImage(fd);
-        finalImageUrl = url;
+        const uploaded = await uploadProductImage(fd);
+        finalImageUrl = uploaded.url;
+        thumbnailUrl = uploaded.thumbnailUrl;
       }
       const variants =
         rowsWithAny.length > 0
@@ -119,6 +121,7 @@ export function AddProductModal({
         category: category.trim() || null,
         name: name.trim(),
         imageUrl: finalImageUrl,
+        ...(thumbnailUrl !== undefined ? { thumbnailUrl } : {}),
         memo: memo.trim() || null,
         memo2: memo2.trim() || null,
         variants,

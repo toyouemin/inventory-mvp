@@ -93,6 +93,12 @@ export function thumbnailObjectPathFromStem(stem: string): string {
   return `thumbs/${stem}.jpg`;
 }
 
+/** 엑셀용 `thumbs/{stem}.jpg` 공개 URL (파일이 Storage에 있어야 함) */
+export function thumbnailPublicUrlForProductImageStem(stem: string): string {
+  const { data } = supabaseServer.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(thumbnailObjectPathFromStem(stem));
+  return data.publicUrl;
+}
+
 /** `original/{stem}.(jpg|png|webp)` 저장 정책일 때 대응하는 엑셀용 썸네일 공개 URL */
 export function thumbnailPublicUrlFromOriginalObjectPath(originalPath: string): string | null {
   if (!originalPath.startsWith("original/")) return null;
@@ -247,31 +253,31 @@ export type ResetSkuImageReconnectResult = {
   failedSamples: Array<{ productId: string; sku: string; message: string }>;
 };
 
+/** 버킷 루트의 `{SKU}.{ext}` (폴더 없음, thumbs/original 제외) */
+export function isProductImagesRootSkuObjectPath(path: string): boolean {
+  const p = String(path ?? "").trim();
+  if (!p || p.includes("/")) return false;
+  return isDeletableImageObjectPath(p);
+}
+
 /**
  * CSV reset 등 `reconnectProductsImageUrlsFromStorageBySku`용:
- * 확장자 우선순위가 `jpg`라 `thumbs/{sku}.jpg`가 `original/{sku}.webp`보다 먼저 매칭되며
- * 저해상도 썸네일만 `image_url`로 들어가는 문제를 막기 위해 경로 선택 순서를 둔다.
- * 1) `original/` 아래 파일만 우선 · 2) thumbs가 아닌 경로 · 3) 마지막에 thumbs
+ * 1) 버킷 루트 `{SKU}.{ext}` 우선 · 2) 레거시 `original/{SKU}.{ext}` · thumbs는 image_url에 사용 안 함
  */
 function pickReconnectObjectPathForSku(
   skuTrim: string,
-  byFileNameLower: Map<string, string>,
+  byFileNameLowerRoot: Map<string, string>,
   byFileNameLowerOriginalOnly: Map<string, string>
 ): string | null {
   for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
     const wanted = `${skuTrim}.${ext}`.toLowerCase();
+    const atRoot = byFileNameLowerRoot.get(wanted);
+    if (atRoot) return atRoot;
+  }
+  for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
+    const wanted = `${skuTrim}.${ext}`.toLowerCase();
     const inOriginal = byFileNameLowerOriginalOnly.get(wanted);
     if (inOriginal) return inOriginal;
-  }
-  for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
-    const wanted = `${skuTrim}.${ext}`.toLowerCase();
-    const found = byFileNameLower.get(wanted);
-    if (found && !found.startsWith("thumbs/")) return found;
-  }
-  for (const ext of RESET_IMAGE_MATCH_EXTENSION_PRIORITY) {
-    const wanted = `${skuTrim}.${ext}`.toLowerCase();
-    const found = byFileNameLower.get(wanted);
-    if (found) return found;
   }
   return null;
 }
@@ -299,14 +305,13 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
 
   const storagePaths = await listAllProductImagesObjectPaths();
   storagePaths.sort((a, b) => a.localeCompare(b, "ko"));
-  const byFileNameLower = new Map<string, string>();
+  const byFileNameLowerRoot = new Map<string, string>();
   const byFileNameLowerOriginalOnly = new Map<string, string>();
   for (const p of storagePaths) {
     const info = splitImageObjectPath(p);
     if (!info) continue;
-    // 같은 파일명이 여러 경로에 있으면 정렬상 앞선(안정적인) 경로를 사용
-    if (!byFileNameLower.has(info.fileNameLower)) {
-      byFileNameLower.set(info.fileNameLower, p);
+    if (isProductImagesRootSkuObjectPath(p) && !byFileNameLowerRoot.has(info.fileNameLower)) {
+      byFileNameLowerRoot.set(info.fileNameLower, p);
     }
     if (p.startsWith("original/") && !byFileNameLowerOriginalOnly.has(info.fileNameLower)) {
       byFileNameLowerOriginalOnly.set(info.fileNameLower, p);
@@ -337,7 +342,7 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
       continue;
     }
 
-    const hitPath = pickReconnectObjectPathForSku(skuTrim, byFileNameLower, byFileNameLowerOriginalOnly);
+    const hitPath = pickReconnectObjectPathForSku(skuTrim, byFileNameLowerRoot, byFileNameLowerOriginalOnly);
     if (!hitPath) {
       result.skippedNonMatchedCount++;
       continue;
@@ -349,13 +354,12 @@ export async function reconnectProductsImageUrlsFromStorageBySku(options?: {
     }
 
     const url = publicUrlForProductImagesPath(hitPath);
-    const thumbUrl = thumbnailPublicUrlFromOriginalObjectPath(hitPath);
     try {
       const { error: upErr } = await supabaseServer
         .from("products")
         .update({
           image_url: url,
-          ...(thumbUrl ? { thumbnail_url: thumbUrl } : { thumbnail_url: null }),
+          thumbnail_url: null,
         })
         .eq("id", productId);
       if (upErr) throw new Error(upErr.message);
@@ -430,10 +434,16 @@ export async function cleanupProductImageOrphans(options?: {
         continue;
       }
       referenced.add(p);
-      /* DB가 `thumbs/{stem}.jpg`만 가리킬 때 같은 stem의 `original/*`가 고아로 오인·삭제되지 않게 함 */
-      if (p.startsWith("thumbs/")) {
-        const stem = stemFromProductImagesFilename(p);
-        if (stem) {
+      const stem = stemFromProductImagesFilename(p);
+      if (stem) {
+        /* 루트 원본 ↔ 엑셀용 thumbs / 레거시 original 상호 보호 */
+        if (p.startsWith("thumbs/") || p.startsWith("original/")) {
+          for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {
+            referenced.add(`${stem}.${ext}`);
+          }
+        }
+        if (isProductImagesRootSkuObjectPath(p)) {
+          referenced.add(thumbnailObjectPathFromStem(stem));
           for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {
             referenced.add(`original/${stem}.${ext}`);
           }

@@ -9,6 +9,7 @@ import {
   EXCEL_DOWNLOAD_FONT_NAME,
   EXCEL_DOWNLOAD_HEADER_FONT_SZ,
 } from "@/lib/excelDownloadFont";
+import { ensureProductExcelThumbnailsForExport } from "@/lib/ensureProductExcelThumbnails.server";
 import { stripInvalidOneCellAnchorEditAsFromXlsxBuffer } from "@/lib/excelXlsxStripInvalidOneCellEditAs";
 import { supabaseServer } from "@/lib/supabaseClient";
 import ExcelJS from "exceljs";
@@ -385,6 +386,19 @@ export async function GET(req: Request) {
     { silent: true }
   );
   list.sort((a, b) => comparePriceListRows(a, b, categoryOrder));
+
+  const thumbById = await ensureProductExcelThumbnailsForExport(
+    list.map((p) => ({
+      id: p.id,
+      sku: p.sku,
+      image_url: p.image_url,
+      thumbnail_url: p.thumbnail_url,
+    }))
+  );
+  for (const p of list) {
+    const t = thumbById.get(p.id);
+    if (t) p.thumbnail_url = t;
+  }
 
   const { map: variantsByProductId, error: vErr } = await fetchVariantsByProductIds(list.map((p) => p.id));
   if (vErr) {

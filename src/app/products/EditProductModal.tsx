@@ -256,6 +256,7 @@ export function EditProductModal({
     setPending(true);
     try {
       let finalImageUrl = imageUrl.trim() || null;
+      let thumbnailUrl: string | null | undefined;
       if (imageFile) {
         if (!sku.trim()) {
           throw new Error("SKU를 먼저 입력한 뒤 이미지를 업로드해 주세요.");
@@ -264,14 +265,16 @@ export function EditProductModal({
         const fd = new FormData();
         fd.append("file", resized);
         fd.append("sku", sku.trim());
-        const { url } = await uploadProductImage(fd);
-        finalImageUrl = url;
+        const uploaded = await uploadProductImage(fd);
+        finalImageUrl = uploaded.url;
+        thumbnailUrl = uploaded.thumbnailUrl;
       }
       const updatePayload = {
         sku: sku.trim(),
         category: category.trim() || null,
         name: name.trim(),
         imageUrl: finalImageUrl,
+        ...(thumbnailUrl !== undefined ? { thumbnailUrl } : {}),
         memo: memo.trim() || null,
         memo2: memo2.trim() || null,
         ...(variantsChanged ? { variants: { updates, deleteIds } } : {}),

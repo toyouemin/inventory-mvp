@@ -22,7 +22,8 @@ import {
   reconnectProductsImageUrlsFromStorageBySku,
   removeReplacedProductImageFromStorage,
   stemFromProductImagesFilename,
-  thumbnailPublicUrlFromOriginalPublicUrl,
+  thumbnailObjectPathFromStem,
+  thumbnailPublicUrlForProductImageStem,
 } from "@/lib/productImagesStorage";
 import { decodeWithFallback } from "@/lib/csvDecodeWithFallback";
 
@@ -97,6 +98,7 @@ export async function createProduct(data: {
   category?: string | null;
   name: string;
   imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   memo?: string | null;
   memo2?: string | null;
   variants?: {
@@ -134,7 +136,7 @@ export async function createProduct(data: {
     category: data.category?.trim() || null,
     name: (data.name ?? "").trim(),
     image_url: resolvedImg,
-    thumbnail_url: resolvedImg ? thumbnailPublicUrlFromOriginalPublicUrl(resolvedImg) ?? null : null,
+    thumbnail_url: data.thumbnailUrl !== undefined ? data.thumbnailUrl?.trim() || null : null,
     wholesale_price: null,
     msrp_price: null,
     sale_price: null,
@@ -189,6 +191,7 @@ export async function updateProduct(
     category?: string | null;
     name?: string;
     imageUrl?: string | null;
+    thumbnailUrl?: string | null;
     memo?: string | null;
     memo2?: string | null;
     variants?: {
@@ -232,7 +235,11 @@ export async function updateProduct(
     }
     const resolved = resolveProductImageUrl(skuForImg, data.imageUrl);
     updateData.image_url = resolved;
-    updateData.thumbnail_url = resolved ? thumbnailPublicUrlFromOriginalPublicUrl(resolved) ?? null : null;
+    if (data.thumbnailUrl !== undefined) {
+      updateData.thumbnail_url = data.thumbnailUrl?.trim() || null;
+    } else if (!resolved) {
+      updateData.thumbnail_url = null;
+    }
     imageUrlReplaceForStorageCleanup = {
       prev: previousUrlTrim,
       next: String(resolved ?? "").trim(),
@@ -480,9 +487,10 @@ function safeSkuForImageFilename(rawSku: string): string {
 }
 
 async function removeOtherSkuImageExtensions(skuBase: string, keepExt: string): Promise<void> {
-  const removeTargets = SKU_IMAGE_CLEANUP_EXTENSIONS
-    .filter((ext) => ext !== keepExt)
-    .map((ext) => `original/${skuBase}.${ext}`);
+  const removeTargets = SKU_IMAGE_CLEANUP_EXTENSIONS.filter((ext) => ext !== keepExt).flatMap((ext) => [
+    `${skuBase}.${ext}`,
+    `original/${skuBase}.${ext}`,
+  ]);
   if (removeTargets.length === 0) return;
   const { error } = await supabaseServer.storage.from("product-images").remove(removeTargets);
   if (error) {
@@ -494,8 +502,11 @@ async function removeOtherSkuImageExtensions(skuBase: string, keepExt: string): 
   }
 }
 
-/** 개별 업로드 전용: 원본 파일명 무시, `product-images/original/{SKU}.{ext}` + `thumbs/{SKU}.jpg` */
-async function uploadImageFileToProductImagesBucketBySku(file: File, skuRaw: string): Promise<string> {
+/** 개별 업로드: 루트 `{SKU}.{ext}` + 엑셀용 `thumbs/{SKU}.jpg` */
+async function uploadImageFileToProductImagesBucketBySku(
+  file: File,
+  skuRaw: string
+): Promise<{ imageUrl: string; thumbnailUrl: string }> {
   const type = file.type?.toLowerCase() ?? "";
   if (!ALLOWED_IMAGE_TYPES.includes(type)) {
     throw new Error("jpg, png, webp만 업로드할 수 있습니다.");
@@ -509,10 +520,10 @@ async function uploadImageFileToProductImagesBucketBySku(file: File, skuRaw: str
   }
 
   const ext = type === "image/jpeg" ? "jpg" : type === "image/png" ? "png" : "webp";
-  const originalPath = `original/${skuBase}.${ext}`;
+  const objectPath = `${skuBase}.${ext}`;
   const buf = Buffer.from(await file.arrayBuffer());
 
-  const { error } = await supabaseServer.storage.from("product-images").upload(originalPath, buf, {
+  const { error } = await supabaseServer.storage.from("product-images").upload(objectPath, buf, {
     contentType: type,
     upsert: true,
   });
@@ -521,24 +532,25 @@ async function uploadImageFileToProductImagesBucketBySku(file: File, skuRaw: str
   await removeOtherSkuImageExtensions(skuBase, ext);
 
   const thumbBuf = await buildProductExcelThumbJpegFromBuffer(buf);
-  const thumbPath = `thumbs/${skuBase}.jpg`;
+  const thumbPath = thumbnailObjectPathFromStem(skuBase);
   const { error: thumbErr } = await supabaseServer.storage.from("product-images").upload(thumbPath, thumbBuf, {
     contentType: "image/jpeg",
     upsert: true,
   });
   if (thumbErr) throw new Error(thumbErr.message);
 
-  const { data: urlData } = supabaseServer.storage.from("product-images").getPublicUrl(originalPath);
-  return urlData.publicUrl;
+  const { data: urlData } = supabaseServer.storage.from("product-images").getPublicUrl(objectPath);
+  const thumbnailUrl = thumbnailPublicUrlForProductImageStem(skuBase);
+  return { imageUrl: urlData.publicUrl, thumbnailUrl };
 }
 
 /** Upload image to Supabase Storage bucket product-images; returns public URL. */
-export async function uploadProductImage(formData: FormData): Promise<{ url: string }> {
+export async function uploadProductImage(formData: FormData): Promise<{ url: string; thumbnailUrl: string | null }> {
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File)) throw new Error("파일이 없습니다.");
   const sku = String(formData.get("sku") ?? "");
-  const url = await uploadImageFileToProductImagesBucketBySku(file, sku);
-  return { url };
+  const { imageUrl, thumbnailUrl } = await uploadImageFileToProductImagesBucketBySku(file, sku);
+  return { url: imageUrl, thumbnailUrl };
 }
 
 function imageFilenameBasename(name: string): string {
@@ -1400,7 +1412,7 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
       category: row0.category || null,
       name: row0.name,
       image_url: csvImageUrl,
-      thumbnail_url: csvImageUrl ? thumbnailPublicUrlFromOriginalPublicUrl(csvImageUrl) ?? null : null,
+      thumbnail_url: null,
       wholesale_price: null as number | null,
       msrp_price: null as number | null,
       sale_price: null as number | null,
@@ -1448,7 +1460,7 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
           ...(hasExplicitImageUrl(row0.imageUrl)
             ? {
                 image_url: nextImageUrl,
-                thumbnail_url: nextImageUrl ? thumbnailPublicUrlFromOriginalPublicUrl(nextImageUrl) ?? null : null,
+                thumbnail_url: null,
               }
             : {}),
         })
@@ -1616,7 +1628,7 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
         category: row0.category || null,
         name: row0.name,
         image_url: resetCsvImageUrl,
-        thumbnail_url: resetCsvImageUrl ? thumbnailPublicUrlFromOriginalPublicUrl(resetCsvImageUrl) ?? null : null,
+        thumbnail_url: null,
         wholesale_price: null as number | null,
         msrp_price: null as number | null,
         sale_price: null as number | null,
@@ -1728,10 +1740,14 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
     const newPathsRef = collectReferencedProductImagesStoragePaths(finalProductRows);
     const stalePaths = [...oldPathsRef].filter((p) => {
       if (newPathsRef.has(p)) return false;
-      /* 재연결이 원본 대신 thumbs만 새 DB에 두면 원본 경로가 `stale`로 오인·삭제되는 것 방지 */
-      if (p.startsWith("original/")) {
+      /* 스냅샷의 original/thumbs 경로 — 새 DB가 루트 `{stem}.*`를 쓰면 루트 파일을 stale로 지우지 않음 */
+      if (p.startsWith("original/") || p.startsWith("thumbs/")) {
         const stem = stemFromProductImagesFilename(p);
-        if (stem && newPathsRef.has(`thumbs/${stem}.jpg`)) return false;
+        if (stem) {
+          for (const ext of ["jpg", "jpeg", "png", "webp"] as const) {
+            if (newPathsRef.has(`${stem}.${ext}`)) return false;
+          }
+        }
       }
       return true;
     });

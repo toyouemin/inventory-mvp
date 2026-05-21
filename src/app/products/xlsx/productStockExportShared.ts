@@ -1,3 +1,5 @@
+import { ensureProductExcelThumbnailsForExport } from "@/lib/ensureProductExcelThumbnails.server";
+
 import { fetchCategoryOrderMap } from "../categorySortOrder.server";
 import { compareProductsByCategoryOrder, mergeCategoryOrderMapForDisplay } from "../categorySortOrder.utils";
 import { sortVariants } from "../variantOptions";
@@ -101,6 +103,19 @@ export async function loadProductStockExportBundle(options: {
     console.info("[xlsx/products] fetched-counts", {
       fetchedProducts: list.length,
     });
+  }
+
+  const thumbById = await ensureProductExcelThumbnailsForExport(
+    list.map((p) => ({
+      id: p.id,
+      sku: p.sku,
+      image_url: p.image_url,
+      thumbnail_url: p.thumbnail_url,
+    }))
+  );
+  for (const p of list) {
+    const t = thumbById.get(p.id);
+    if (t) p.thumbnail_url = t;
   }
 
   const categoryOrder = mergeCategoryOrderMapForDisplay(

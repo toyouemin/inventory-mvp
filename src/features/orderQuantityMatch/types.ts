@@ -34,8 +34,7 @@ export type NormalizedStockLine = {
 };
 
 /**
- * 매칭 엔진 표준 입력 한 행.
- * 수동 UI·엑셀 정규화 파이프라인 모두 이 형태로 끝나면 `matchOrderRowsToStock(rows, stockLines)`에 그대로 넣을 수 있다.
+ * 매칭 엔진 표준 입력 한 행 (`matchOrderRowsToProducts` 등).
  * 예: 단품 `{ rowId, category:"티셔츠", garmentType:"top", gender:"남", size:"M", quantity:24, bundleKey:"" }`,
  * 세트는 `bundleKey` 동일 + `garmentType`을 상의/하의로 나눈 행 2개 이상.
  */
@@ -58,44 +57,3 @@ export type NormalizedDemandLine = {
   /** UI/결과용 요약 라벨 */
   summaryLabel: string;
 };
-
-export type LineShortageDetail = {
-  matchKey: string;
-  dimensionSummary: string;
-  requested: number;
-  allocated: number;
-  shortage: number;
-  availableStock: number;
-};
-
-export type RowMatchResult = {
-  rowId: string;
-  bundleKey: string | null;
-  summaryLabel: string;
-  garmentType: GarmentTypeId;
-  status: MatchStatus;
-  totalRequested: number;
-  totalAllocated: number;
-  totalShortage: number;
-  details: LineShortageDetail[];
-};
-
-export type BundleMatchResult = {
-  bundleKey: string;
-  rowResults: RowMatchResult[];
-  status: MatchStatus;
-  totalRequested: number;
-  totalAllocated: number;
-  totalShortage: number;
-};
-
-export type MatchReport = {
-  standaloneRows: RowMatchResult[];
-  bundles: BundleMatchResult[];
-  /** 표시 순서용 평탄화(번들은 한 블록으로) */
-  displayItems: DisplayMatchItem[];
-};
-
-export type DisplayMatchItem =
-  | { kind: "standalone"; result: RowMatchResult }
-  | { kind: "bundle"; result: BundleMatchResult };

@@ -1,9 +1,4 @@
-/**
- * 주문 입력 행 → 정규화 수요 라인.
- *
- * 엑셀 등 외부 소스는 `toRequestLineInput`으로 먼저 `RequestLineInput`을 만든 뒤,
- * 여기 `normalizeRequestLine`을 거치면 매칭 키와 동일한 차원 맵이 된다(`excelPipelineContract.ts` 참고).
- */
+/** 주문 입력 행 → 정규화 수요 라인 (`matchOrderRowsToProducts` 등에서 사용). */
 
 import type { NormalizedDemandLine, RequestLineInput } from "./types";
 import {

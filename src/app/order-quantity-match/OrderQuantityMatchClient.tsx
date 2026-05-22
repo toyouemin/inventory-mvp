@@ -1314,9 +1314,19 @@ function OqmResultDetailSheet({
         <div className="oqm-detail-sheet__image-wrap oqm-image-modal">
           {imageUrl ? (
             <img
-              className="oqm-detail-sheet__image"
+              className="oqm-detail-sheet__image oqm-detail-sheet__image--tap-close"
               src={imageUrl}
               alt={result.displayName}
+              role="button"
+              tabIndex={0}
+              aria-label={`${result.displayName} 이미지 — 탭하면 닫기`}
+              onClick={onClose}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onClose();
+                }
+              }}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}

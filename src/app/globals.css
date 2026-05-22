@@ -7226,6 +7226,11 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   object-position: center;
 }
 
+.oqm-detail-sheet__image--tap-close {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .oqm-detail-sheet__image-ph {
   width: 100%;
   height: 200px;
@@ -7254,6 +7259,52 @@ button.status-stock-stat.status-stock-stat--zero-toggle[aria-pressed="true"] {
   font-size: 0.8rem;
   font-weight: 800;
   color: var(--muted);
+}
+
+/* PC: 상품 상세(이미지) 팝업 — 카드 폭 수준, 전체 화면 확대 방지 */
+@media (min-width: 1024px) {
+  .oqm-detail-sheet {
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+  }
+
+  .oqm-detail-sheet__panel {
+    width: fit-content;
+    max-width: min(900px, calc(100vw - 48px));
+    margin: auto;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+  }
+
+  .oqm-detail-sheet__image-wrap {
+    width: fit-content;
+    max-width: 420px;
+    max-height: none;
+    min-height: 0;
+    margin-left: auto;
+    margin-right: auto;
+    overflow: visible;
+  }
+
+  .oqm-detail-sheet__image,
+  .oqm-image-modal img {
+    width: auto;
+    max-width: 420px;
+    max-height: 500px;
+    height: auto;
+    object-fit: contain;
+    object-position: center;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .oqm-detail-sheet__image-ph {
+    width: 200px;
+    max-width: 420px;
+    height: 200px;
+    max-height: 500px;
+  }
 }
 
 .oqm-num-warn {

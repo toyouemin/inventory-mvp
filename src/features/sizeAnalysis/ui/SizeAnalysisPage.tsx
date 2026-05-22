@@ -784,7 +784,7 @@ export function SizeAnalysisPage() {
             .join(" ")}
         >
           <button
-            className="btn btn-danger btn-strong"
+            className="btn btn-primary btn-strong"
             type="button"
             onClick={runAction}
             disabled={!allSetupStepsComplete || loading !== ""}

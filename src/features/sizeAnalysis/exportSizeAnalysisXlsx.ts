@@ -8,6 +8,7 @@ import {
   buildAggRowsDuplicate,
   buildAggRowsTotal,
   buildClubAggBlock,
+  computeOverallExportSummary,
   compareRowsBySourceThenIndex,
   matrixAggGenderAndSizeFromRow,
   normClubFromNormRow,
@@ -489,7 +490,10 @@ function appendClubMatrixSection(
     hasSizeCheckInCell?: (gk: "여" | "남" | "공용", sz: string) => boolean;
     hasSizeCheckInColumn?: (sz: string) => boolean;
     clubTintFill?: import("xlsx-js-style").CellStyle["fill"];
-    /** false면 `clubTintFill`은 제목 행에만 적용(헤더·본문은 파란 헤더·기본 배경 유지). 기본 true */
+    /**
+     * true: 매트릭스 전체에 클럽 색
+     * false: 블록 제목만 클럽 색, 성별·합계 열은 헤더(파란)와 동일, 수량·총합계는 흰색
+     */
     clubTintSpreadToMatrix?: boolean;
   }
 ): { r: number; cMax: number } {
@@ -502,7 +506,17 @@ function appendClubMatrixSection(
   let cMax = colCount - 1;
 
   const clubTintFillOpt = opts?.clubTintFill;
-  const tintBody = Boolean(clubTintFillOpt) && opts?.clubTintSpreadToMatrix !== false;
+  const tintAllMatrix = Boolean(clubTintFillOpt) && opts?.clubTintSpreadToMatrix !== false;
+  const styleGenderSumLikeHeader = Boolean(clubTintFillOpt) && !tintAllMatrix;
+
+  const styleMatrixCell = (
+    base: import("xlsx-js-style").CellStyle,
+    col: number
+  ): import("xlsx-js-style").CellStyle => {
+    if (tintAllMatrix && clubTintFillOpt) return mergeStyle(base, { fill: clubTintFillOpt });
+    if (styleGenderSumLikeHeader && (col === 0 || col === lastSumCol)) return styleHeader();
+    return base;
+  };
 
   const titleWithTint = clubTintFillOpt ? mergeStyle(titleStyle, { fill: clubTintFillOpt }) : titleStyle;
   const titleRowStyle = clubBlockTopSeparator
@@ -518,11 +532,10 @@ function appendClubMatrixSection(
 
   r += 1;
   const headerR = r;
-  const headerRow: (string | number)[] = ["성별", ...colSizes, "합계", "종합계"];
+  const headerRow: (string | number)[] = ["성별", ...colSizes, "합계", "총합계"];
   for (let c = 0; c < colCount; c += 1) {
     const v = headerRow[c]!;
-    let headStyle = styleHeader();
-    if (tintBody && clubTintFillOpt) headStyle = mergeStyle(headStyle, { fill: clubTintFillOpt });
+    let headStyle = styleMatrixCell(styleHeader(), c);
     if (c >= 1 && c <= L) {
       const sz = colSizes[c - 1]!;
       if (opts?.hasSizeCheckInColumn?.(sz)) {
@@ -543,8 +556,7 @@ function appendClubMatrixSection(
   for (let gi = 0; gi < genders.length; gi += 1) {
     const gk = genders[gi]!;
     const rowIdx = r;
-    let firstColStyle = styleDataCenter();
-    if (tintBody && clubTintFillOpt) firstColStyle = mergeStyle(firstColStyle, { fill: clubTintFillOpt });
+    const firstColStyle = styleMatrixCell(styleDataCenter(), 0);
     ws[enc({ r: rowIdx, c: 0 })] = { v: gk, t: "s", s: firstColStyle };
     let rowSum = 0;
     for (let i = 0; i < L; i += 1) {
@@ -552,8 +564,7 @@ function appendClubMatrixSection(
       const q = b.qtyMap.get(`${gk}\0${sz}`) ?? 0;
       rowSum += q;
       const hasSizeCheck = Boolean(opts?.hasSizeCheckInCell?.(gk, sz));
-      let cellStyle = styleDataCenter();
-      if (tintBody && clubTintFillOpt) cellStyle = mergeStyle(cellStyle, { fill: clubTintFillOpt });
+      let cellStyle = styleMatrixCell(styleDataCenter(), 1 + i);
       if (hasSizeCheck) {
         if (opts?.modeKind === "duplicate" && q > 0) {
           cellStyle = mergeStyle(cellStyle, { border: { bottom: SIZE_CHECK_BOTTOM_BORDER } });
@@ -568,25 +579,21 @@ function appendClubMatrixSection(
       }
     }
     if (rowSum === 0) {
-      let sumStyle = styleDataCenter();
-      if (tintBody && clubTintFillOpt) sumStyle = mergeStyle(sumStyle, { fill: clubTintFillOpt });
+      const sumStyle = styleMatrixCell(styleDataCenter(), lastSumCol);
       ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "s", v: "", s: sumStyle };
     } else {
-      let sumStyle = styleDataCenter();
-      if (tintBody && clubTintFillOpt) sumStyle = mergeStyle(sumStyle, { fill: clubTintFillOpt });
+      const sumStyle = styleMatrixCell(styleDataCenter(), lastSumCol);
       ws[enc({ r: rowIdx, c: lastSumCol })] = { t: "n", v: rowSum, s: sumStyle };
     }
     if (gi === 0) {
-      let zStyle = { ...styleDataCenter(), font: { bold: true } } as import("xlsx-js-style").CellStyle;
-      if (tintBody && clubTintFillOpt) zStyle = mergeStyle(zStyle, { fill: clubTintFillOpt });
+      let zStyle = mergeStyle(styleMatrixCell(styleDataCenter(), lastCol), { font: { bold: true } });
       ws[enc({ r: rowIdx, c: lastCol })] = {
         v: zongV,
         t: zongV === "" ? "s" : "n",
         s: zStyle,
       };
     } else {
-      let zStyle = styleDataCenter();
-      if (tintBody && clubTintFillOpt) zStyle = mergeStyle(zStyle, { fill: clubTintFillOpt });
+      const zStyle = styleMatrixCell(styleDataCenter(), lastCol);
       ws[enc({ r: rowIdx, c: lastCol })] = { t: "s", v: "", s: zStyle };
     }
     r += 1;
@@ -599,6 +606,11 @@ function appendClubMatrixSection(
   }
 
   return { r, cMax };
+}
+
+/** 클럽별집계 — 전체 합계 블록 제목 한 줄 */
+function formatOverallExportSummaryTitle(summary: ReturnType<typeof computeOverallExportSummary>): string {
+  return `총인원 (${summary.totalPersons}명).검토 (${summary.reviewPersons}명).전체합계 (${summary.totalQty}개)`;
 }
 
 function collectSortedItemLabelsForExport(rows: any[]): string[] {
@@ -642,6 +654,7 @@ function buildClubAggregateStyledSheet(
   const merges: import("xlsx").Range[] = [];
   let cMax = 0;
   let r = 0;
+  const overallSummary = computeOverallExportSummary(rows, duplicateRowIds, opts?.structureType);
   const sizeCheckCellKeys = new Set<string>();
   const sizeCheckColumnKeys = new Set<string>();
   for (const row of rows) {
@@ -678,7 +691,8 @@ function buildClubAggregateStyledSheet(
       const mode = overallModesTop[mi]!;
       if (mi > 0) r += 1;
       const b = buildClubAggBlock("전체", mode.flat);
-      const titleText = `${mode.label} (${b.totalQty}개)`;
+      const titleText =
+        mode.kind === "total" ? formatOverallExportSummaryTitle(overallSummary) : `${mode.label} (${b.totalQty}개)`;
       const out = appendClubMatrixSection(
         ws,
         enc,
@@ -744,7 +758,8 @@ function buildClubAggregateStyledSheet(
     const mode = overallModes[mi]!;
     if (mi > 0) r += 1;
     const b = buildClubAggBlock("전체", mode.flat);
-    const titleText = `${mode.label} (${b.totalQty}개)`;
+    const titleText =
+      mode.kind === "total" ? formatOverallExportSummaryTitle(overallSummary) : `${mode.label} (${b.totalQty}개)`;
     const out = appendClubMatrixSection(
       ws,
       enc,
@@ -789,6 +804,8 @@ function buildClubAggregateStyledSheet(
           hasSizeCheckInCell: (gk, sz) => sizeCheckCellKeys.has(`${club}\0${gk}\0${sz}`),
           hasSizeCheckInColumn: (sz) => sizeCheckColumnKeys.has(`${club}\0${sz}`),
           clubTintFill,
+          /** 수량·총합계 흰색, 성별·합계는 헤더(파란)색, 제목만 클럽 색 */
+          clubTintSpreadToMatrix: false,
         }
       );
       r = out.r;

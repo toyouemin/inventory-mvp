@@ -259,6 +259,56 @@ export function computeClubDisplaySummaryStats(
   return { totalPersons, sizedQtySum, missingSizePersons };
 }
 
+export type OverallExportSummary = {
+  totalPersons: number;
+  reviewPersons: number;
+  totalQty: number;
+};
+
+function personKeyForOverallExportSummary(r: any, structureType?: StructureType): string {
+  const club = normClubFromNormRow(r);
+  const isMultiItem = structureType === "multi_item_personal_order";
+  if (!isMultiItem) {
+    return `${club}\0#row:${String(r?.sourceRowIndex ?? "")}:${String(r?.sourceGroupIndex ?? "")}`;
+  }
+  const name = String(r?.memberNameRaw ?? r?.memberName ?? "").trim();
+  return name.length > 0
+    ? `${club}\0${name}`
+    : `${club}\0#row:${String(r?.sourceRowIndex ?? "")}:${String(r?.sourceGroupIndex ?? "")}`;
+}
+
+/** 엑셀 클럽별집계 시트 상단 — 총인원·검토·전체합계 요약 */
+export function computeOverallExportSummary(
+  rows: any[],
+  duplicateRowIds: Set<string>,
+  structureType?: StructureType
+): OverallExportSummary {
+  const isMultiItem = structureType === "multi_item_personal_order";
+  let totalPersons = 0;
+  let reviewPersons = 0;
+
+  if (!isMultiItem) {
+    totalPersons = rows.length;
+    for (const r of rows) {
+      if (String(r?.parseStatus ?? "").trim() === "needs_review") reviewPersons += 1;
+    }
+  } else {
+    const allPersons = new Set<string>();
+    const reviewKeys = new Set<string>();
+    for (const r of rows) {
+      const key = personKeyForOverallExportSummary(r, structureType);
+      allPersons.add(key);
+      if (String(r?.parseStatus ?? "").trim() === "needs_review") reviewKeys.add(key);
+    }
+    totalPersons = allPersons.size;
+    reviewPersons = reviewKeys.size;
+  }
+
+  const totalFlat = buildAggRowsTotal(rows, duplicateRowIds);
+  const totalQty = totalFlat.reduce((sum, x) => sum + x.qty, 0);
+  return { totalPersons, reviewPersons, totalQty };
+}
+
 /** 여·남은 항상 행으로 두고, 공용은 데이터가 있을 때만 추가 */
 export function matrixGenderRowKeys(clubRows: Array<{ gender: string }>): Array<"여" | "남" | "공용"> {
   const keys: Array<"여" | "남" | "공용"> = ["여", "남"];

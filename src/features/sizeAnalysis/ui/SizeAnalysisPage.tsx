@@ -851,7 +851,7 @@ export function SizeAnalysisPage() {
           </p>
           <button
             type="button"
-            className="btn btn-secondary"
+            className={`btn ${allRows.length > 0 ? "btn-primary" : "btn-secondary"}`}
             disabled={allRows.length === 0}
             onClick={() =>
               downloadSizeAnalysisResultXlsx(allRows, duplicateAnalysis, {

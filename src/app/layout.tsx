@@ -1,8 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { AdaptiveHomepageLink } from "./AdaptiveHomepageLink";
+import { AppMainNav } from "./AppMainNav";
 import { HeaderActionButtons } from "./HeaderActionButtons";
 import { ProductImageExcelDownloadProvider } from "./ProductImageExcelDownloadProvider";
 import { withAssetVersion } from "@/lib/assetVersion";
@@ -40,15 +39,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <HeaderActionButtons />
             </div>
           </header>
-          <nav className="app-main-nav" aria-label="주요 메뉴">
-            <Link href="/products">상품</Link>
-            <Link href="/status">재고현황</Link>
-            <AdaptiveHomepageLink />
-            <Link href="/transaction-statement">거래명세서</Link>
-            <Link href="/order-quantity-match">주문수량매칭</Link>
-            <Link href="/size-analysis">사이즈분석</Link>
-            {/* <Link href="/moves">재고 변동</Link> */}
-          </nav>
+          <AppMainNav />
         </div>
         <ProductImageExcelDownloadProvider>{children}</ProductImageExcelDownloadProvider>
       </body>

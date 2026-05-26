@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 const DESKTOP_URL = "https://tagosports.co.kr/";
 const MOBILE_URL = "https://m.tagosports.co.kr/";
@@ -11,6 +12,30 @@ const ECOUNT_URL = "https://login.ecount.com/Login/";
 export function AdaptiveHomepageLink() {
   /** 타고스포츠 링크: PC·넓은 화면은 데스크톱 사이트, 모바일 UA·좁은 화면은 모바일 사이트 */
   const [tagosportsHref, setTagosportsHref] = useState(DESKTOP_URL);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const pathname = usePathname();
+
+  useEffect(() => {
+    const details = detailsRef.current;
+    if (details?.open) details.open = false;
+  }, [pathname]);
+
+  useEffect(() => {
+    const nav = detailsRef.current?.closest(".app-main-nav");
+    if (!nav) return;
+
+    const onNavClick = (event: MouseEvent) => {
+      const details = detailsRef.current;
+      if (!details?.open) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (details.contains(target)) return;
+      details.open = false;
+    };
+
+    nav.addEventListener("click", onNavClick);
+    return () => nav.removeEventListener("click", onNavClick);
+  }, []);
 
   useEffect(() => {
     const apply = () => {
@@ -27,7 +52,7 @@ export function AdaptiveHomepageLink() {
   }, []);
 
   return (
-    <details className="nav-dropdown">
+    <details ref={detailsRef} className="nav-dropdown">
       <summary className="nav-dropdown__summary">홈페이지</summary>
       <div className="nav-dropdown__menu">
         <a href={tagosportsHref} target="_blank" rel="noopener noreferrer">

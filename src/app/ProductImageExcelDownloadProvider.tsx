@@ -11,7 +11,10 @@ import {
   type ReactNode,
 } from "react";
 
-import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import {
+  priceListWithImagesXlsxFile,
+  productStockWithImagesXlsxFile,
+} from "@/lib/downloadFileNames";
 
 type ProductImageExcelDownloadContextValue = {
   stockLoading: boolean;
@@ -216,11 +219,10 @@ export function ProductImageExcelDownloadProvider({ children }: { children: Reac
     setStockProgress({ pct: null, received: 0, total: null });
     const ac = new AbortController();
     stockAbortRef.current = ac;
-    const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
     try {
       await fetchAndSaveXlsx(
         "/products/xlsx/products/with-images",
-        `products_with_images_${yymmdd}.xlsx`,
+        productStockWithImagesXlsxFile().display,
         ac.signal,
         setStockProgress
       );
@@ -246,11 +248,10 @@ export function ProductImageExcelDownloadProvider({ children }: { children: Reac
     setPriceProgress({ pct: null, received: 0, total: null });
     const ac = new AbortController();
     priceAbortRef.current = ac;
-    const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
     try {
       await fetchAndSaveXlsx(
         "/products/xlsx/price-list/with-images",
-        `price-list_with_images_${yymmdd}.xlsx`,
+        priceListWithImagesXlsxFile().display,
         ac.signal,
         setPriceProgress
       );

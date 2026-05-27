@@ -1,4 +1,4 @@
-import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import { buildAttachmentContentDisposition, stockCsvFile } from "@/lib/downloadFileNames";
 import { supabaseServer } from "@/lib/supabaseClient";
 import { unstable_noStore as noStore } from "next/cache";
 
@@ -29,11 +29,10 @@ export async function GET(req: Request) {
   const lines = [aoa[0].map((h) => csvEscape(h)).join(","), ...aoa.slice(1).map((row) => row.map((c) => csvEscape(c)).join(","))];
   const csv = "\uFEFF" + lines.join("\r\n");
 
-  const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="stock_${yymmdd}.csv"`,
+      "Content-Disposition": buildAttachmentContentDisposition(stockCsvFile()),
       "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       Pragma: "no-cache",
     },

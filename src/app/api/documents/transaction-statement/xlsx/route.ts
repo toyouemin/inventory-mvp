@@ -1,5 +1,8 @@
 import { buildTransactionStatementData } from "@/features/transactionStatement/buildData";
-import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import {
+  buildAttachmentContentDisposition,
+  transactionStatementXlsxFile,
+} from "@/lib/downloadFileNames";
 import {
   exportTransactionStatementExcel,
   exportTransactionStatementExcelFromTemplateBuffer,
@@ -54,13 +57,11 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
 
-    const fileName = `transaction-statement-${formatDownloadFileNameDateYymmdd(new Date())}.xlsx`;
-
     return new Response(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${fileName}"`,
+        "Content-Disposition": buildAttachmentContentDisposition(transactionStatementXlsxFile()),
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
         Pragma: "no-cache",
       },

@@ -1,4 +1,7 @@
-import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import {
+  buildAttachmentContentDisposition,
+  productStockWithImagesXlsxFile,
+} from "@/lib/downloadFileNames";
 import { stripInvalidOneCellAnchorEditAsFromXlsxBuffer } from "@/lib/excelXlsxStripInvalidOneCellEditAs";
 import ExcelJS from "exceljs";
 import { unstable_noStore as noStore } from "next/cache";
@@ -28,11 +31,10 @@ export async function GET(req: Request) {
   const raw = new Uint8Array(await workbook.xlsx.writeBuffer());
   const buffer = await stripInvalidOneCellAnchorEditAsFromXlsxBuffer(raw);
 
-  const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="products_with_images_${yymmdd}.xlsx"`,
+      "Content-Disposition": buildAttachmentContentDisposition(productStockWithImagesXlsxFile()),
       "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       Pragma: "no-cache",
     },

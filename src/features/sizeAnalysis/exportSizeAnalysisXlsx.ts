@@ -2,6 +2,7 @@ import * as XLSX from "xlsx-js-style";
 
 import { applyExcelDownloadFontToWorksheet } from "@/lib/excelDownloadFont";
 import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import { sanitizeDownloadFileName } from "@/lib/downloadFileNames";
 import {
   buildAggRowsDedupedFirst,
   buildAggRowsDedupedFirstForItem,
@@ -275,7 +276,7 @@ export function downloadSizeAnalysisResultXlsx(
   const ymd = formatDownloadFileNameDateYymmdd();
   const rawName = opts?.uploadFileName?.trim();
   const base = rawName ? baseNameFromUploadFileName(rawName) : "size-analysis";
-  const fileName = `(분석) ${base}_${ymd}.xlsx`;
+  const fileName = sanitizeDownloadFileName(`(분석) ${base}_${ymd}.xlsx`);
   XLSX.writeFile(wb, fileName, { bookType: "xlsx", cellStyles: true });
 }
 

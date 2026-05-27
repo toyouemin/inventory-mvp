@@ -11,6 +11,7 @@ import {
 } from "@/features/transactionStatement/TransactionStatementPrintSheet";
 import panelStyles from "@/features/transactionStatement/TransactionStatementScreenPanel.module.css";
 import { TransactionStatementScreenPanel } from "@/features/transactionStatement/TransactionStatementScreenPanel";
+import { sanitizeDownloadFileName } from "@/lib/downloadFileNames";
 
 type StatementItemFormRow = {
   id: string;
@@ -108,7 +109,7 @@ function formatYmd(date: Date): string {
 function sanitizeFileNamePart(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "상호미입력";
-  return trimmed.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_");
+  return sanitizeDownloadFileName(trimmed);
 }
 
 /** 형식: 상호-거래명세표-260417 */

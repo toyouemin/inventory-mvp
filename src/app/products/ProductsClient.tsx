@@ -31,7 +31,11 @@ import {
 import { VARIANT_AUDIT_TARGET_SKUS } from "./variantAuditTargets";
 import { ENABLE_BATCH_IMAGE_UPLOAD } from "./featureFlags";
 import { fitCategorySelectWidth } from "./fitCategorySelectWidth";
-import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import {
+  priceListXlsxFile,
+  productStockCsvFile,
+  productStockXlsxFile,
+} from "@/lib/downloadFileNames";
 import { useProductImageExcelDownload } from "@/app/ProductImageExcelDownloadProvider";
 
 type ViewMode = "card" | "list";
@@ -774,7 +778,11 @@ export function ProductsClient({
   const searchParams = useSearchParams();
   const { stockLoading, priceLoading, downloadStockWithImages, downloadPriceWithImages } =
     useProductImageExcelDownload();
-  const downloadYymmdd = formatDownloadFileNameDateYymmdd(new Date());
+  const downloadNames = {
+    priceListXlsx: priceListXlsxFile(new Date()).display,
+    productStockCsv: productStockCsvFile(new Date()).display,
+    productStockXlsx: productStockXlsxFile(new Date()).display,
+  };
   const jumpProductId = (searchParams.get("jumpProductId") ?? "").trim();
   const hasJumpedToProductRef = useRef(false);
   const [uploading, setUploading] = useState(false);
@@ -2345,7 +2353,7 @@ export function ProductsClient({
         <a
           role="menuitem"
           href="/products/xlsx/price-list"
-          download={`price-list_${downloadYymmdd}.xlsx`}
+          download={downloadNames.priceListXlsx}
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
@@ -2367,7 +2375,7 @@ export function ProductsClient({
         <a
           role="menuitem"
           href="/products/csv/products"
-          download={`products_${downloadYymmdd}.csv`}
+          download={downloadNames.productStockCsv}
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >
@@ -2376,7 +2384,7 @@ export function ProductsClient({
         <a
           role="menuitem"
           href="/products/xlsx/products"
-          download={`products_${downloadYymmdd}.xlsx`}
+          download={downloadNames.productStockXlsx}
           className="download-dropdown__item"
           onClick={() => setDownloadOpen(false)}
         >

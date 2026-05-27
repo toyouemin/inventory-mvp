@@ -1,4 +1,4 @@
-import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import { buildAttachmentContentDisposition, priceListXlsxFile } from "@/lib/downloadFileNames";
 import { ExcelColumnWidthAccumulator } from "@/lib/excelDownloadColumnWidths";
 import { applyExcelDownloadFontToWorksheet, writeStyledXlsxBuffer } from "@/lib/excelDownloadFont";
 import { supabaseServer } from "@/lib/supabaseClient";
@@ -433,12 +433,10 @@ export async function GET(req: Request) {
 
   const buffer = writeStyledXlsxBuffer(wb);
 
-  const fname = `price-list_${formatDownloadFileNameDateYymmdd(new Date())}.xlsx`;
-
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${fname}"`,
+      "Content-Disposition": buildAttachmentContentDisposition(priceListXlsxFile()),
       "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       Pragma: "no-cache",
     },

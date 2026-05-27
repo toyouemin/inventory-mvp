@@ -1,4 +1,7 @@
-import { formatDownloadFileNameDateYymmdd } from "@/lib/downloadFileNameDate";
+import {
+  buildAttachmentContentDisposition,
+  priceListWithImagesXlsxFile,
+} from "@/lib/downloadFileNames";
 import {
   ExcelColumnWidthAccumulator,
   EXCEL_COL_WCH_MAX,
@@ -412,11 +415,10 @@ export async function GET(req: Request) {
 
   const raw = new Uint8Array(await workbook.xlsx.writeBuffer());
   const buffer = await stripInvalidOneCellAnchorEditAsFromXlsxBuffer(raw);
-  const yymmdd = formatDownloadFileNameDateYymmdd(new Date());
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="price-list_with_images_${yymmdd}.xlsx"`,
+      "Content-Disposition": buildAttachmentContentDisposition(priceListWithImagesXlsxFile()),
       "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       Pragma: "no-cache",
     },

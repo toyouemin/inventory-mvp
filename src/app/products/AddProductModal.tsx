@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
-import { VariantEditor, type VariantRow } from "./VariantEditor";
+import { VariantEditor, getPersistableVariantRows, type VariantRow } from "./VariantEditor";
 import { variantCompositeKey } from "./variantOptions";
 
 function parsePriceInput(value: string): number | null {
@@ -64,18 +64,9 @@ export function AddProductModal({
     if (!sku.trim() || !name.trim()) return;
     if (pending) return;
 
-    const rowsWithAny = variantRows.filter(
-      (r) =>
-        (r.color ?? "").trim() !== "" ||
-        (r.gender ?? "").trim() !== "" ||
-        (r.size ?? "").trim() !== ""
-    );
-    if (variantRows.length > 0 && rowsWithAny.length === 0) {
-      setVariantError("옵션 행이 있으면 색상, 성별, 사이즈 중 하나 이상 입력해 주세요.");
-      return;
-    }
+    const rowsToPersist = getPersistableVariantRows(variantRows);
 
-    const variantKeys = rowsWithAny.map((r) =>
+    const variantKeys = rowsToPersist.map((r) =>
       variantCompositeKey(r.color, r.gender, r.size)
     );
     if (new Set(variantKeys).size !== variantKeys.length) {
@@ -101,8 +92,8 @@ export function AddProductModal({
         thumbnailUrl = uploaded.thumbnailUrl;
       }
       const variants =
-        rowsWithAny.length > 0
-          ? rowsWithAny.map((r) => ({
+        rowsToPersist.length > 0
+          ? rowsToPersist.map((r) => ({
               color: (r.color ?? "").trim(),
               gender: (r.gender ?? "").trim(),
               size: (r.size ?? "").trim(),

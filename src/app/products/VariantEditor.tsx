@@ -37,12 +37,12 @@ const emptyRow = (): VariantRow => ({
 
 const PLACEHOLDER_ROW_ID = "empty-1";
 
-function rowHasAnyPriceFields(r: VariantRow): boolean {
+export function rowHasAnyPriceFields(r: VariantRow): boolean {
   return [r.wholesalePrice, r.msrpPrice, r.salePrice, r.extraPrice].some((p) => String(p ?? "").trim() !== "");
 }
 
 /** 표시용 empty-1 또는, 입력 전 템플릿 같은 빈 줄(옵션/가격/메모 없음·재고 0) */
-function isVacantScratchRow(r: VariantRow): boolean {
+export function isVacantScratchRow(r: VariantRow): boolean {
   if (r.rowId === PLACEHOLDER_ROW_ID) return true;
   if (r.variantId) return false;
   const hasOpts =
@@ -55,6 +55,34 @@ function isVacantScratchRow(r: VariantRow): boolean {
   const st = String(r.stock ?? "").trim();
   const stockNum = st === "" ? 0 : parseInt(st, 10);
   return !Number.isFinite(stockNum) || stockNum === 0;
+}
+
+/**
+ * variant 없이 `products.stock`만 쓰던 상품의 편집 화면 기본 행(색상·성별·사이즈·가격·메모 없음).
+ * CSV처럼 variant로 저장하지 않고 기존 product.stock 경로만 유지할 때 제외합니다.
+ */
+export function isLegacyProductStockOnlyRow(r: VariantRow): boolean {
+  if (r.variantId) return false;
+  const hasOpts =
+    String(r.color ?? "").trim() !== "" ||
+    String(r.gender ?? "").trim() !== "" ||
+    String(r.size ?? "").trim() !== "";
+  if (hasOpts || rowHasAnyPriceFields(r)) return false;
+  if (String(r.memo ?? "").trim() !== "" || String(r.memo2 ?? "").trim() !== "") return false;
+  return true;
+}
+
+/** 저장·전송 대상 옵션 행(CSV와 동일: 가격·재고·메모만 있어도 variant로 저장) */
+export function getPersistableVariantRows(
+  rows: VariantRow[],
+  options?: { excludeLegacyProductStockOnly?: boolean }
+): VariantRow[] {
+  const excludeLegacy = options?.excludeLegacyProductStockOnly ?? false;
+  return rows.filter((r) => {
+    if (isVacantScratchRow(r)) return false;
+    if (excludeLegacy && isLegacyProductStockOnlyRow(r)) return false;
+    return true;
+  });
 }
 
 /**

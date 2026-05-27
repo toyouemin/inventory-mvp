@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { updateProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
-import { VariantEditor, type VariantRow, generateRowId } from "./VariantEditor";
+import {
+  VariantEditor,
+  getPersistableVariantRows,
+  type VariantRow,
+  generateRowId,
+} from "./VariantEditor";
 import { sortVariants, variantCompositeKey } from "./variantOptions";
 
 function parsePriceInput(value: string): number | null {
@@ -185,32 +190,28 @@ export function EditProductModal({
     if (!sku.trim() || !name.trim()) return;
     if (pending) return;
 
-    const rowsWithAny = variantRows.filter(
-      (r) =>
-        (r.color ?? "").trim() !== "" ||
-        (r.gender ?? "").trim() !== "" ||
-        (r.size ?? "").trim() !== ""
-    );
+    const hadNoVariantsInitially = initialVariantIds.length === 0;
+    const rowsToPersist = getPersistableVariantRows(variantRows, {
+      excludeLegacyProductStockOnly: hadNoVariantsInitially,
+    });
 
-    if (variantRows.length > 0 && rowsWithAny.length === 0 && variantRows.some((r) => variantRows.length > 1)) {
-      setVariantError("옵션 행이 있으면 색상, 성별, 사이즈 중 하나 이상 입력해 주세요.");
-      return;
-    }
-
-    const variantKeys = rowsWithAny.map((r) => variantCompositeKey(r.color, r.gender, r.size));
+    const variantKeys = rowsToPersist.map((r) => variantCompositeKey(r.color, r.gender, r.size));
     if (new Set(variantKeys).size !== variantKeys.length) {
       setVariantError("중복된 변형입니다. 동일 SKU에서 색상·성별·사이즈 조합은 하나만 허용됩니다.");
       return;
     }
     setVariantError("");
 
-    const singleStockRow = variantRows.find(
-      (r) =>
-        (r.color ?? "").trim() === "" &&
-        (r.gender ?? "").trim() === "" &&
-        (r.size ?? "").trim() === ""
-    );
-    const updates = rowsWithAny.map((r) => ({
+    const legacyStockRow = hadNoVariantsInitially
+      ? variantRows.find(
+          (r) =>
+            (r.color ?? "").trim() === "" &&
+            (r.gender ?? "").trim() === "" &&
+            (r.size ?? "").trim() === "" &&
+            !r.variantId
+        )
+      : undefined;
+    const updates = rowsToPersist.map((r) => ({
       id: r.variantId,
       color: (r.color ?? "").trim(),
       gender: (r.gender ?? "").trim(),
@@ -247,8 +248,8 @@ export function EditProductModal({
       nextVariantSignatures.size !== initialVariantSignatures.size ||
       [...nextVariantSignatures].some((sig) => !initialVariantSignatures.has(sig));
     const stockForSingle =
-      updates.length === 0 && singleStockRow
-        ? Math.max(0, parseInt(String(singleStockRow.stock), 10) || 0)
+      updates.length === 0 && legacyStockRow
+        ? Math.max(0, parseInt(String(legacyStockRow.stock), 10) || 0)
         : undefined;
     const initialSingleStock = Math.max(0, Number(product.stock ?? 0));
     const stockChanged = stockForSingle !== undefined && stockForSingle !== initialSingleStock;

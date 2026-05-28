@@ -10,6 +10,7 @@ import { StatusClient } from "./StatusClient";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
+const PRODUCT_VARIANTS_PAGE_SIZE = 1000;
 
 export default async function StatusPage() {
   const categoryOrderFromDb = await fetchCategoryOrderMap();
@@ -62,28 +63,34 @@ export default async function StatusPage() {
   let variantAssetByProductId = new Map<string, number>();
   let variantPricedStockByProductId = new Map<string, number>();
   if (productIds.length > 0) {
-    const { data: variantsData, error: variantsError } = await supabaseServer
-      .from("product_variants")
-      .select("product_id, stock, wholesale_price")
-      .in("product_id", productIds);
-    if (variantsError) {
-      return (
-        <div style={{ padding: 24 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>재고 현황</h1>
-          <p style={{ color: "crimson" }}>Supabase error: {variantsError.message}</p>
-        </div>
-      );
-    }
-    for (const v of variantsData ?? []) {
-      const pid = String((v as { product_id?: string }).product_id ?? "");
-      const qty = Number((v as { stock?: number }).stock ?? 0) || 0;
-      const wpRaw = (v as { wholesale_price?: number | string | null }).wholesale_price;
-      const wp = wpRaw != null ? Number(wpRaw) : Number.NaN;
-      variantsByProductId.set(pid, (variantsByProductId.get(pid) ?? 0) + qty);
-      if (Number.isFinite(wp) && wp > 0) {
-        variantPricedStockByProductId.set(pid, (variantPricedStockByProductId.get(pid) ?? 0) + qty);
-        variantAssetByProductId.set(pid, (variantAssetByProductId.get(pid) ?? 0) + qty * wp);
+    for (let offset = 0; ; offset += PRODUCT_VARIANTS_PAGE_SIZE) {
+      const { data: variantsData, error: variantsError } = await supabaseServer
+        .from("product_variants")
+        .select("product_id, stock, wholesale_price")
+        .in("product_id", productIds)
+        .order("id", { ascending: true })
+        .range(offset, offset + PRODUCT_VARIANTS_PAGE_SIZE - 1);
+      if (variantsError) {
+        return (
+          <div style={{ padding: 24 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700 }}>재고 현황</h1>
+            <p style={{ color: "crimson" }}>Supabase error: {variantsError.message}</p>
+          </div>
+        );
       }
+      const chunk = variantsData ?? [];
+      for (const v of chunk) {
+        const pid = String((v as { product_id?: string }).product_id ?? "");
+        const qty = Number((v as { stock?: number }).stock ?? 0) || 0;
+        const wpRaw = (v as { wholesale_price?: number | string | null }).wholesale_price;
+        const wp = wpRaw != null ? Number(wpRaw) : Number.NaN;
+        variantsByProductId.set(pid, (variantsByProductId.get(pid) ?? 0) + qty);
+        if (Number.isFinite(wp) && wp > 0) {
+          variantPricedStockByProductId.set(pid, (variantPricedStockByProductId.get(pid) ?? 0) + qty);
+          variantAssetByProductId.set(pid, (variantAssetByProductId.get(pid) ?? 0) + qty * wp);
+        }
+      }
+      if (chunk.length < PRODUCT_VARIANTS_PAGE_SIZE) break;
     }
   }
 
@@ -95,16 +102,21 @@ export default async function StatusPage() {
       r.wholesale_price != null && Number.isFinite(Number(r.wholesale_price))
         ? Number(r.wholesale_price)
         : null;
-    const pricedStock = hasVariants
-      ? variantPricedStockByProductId.get(r.id) ?? 0
-      : productWholesalePrice != null && productWholesalePrice > 0
-        ? stock
-        : 0;
-    const assetValue = hasVariants
-      ? variantAssetByProductId.get(r.id) ?? 0
-      : productWholesalePrice != null && productWholesalePrice > 0
-        ? stock * productWholesalePrice
-        : 0;
+    let pricedStock = 0;
+    let assetValue = 0;
+    if (hasVariants) {
+      const variantPricedStock = variantPricedStockByProductId.get(r.id) ?? 0;
+      const variantAsset = variantAssetByProductId.get(r.id) ?? 0;
+      const unpricedVariantStock = Math.max(0, stock - variantPricedStock);
+      // 옵션 도매가가 비어 있어도 상품 기본 도매가가 있으면 보완 계산
+      const fallbackPricedStock =
+        productWholesalePrice != null && productWholesalePrice > 0 ? unpricedVariantStock : 0;
+      pricedStock = variantPricedStock + fallbackPricedStock;
+      assetValue = variantAsset + fallbackPricedStock * (productWholesalePrice ?? 0);
+    } else if (productWholesalePrice != null && productWholesalePrice > 0) {
+      pricedStock = stock;
+      assetValue = stock * productWholesalePrice;
+    }
     return {
       id: r.id,
       sku: r.sku,

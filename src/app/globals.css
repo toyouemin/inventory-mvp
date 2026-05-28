@@ -2451,7 +2451,7 @@ label {
 
 .status-stock-asset-missing-list {
   margin-top: 4px;
-  max-height: 120px;
+  max-height: 210px;
   overflow-y: auto;
   border: 1px solid #ece6de;
   border-radius: 8px;

@@ -2066,10 +2066,9 @@ export function ProductsClient({
     const target = document.querySelector(selector) as HTMLElement | null;
     if (!target) return;
     const headerH = (document.querySelector(".app-global-header") as HTMLElement | null)?.offsetHeight ?? 0;
-    const stickyToolbarH = stickyControlsRef.current?.offsetHeight ?? 0;
-    const topGap = 2;
+    const offset = Math.round(headerH * 0.5) + 80;
     const absoluteTop = window.scrollY + target.getBoundingClientRect().top;
-    const y = Math.max(0, absoluteTop - headerH - stickyToolbarH - topGap);
+    const y = Math.max(0, absoluteTop - offset);
     window.scrollTo({ top: y, behavior: "smooth" });
     hasJumpedToProductRef.current = true;
   }, [jumpProductId, viewMode, skuDisplayGroupsForView.length]);

@@ -2506,6 +2506,18 @@ label {
   vertical-align: middle;
 }
 
+.status-stock-asset-category-wrap {
+  display: inline-block;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+
+.status-stock-asset-category-wrap .status-stock-asset-category-select {
+  margin: 0;
+  min-width: 0;
+  max-width: none;
+}
+
 .status-stock-stat {
   flex: 1 1 0;
   min-width: 0;

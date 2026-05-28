@@ -57,6 +57,7 @@ export function StatusClient({
   const [showMissingPriceList, setShowMissingPriceList] = useState(false);
 
   const categorySelectRef = useRef<HTMLSelectElement>(null);
+  const assetCategorySelectRef = useRef<HTMLSelectElement>(null);
   const toolbarSearchRowRef = useRef<HTMLDivElement>(null);
   const categorySelectDisplayedLabel = categoryFilter === "" ? "전체" : categoryFilter;
 
@@ -74,6 +75,13 @@ export function StatusClient({
     ro.observe(sel);
     return () => ro.disconnect();
   }, [categorySelectDisplayedLabel]);
+
+  useLayoutEffect(() => {
+    const sel = assetCategorySelectRef.current;
+    if (!sel) return;
+    const label = selectedAssetCategory || "카테고리";
+    fitCategorySelectWidth(sel, label, null);
+  }, [selectedAssetCategory, showAssetSummary, categoryAssetOptions.length]);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -266,23 +274,26 @@ export function StatusClient({
                 재고금액합계(도매가x수량): {formatKrwWithEokCompact(totalAssetValue)}
               </p>
               <p className="status-stock-asset-line">
-                카테고리선택:
-                <select
-                  className="status-stock-asset-category-select"
-                  value={selectedAssetCategory}
-                  onChange={(e) => setSelectedAssetCategory(e.target.value)}
-                  aria-label="자산 요약 카테고리 선택"
-                >
-                  {categoryAssetOptions.length === 0 ? (
-                    <option value="">—</option>
-                  ) : (
-                    categoryAssetOptions.map((cat) => (
-                      <option key={cat.label} value={cat.label}>
-                        {cat.label}
-                      </option>
-                    ))
-                  )}
-                </select>
+                카테고리:
+                <span className="status-stock-asset-category-wrap">
+                  <select
+                    ref={assetCategorySelectRef}
+                    className="status-stock-asset-category-select"
+                    value={selectedAssetCategory}
+                    onChange={(e) => setSelectedAssetCategory(e.target.value)}
+                    aria-label="자산 요약 카테고리 선택"
+                  >
+                    {categoryAssetOptions.length === 0 ? (
+                      <option value="">—</option>
+                    ) : (
+                      categoryAssetOptions.map((cat) => (
+                        <option key={cat.label} value={cat.label}>
+                          {cat.label}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </span>
                 : {formatKrwWithEokCompact(selectedCategoryAssetValue)}
               </p>
               <p className="status-stock-asset-line">

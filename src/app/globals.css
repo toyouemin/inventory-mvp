@@ -2432,6 +2432,65 @@ label {
   margin-top: 4px;
 }
 
+.status-stock-asset-line-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.status-stock-asset-line-btn:hover {
+  text-decoration: underline;
+}
+
+.status-stock-asset-missing-list {
+  margin-top: 4px;
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid #ece6de;
+  border-radius: 8px;
+  background: #fcfbf9;
+  padding: 4px 6px;
+}
+
+.status-stock-asset-missing-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 2px;
+  border-bottom: 1px dashed #e8e2da;
+  text-decoration: none;
+  color: inherit;
+}
+
+.status-stock-asset-missing-item:last-child {
+  border-bottom: 0;
+}
+
+.status-stock-asset-missing-item:hover {
+  background: color-mix(in srgb, var(--accent) 8%, #ffffff);
+  border-radius: 6px;
+}
+
+.status-stock-asset-missing-item__name {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.status-stock-asset-missing-item__meta {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
 .status-stock-asset-category-select {
   margin: 0 4px;
   min-width: 84px;
@@ -2678,6 +2737,14 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
 
   .products-page.status-stock-page .status-stock-asset-line {
     font-size: 15px;
+  }
+
+  .products-page.status-stock-page .status-stock-asset-missing-item__name {
+    font-size: 13px;
+  }
+
+  .products-page.status-stock-page .status-stock-asset-missing-item__meta {
+    font-size: 12px;
   }
 
   .products-page.status-stock-page .status-stock-asset-toggle-row {

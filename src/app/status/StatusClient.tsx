@@ -54,6 +54,7 @@ export function StatusClient({
   const [hideZeroStock, setHideZeroStock] = useState(false);
   const [showAssetSummary, setShowAssetSummary] = useState(false);
   const [selectedAssetCategory, setSelectedAssetCategory] = useState("");
+  const [showMissingPriceList, setShowMissingPriceList] = useState(false);
 
   const categorySelectRef = useRef<HTMLSelectElement>(null);
   const toolbarSearchRowRef = useRef<HTMLDivElement>(null);
@@ -119,6 +120,22 @@ export function StatusClient({
     const priced = Number(r.pricedStock) || 0;
     return priced <= 0;
   }).length;
+  const missingPriceRows = useMemo(
+    () =>
+      assetBase
+        .filter((r) => {
+          const stock = Number(r.stock) || 0;
+          const priced = Number(r.pricedStock) || 0;
+          return stock > 0 && priced <= 0;
+        })
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          category: (r.category ?? "").trim() || "미분류",
+          stock: Number(r.stock) || 0,
+        })),
+    [assetBase]
+  );
   const categoryAssetOptions = useMemo(() => {
     const byCategory = new Map<string, number>();
     for (const r of assetBase) {
@@ -144,6 +161,10 @@ export function StatusClient({
       setSelectedAssetCategory(categoryAssetOptions[0]!.label);
     }
   }, [categoryAssetOptions, selectedAssetCategory]);
+
+  useEffect(() => {
+    if (!showAssetSummary) setShowMissingPriceList(false);
+  }, [showAssetSummary]);
 
   const cycleStockSort = () => {
     setStockSort((prev) => (prev === "default" ? "asc" : prev === "asc" ? "desc" : "default"));
@@ -265,8 +286,34 @@ export function StatusClient({
                 : {formatKrwWithEokCompact(selectedCategoryAssetValue)}
               </p>
               <p className="status-stock-asset-line">
-                가격 미입력 제품: {missingPriceSkuCount.toLocaleString()}개
+                <button
+                  type="button"
+                  className="status-stock-asset-line-btn"
+                  onClick={() => setShowMissingPriceList((v) => !v)}
+                  aria-expanded={showMissingPriceList}
+                  title={showMissingPriceList ? "미입력 제품 리스트 숨기기" : "미입력 제품 리스트 보기"}
+                >
+                  가격 미입력 제품: {missingPriceSkuCount.toLocaleString()}개
+                </button>
               </p>
+              {showMissingPriceList && missingPriceRows.length > 0 ? (
+                <div className="status-stock-asset-missing-list" role="list" aria-label="가격 미입력 제품 목록">
+                  {missingPriceRows.map((row) => (
+                    <Link
+                      key={row.id}
+                      className="status-stock-asset-missing-item"
+                      role="listitem"
+                      href={`/products?jumpProductId=${encodeURIComponent(row.id)}`}
+                      title={`${row.name} 상품으로 이동`}
+                    >
+                      <span className="status-stock-asset-missing-item__name">{row.name}</span>
+                      <span className="status-stock-asset-missing-item__meta">
+                        {row.category} · 재고 {row.stock.toLocaleString()}개
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}

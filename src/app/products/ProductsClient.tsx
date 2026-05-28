@@ -2065,7 +2065,12 @@ export function ProductsClient({
     const selector = `[data-product-id="${jumpProductId.replace(/"/g, '\\"')}"]`;
     const target = document.querySelector(selector) as HTMLElement | null;
     if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const headerH = (document.querySelector(".app-global-header") as HTMLElement | null)?.offsetHeight ?? 0;
+    const stickyToolbarH = stickyControlsRef.current?.offsetHeight ?? 0;
+    const topGap = 2;
+    const absoluteTop = window.scrollY + target.getBoundingClientRect().top;
+    const y = Math.max(0, absoluteTop - headerH - stickyToolbarH - topGap);
+    window.scrollTo({ top: y, behavior: "smooth" });
     hasJumpedToProductRef.current = true;
   }, [jumpProductId, viewMode, skuDisplayGroupsForView.length]);
 

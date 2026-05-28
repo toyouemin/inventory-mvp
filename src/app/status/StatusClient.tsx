@@ -81,7 +81,7 @@ export function StatusClient({
     if (!sel) return;
     const label = selectedAssetCategory || "카테고리";
     fitCategorySelectWidth(sel, label, null);
-  }, [selectedAssetCategory, showAssetSummary, categoryAssetOptions.length]);
+  }, [selectedAssetCategory, showAssetSummary]);
 
   const filtered = useMemo(() => {
     let list = rows;

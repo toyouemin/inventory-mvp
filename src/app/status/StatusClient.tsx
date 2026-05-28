@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { fitCategorySelectWidth } from "@/app/products/fitCategorySelectWidth";
 
 type StatusRow = {
@@ -10,11 +10,35 @@ type StatusRow = {
   category: string | null;
   name: string;
   stock: number;
+  pricedStock: number;
+  assetValue: number;
   memo: string;
   memo2: string;
 };
 
 type StockSortMode = "default" | "asc" | "desc";
+
+function formatKrwWithEokCompact(value: number): string {
+  const n = Math.max(0, Math.round(Number(value) || 0));
+  if (n >= 100_000_000) {
+    const eok = Math.floor(n / 100_000_000);
+    const restAfterEok = n % 100_000_000;
+    const man = Math.floor(restAfterEok / 10_000);
+    const rest = restAfterEok % 10_000;
+    const eokText = `${eok.toLocaleString()}억`;
+    const manText = man > 0 ? ` ${man.toLocaleString()}만` : "";
+    const restText = rest > 0 ? ` ${rest.toLocaleString()}` : "";
+    return `${eokText}${manText}${restText}원`;
+  }
+  if (n >= 10_000) {
+    const man = Math.floor(n / 10_000);
+    const rest = n % 10_000;
+    const manText = `${man.toLocaleString()}만`;
+    const restText = rest > 0 ? ` ${rest.toLocaleString()}` : "";
+    return `${manText}${restText}원`;
+  }
+  return `${n.toLocaleString()}원`;
+}
 
 export function StatusClient({
   rows,
@@ -28,6 +52,8 @@ export function StatusClient({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [stockSort, setStockSort] = useState<StockSortMode>("default");
   const [hideZeroStock, setHideZeroStock] = useState(false);
+  const [showAssetSummary, setShowAssetSummary] = useState(false);
+  const [selectedAssetCategory, setSelectedAssetCategory] = useState("");
 
   const categorySelectRef = useRef<HTMLSelectElement>(null);
   const toolbarSearchRowRef = useRef<HTMLDivElement>(null);
@@ -84,6 +110,40 @@ export function StatusClient({
   const totalSkus = filtered.length;
   const totalQty = filtered.reduce((sum, r) => sum + (Number(r.stock) || 0), 0);
   const zeroStock = filtered.filter((r) => (Number(r.stock) || 0) === 0).length;
+  const assetBase = listAfterZeroToggle;
+  const totalAssetValue = assetBase.reduce((sum, r) => sum + (Number(r.assetValue) || 0), 0);
+  const totalPricedStock = assetBase.reduce((sum, r) => sum + (Number(r.pricedStock) || 0), 0);
+  const missingPriceSkuCount = assetBase.filter((r) => {
+    const stock = Number(r.stock) || 0;
+    if (stock <= 0) return false;
+    const priced = Number(r.pricedStock) || 0;
+    return priced <= 0;
+  }).length;
+  const categoryAssetOptions = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    for (const r of assetBase) {
+      const cat = (r.category ?? "").trim() || "미분류";
+      byCategory.set(cat, (byCategory.get(cat) ?? 0) + (Number(r.assetValue) || 0));
+    }
+    return [...byCategory.entries()]
+      .map(([label, value]) => ({ label, value }))
+      .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label, "ko"));
+  }, [assetBase]);
+  const selectedCategoryAssetValue = useMemo(() => {
+    const target = categoryAssetOptions.find((v) => v.label === selectedAssetCategory);
+    if (target) return target.value;
+    return categoryAssetOptions[0]?.value ?? 0;
+  }, [categoryAssetOptions, selectedAssetCategory]);
+
+  useEffect(() => {
+    if (categoryAssetOptions.length === 0) {
+      if (selectedAssetCategory !== "") setSelectedAssetCategory("");
+      return;
+    }
+    if (!categoryAssetOptions.some((v) => v.label === selectedAssetCategory)) {
+      setSelectedAssetCategory(categoryAssetOptions[0]!.label);
+    }
+  }, [categoryAssetOptions, selectedAssetCategory]);
 
   const cycleStockSort = () => {
     setStockSort((prev) => (prev === "default" ? "asc" : prev === "asc" ? "desc" : "default"));
@@ -106,7 +166,18 @@ export function StatusClient({
   return (
     <div className="products-page status-stock-page">
       <div className="products-content-container">
-        <h1 className="status-stock-page__title">재고 현황</h1>
+        <div className="status-stock-page__title-row">
+          <h1 className="status-stock-page__title">재고 현황</h1>
+          <button
+            type="button"
+            className="btn btn-secondary btn-compact status-stock-asset-toggle-btn status-stock-asset-toggle-btn--title"
+            aria-pressed={showAssetSummary}
+            onClick={() => setShowAssetSummary((v) => !v)}
+            title={showAssetSummary ? "재고 자산 요약 숨기기" : "재고 자산 요약 보기"}
+          >
+            {showAssetSummary ? "자산 숨기기" : "자산 보기"}
+          </button>
+        </div>
 
         <div className="products-toolbar products-toolbar--compact">
           <div ref={toolbarSearchRowRef} className="toolbar-row toolbar-row--search">
@@ -167,10 +238,48 @@ export function StatusClient({
             <span className="status-stock-stat__value">{`${zeroStock.toLocaleString()}개`}</span>
           </button>
         </div>
+        {showAssetSummary ? (
+          <div className="status-stock-asset-stats" role="group" aria-label="재고 자산 요약">
+            <div className="status-stock-asset-lines">
+              <p className="status-stock-asset-line">
+                재고금액합계(도매가x수량): {formatKrwWithEokCompact(totalAssetValue)}
+              </p>
+              <p className="status-stock-asset-line">
+                카테고리선택:
+                <select
+                  className="status-stock-asset-category-select"
+                  value={selectedAssetCategory}
+                  onChange={(e) => setSelectedAssetCategory(e.target.value)}
+                  aria-label="자산 요약 카테고리 선택"
+                >
+                  {categoryAssetOptions.length === 0 ? (
+                    <option value="">—</option>
+                  ) : (
+                    categoryAssetOptions.map((cat) => (
+                      <option key={cat.label} value={cat.label}>
+                        {cat.label}
+                      </option>
+                    ))
+                  )}
+                </select>
+                : {formatKrwWithEokCompact(selectedCategoryAssetValue)}
+              </p>
+              <p className="status-stock-asset-line">
+                가격 미입력 제품: {missingPriceSkuCount.toLocaleString()}개
+              </p>
+            </div>
+          </div>
+        ) : null}
         <p className="status-stock-stats-note">
           ※ 검색·카테고리 필터 기준. 재고는 <strong>옵션 수량 합</strong>. CSV 동일 옵션 여러 줄은{" "}
           <strong>수량 합산</strong>. <strong>초기화</strong>는 파일과 일치, <strong>덮어쓰기</strong>는 파일에 없는 옵션이
           DB에 남으면 합계에 포함될 수 있음.
+          {showAssetSummary ? (
+            <>
+              {" "}
+              자산요약은 <strong>도매가가 입력된 수량 {totalPricedStock.toLocaleString()}개</strong>만 계산합니다.
+            </>
+          ) : null}
         </p>
 
         <div className="table-wrap status-stock-table-wrap">

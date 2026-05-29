@@ -733,7 +733,7 @@ export default function TransactionStatementPage() {
         {showSavedListPanel ? (
           <div className="transaction-saved-list-panel" role="region" aria-label="저장된 거래 리스트">
             {savedLists.length === 0 ? (
-              <p className="transaction-saved-list-panel__empty muted">저장된 리스트가 없습니다. 거래 요약 아래 「리스트 저장」으로 추가하세요.</p>
+              <p className="transaction-saved-list-panel__empty muted">저장된 리스트가 없습니다.</p>
             ) : (
               <div className="transaction-saved-list" role="list" aria-label="저장된 리스트 목록">
                 {savedLists.map((entry) => {
@@ -753,7 +753,7 @@ export default function TransactionStatementPage() {
                         </span>
                         <span className="transaction-saved-list__preview-meta">
                           저장 {formatSavedListDateTime(entry.savedAt)} ·{" "}
-                          {entry.documentType === "estimate" ? "견적서" : "거래명세서"}
+                          {entry.documentType === "estimate" ? "견적서" : "거래명세서"} · 품목 {previewRows.length}개
                         </span>
                       </button>
                       <button

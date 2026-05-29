@@ -5125,6 +5125,93 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
   line-height: 1.4;
 }
 
+.transaction-doc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.transaction-saved-list-panel {
+  margin: -4px 0 12px;
+}
+
+.transaction-saved-list-panel__empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border: 1px dashed var(--border, #e3ddd6);
+  border-radius: 8px;
+  background: #fcfbf9;
+}
+
+.transaction-saved-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #ece6de;
+  border-radius: 8px;
+  background: #fcfbf9;
+  padding: 4px 6px;
+}
+
+.transaction-saved-list__row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  border-bottom: 1px dashed #e8e2da;
+}
+
+.transaction-saved-list__row:last-child {
+  border-bottom: 0;
+}
+
+.transaction-saved-list__item {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.transaction-saved-list__delete {
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 2px;
+}
+
+.transaction-saved-list__row:hover .transaction-saved-list__item {
+  background: color-mix(in srgb, var(--accent) 8%, #ffffff);
+  border-radius: 6px;
+}
+
+.transaction-saved-list__name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.transaction-saved-list__meta {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--muted);
+}
+
+.transaction-list-save-message {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #2d6a3e;
+}
+
 .transaction-form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

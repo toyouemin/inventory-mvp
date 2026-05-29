@@ -31,6 +31,8 @@ export type TransactionStatementScreenPanelProps = {
   showVatIncluded: boolean;
   onShowVatIncludedChange: (value: boolean) => void;
   onOpenPrintPreview: () => void;
+  onSaveList?: () => void;
+  saveListDisabled?: boolean;
 };
 
 function digitsOnly(value: string): string {
@@ -55,6 +57,8 @@ export function TransactionStatementScreenPanel({
   showVatIncluded,
   onShowVatIncludedChange,
   onOpenPrintPreview,
+  onSaveList,
+  saveListDisabled = false,
 }: TransactionStatementScreenPanelProps) {
   const customerBizNoDigits = digitsOnly(customerBizNo);
   const customerBizNoFieldLabel =
@@ -167,9 +171,19 @@ export function TransactionStatementScreenPanel({
       </div>
 
       <div className={styles.previewRow}>
-        <button type="button" className={`btn btn-secondary ${styles.previewBtn}`} onClick={onOpenPrintPreview}>
+        <button type="button" className={`btn btn-secondary btn-compact ${styles.previewBtn}`} onClick={onOpenPrintPreview}>
           출력 명세서 미리보기
         </button>
+        {onSaveList ? (
+          <button
+            type="button"
+            className={`btn btn-primary btn-compact ${styles.previewBtn}`}
+            onClick={onSaveList}
+            disabled={saveListDisabled}
+          >
+            리스트 저장
+          </button>
+        ) : null}
       </div>
     </section>
   );

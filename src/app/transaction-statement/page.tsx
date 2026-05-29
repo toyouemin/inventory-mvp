@@ -1,7 +1,7 @@
 "use client";
 
 import html2canvas from "html2canvas";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { amountToKoreanText } from "@/features/transactionStatement/amountToKoreanText";
 import { EstimateSheet } from "@/features/transactionStatement/EstimateSheet";
 import { exportEstimateExcel } from "@/features/transactionStatement/exportEstimateExcel";
@@ -11,6 +11,14 @@ import {
 } from "@/features/transactionStatement/TransactionStatementPrintSheet";
 import panelStyles from "@/features/transactionStatement/TransactionStatementScreenPanel.module.css";
 import { TransactionStatementScreenPanel } from "@/features/transactionStatement/TransactionStatementScreenPanel";
+import {
+  formatSavedListDateTime,
+  deleteSavedTransactionList,
+  loadSavedTransactionLists,
+  persistSavedTransactionLists,
+  type SavedTransactionListEntry,
+  type SavedTransactionListSnapshot,
+} from "@/features/transactionStatement/savedTransactionLists";
 import { sanitizeDownloadFileName } from "@/lib/downloadFileNames";
 
 type StatementItemFormRow = {
@@ -223,6 +231,111 @@ export default function TransactionStatementPage() {
   const [errorMessage, setErrorMessage] = useState("");
   /** 거래 요약 토글과 동일: 끄면 미리보기·JPG에도 부가세 관련 문구·공급/세액 숨김 */
   const [showVatIncluded, setShowVatIncluded] = useState(true);
+  const [showSavedListPanel, setShowSavedListPanel] = useState(false);
+  const [savedLists, setSavedLists] = useState<SavedTransactionListEntry[]>([]);
+  const [listSaveMessage, setListSaveMessage] = useState("");
+
+  useEffect(() => {
+    setSavedLists(loadSavedTransactionLists());
+  }, []);
+
+  const buildListSnapshot = useCallback((): SavedTransactionListSnapshot => {
+    return {
+      customerName: formData.customerName,
+      customerBizNo: formData.customerBizNo,
+      customerRepresentative: formData.customerRepresentative,
+      customerAddress: formData.customerAddress,
+      customerBusinessType: formData.customerBusinessType,
+      customerBusinessItem: formData.customerBusinessItem,
+      issueDate: formData.issueDate,
+      tradeDate: formData.tradeDate,
+      estimateManagerName: formData.estimateManagerName,
+      estimateManagerPhone: formData.estimateManagerPhone,
+      estimateTotalNote: formData.estimateTotalNote,
+      estimateFooterMemo: formData.estimateFooterMemo,
+      items: formData.items.map((row) => ({
+        name: row.name,
+        spec: row.spec,
+        qty: row.qty,
+        unit: row.unit,
+        unitPrice: row.unitPrice,
+        note: row.note,
+        isExtra: row.isExtra,
+      })),
+    };
+  }, [formData]);
+
+  const handleSaveList = useCallback((): void => {
+    setErrorMessage("");
+    setListSaveMessage("");
+    const listName = formData.customerName.trim();
+    if (!listName) {
+      setErrorMessage(documentType === "estimate" ? "행사명을 입력한 뒤 저장해 주세요." : "상호/클럽을 입력한 뒤 저장해 주세요.");
+      return;
+    }
+    const hasItem = formData.items.some((row) => row.name.trim() !== "");
+    if (!hasItem) {
+      setErrorMessage("품목명을 1개 이상 입력한 뒤 저장해 주세요.");
+      return;
+    }
+
+    const entry: SavedTransactionListEntry = {
+      id: `ts-list-${Date.now()}`,
+      name: listName,
+      savedAt: new Date().toISOString(),
+      documentType,
+      snapshot: buildListSnapshot(),
+    };
+    const next = [entry, ...loadSavedTransactionLists()];
+    persistSavedTransactionLists(next);
+    setSavedLists(next);
+    setListSaveMessage(`「${listName}」 리스트를 저장했습니다. (${formatSavedListDateTime(entry.savedAt)})`);
+    setShowSavedListPanel(true);
+  }, [buildListSnapshot, documentType, formData.customerName, formData.items]);
+
+  const applySavedList = useCallback((entry: SavedTransactionListEntry): void => {
+    setErrorMessage("");
+    setListSaveMessage("");
+    const snapshot = entry.snapshot;
+    const todayYmd = formatYmd(new Date());
+    setDocumentType(entry.documentType);
+    setFormData({
+      customerName: snapshot.customerName,
+      customerBizNo: snapshot.customerBizNo,
+      customerRepresentative: snapshot.customerRepresentative,
+      customerAddress: snapshot.customerAddress,
+      customerBusinessType: snapshot.customerBusinessType,
+      customerBusinessItem: snapshot.customerBusinessItem,
+      issueDate: todayYmd,
+      tradeDate: todayYmd,
+      estimateManagerName: snapshot.estimateManagerName || DEFAULT_ESTIMATE_MANAGER_NAME,
+      estimateManagerPhone: snapshot.estimateManagerPhone || DEFAULT_ESTIMATE_MANAGER_PHONE,
+      estimateTotalNote: snapshot.estimateTotalNote,
+      estimateFooterMemo: snapshot.estimateFooterMemo,
+      items:
+        snapshot.items.length > 0
+          ? snapshot.items.map((row, index) => ({
+              id: `row-${Date.now()}-${index}`,
+              name: row.name,
+              spec: row.spec,
+              qty: row.qty,
+              unit: row.unit || "개",
+              unitPrice: row.unitPrice,
+              note: row.note,
+              isExtra: row.isExtra,
+            }))
+          : [makeRow(1)],
+    });
+    setListSaveMessage(`「${entry.name}」 리스트를 불러왔습니다.`);
+  }, []);
+
+  const handleDeleteSavedList = useCallback((entry: SavedTransactionListEntry): void => {
+    if (!window.confirm(`「${entry.name}」 리스트를 삭제할까요?`)) return;
+    setErrorMessage("");
+    const next = deleteSavedTransactionList(entry.id);
+    setSavedLists(next);
+    setListSaveMessage(`「${entry.name}」 리스트를 삭제했습니다.`);
+  }, []);
   const computedRows = useMemo(
     () =>
       formData.items.map((row) => {
@@ -598,7 +711,7 @@ export default function TransactionStatementPage() {
       <section className="card transaction-page__card">
         <h1>거래명세표 작성</h1>
         <p className="muted transaction-page__desc">{TRANSACTION_STATEMENT_GUIDE_TEXT}</p>
-        <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+        <div className="transaction-doc-tabs">
           <button
             type="button"
             className={`btn btn-compact ${documentType === "statement" ? "btn-primary" : "btn-secondary"}`}
@@ -613,7 +726,50 @@ export default function TransactionStatementPage() {
           >
             견적서
           </button>
+          <button
+            type="button"
+            className={`btn btn-compact ${showSavedListPanel ? "btn-primary" : "btn-secondary"}`}
+            onClick={() => setShowSavedListPanel((prev) => !prev)}
+            aria-expanded={showSavedListPanel}
+          >
+            리스트
+            {savedLists.length > 0 ? ` (${savedLists.length})` : ""}
+          </button>
         </div>
+        {showSavedListPanel ? (
+          <div className="transaction-saved-list-panel" role="region" aria-label="저장된 거래 리스트">
+            {savedLists.length === 0 ? (
+              <p className="transaction-saved-list-panel__empty muted">저장된 리스트가 없습니다. 거래 요약 아래 「리스트 저장」으로 추가하세요.</p>
+            ) : (
+              <div className="transaction-saved-list" role="list" aria-label="저장된 리스트 목록">
+                {savedLists.map((entry) => (
+                  <div key={entry.id} className="transaction-saved-list__row" role="listitem">
+                    <button
+                      type="button"
+                      className="transaction-saved-list__item"
+                      onClick={() => applySavedList(entry)}
+                    >
+                      <span className="transaction-saved-list__name">{entry.name}</span>
+                      <span className="transaction-saved-list__meta">
+                        저장 {formatSavedListDateTime(entry.savedAt)} ·{" "}
+                        {entry.documentType === "estimate" ? "견적서" : "거래명세서"} · 품목{" "}
+                        {entry.snapshot.items.filter((row) => row.name.trim() !== "").length}개
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-compact transaction-saved-list__delete"
+                      onClick={() => handleDeleteSavedList(entry)}
+                      aria-label={`${entry.name} 리스트 삭제`}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {documentType === "statement" ? (
           <>
@@ -824,6 +980,7 @@ export default function TransactionStatementPage() {
             showVatIncluded={showVatIncluded}
             onShowVatIncludedChange={setShowVatIncluded}
             onOpenPrintPreview={() => previewDialogRef.current?.showModal()}
+            onSaveList={handleSaveList}
           />
         ) : (
           <section className={panelStyles.panel}>
@@ -918,6 +1075,13 @@ export default function TransactionStatementPage() {
                 onClick={() => previewDialogRef.current?.showModal()}
               >
                 견적서 미리보기
+              </button>
+              <button
+                type="button"
+                className={`btn btn-primary btn-compact ${panelStyles.previewBtn}`}
+                onClick={handleSaveList}
+              >
+                리스트 저장
               </button>
             </div>
           </section>
@@ -1036,6 +1200,7 @@ export default function TransactionStatementPage() {
         </dialog>
 
         {shouldShowErrorMessage ? <p className="transaction-error">{errorMessage}</p> : null}
+        {listSaveMessage ? <p className="transaction-list-save-message">{listSaveMessage}</p> : null}
 
         <div className="transaction-actions">
           <button

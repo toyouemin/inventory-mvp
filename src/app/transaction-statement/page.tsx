@@ -99,6 +99,25 @@ function makeRow(idSuffix: number): StatementItemFormRow {
   };
 }
 
+function createEmptyFormData(): TransactionStatementFormData {
+  const todayYmd = formatYmd(new Date());
+  return {
+    customerName: "",
+    customerBizNo: "",
+    customerRepresentative: "",
+    customerAddress: "",
+    customerBusinessType: "",
+    customerBusinessItem: "",
+    issueDate: todayYmd,
+    tradeDate: todayYmd,
+    estimateManagerName: DEFAULT_ESTIMATE_MANAGER_NAME,
+    estimateManagerPhone: DEFAULT_ESTIMATE_MANAGER_PHONE,
+    estimateTotalNote: "",
+    estimateFooterMemo: "",
+    items: [makeRow(1)],
+  };
+}
+
 function toNumber(value: string): number {
   const n = Number(value.replace(/,/g, "").trim());
   return Number.isFinite(n) ? n : 0;
@@ -212,21 +231,7 @@ export default function TransactionStatementPage() {
   const printCaptureRef = useRef<HTMLDivElement>(null);
   const previewDialogRef = useRef<HTMLDialogElement>(null);
   const [documentType, setDocumentType] = useState<DocumentType>("statement");
-  const [formData, setFormData] = useState<TransactionStatementFormData>({
-    customerName: "",
-    customerBizNo: "",
-    customerRepresentative: "",
-    customerAddress: "",
-    customerBusinessType: "",
-    customerBusinessItem: "",
-    issueDate: formatYmd(new Date()),
-    tradeDate: formatYmd(new Date()),
-    estimateManagerName: DEFAULT_ESTIMATE_MANAGER_NAME,
-    estimateManagerPhone: DEFAULT_ESTIMATE_MANAGER_PHONE,
-    estimateTotalNote: "",
-    estimateFooterMemo: "",
-    items: [makeRow(1)],
-  });
+  const [formData, setFormData] = useState<TransactionStatementFormData>(createEmptyFormData);
   const [downloading, setDownloading] = useState(false);
   const [jpgSaving, setJpgSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -329,6 +334,12 @@ export default function TransactionStatementPage() {
     setListSaveMessage("");
     const next = deleteSavedTransactionList(entry.id);
     setSavedLists(next);
+  }, []);
+
+  const handleClearForm = useCallback((): void => {
+    setErrorMessage("");
+    setListSaveMessage("");
+    setFormData(createEmptyFormData());
   }, []);
   const computedRows = useMemo(
     () =>
@@ -728,6 +739,14 @@ export default function TransactionStatementPage() {
           >
             리스트
             {savedLists.length > 0 ? ` (${savedLists.length})` : ""}
+          </button>
+          <button
+            type="button"
+            className="btn btn-compact btn-secondary"
+            onClick={handleClearForm}
+            title="아래 입력 내용을 모두 비웁니다"
+          >
+            지우기
           </button>
         </div>
         {showSavedListPanel ? (

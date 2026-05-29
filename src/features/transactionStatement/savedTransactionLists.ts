@@ -113,6 +113,16 @@ export function deleteSavedTransactionList(id: string): SavedTransactionListEntr
   return next;
 }
 
+/** 예: 구리클럽 | 셔틀콕 700 | 50타 */
+export function formatSavedListPreviewLine(
+  customerName: string,
+  row: SavedTransactionListItemRow
+): string {
+  const productPart = [row.name.trim(), row.spec.trim()].filter(Boolean).join(" ");
+  const qtyPart = row.qty.trim() ? `${row.qty.trim()}${row.unit || "개"}` : "";
+  return [customerName.trim(), productPart, qtyPart].filter(Boolean).join(" | ");
+}
+
 export function formatSavedListDateTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;

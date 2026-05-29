@@ -12,8 +12,9 @@ import {
 import panelStyles from "@/features/transactionStatement/TransactionStatementScreenPanel.module.css";
 import { TransactionStatementScreenPanel } from "@/features/transactionStatement/TransactionStatementScreenPanel";
 import {
-  formatSavedListDateTime,
   deleteSavedTransactionList,
+  formatSavedListDateTime,
+  formatSavedListPreviewLine,
   loadSavedTransactionLists,
   persistSavedTransactionLists,
   type SavedTransactionListEntry,
@@ -746,25 +747,14 @@ export default function TransactionStatementPage() {
                         className="transaction-saved-list__item"
                         onClick={() => applySavedList(entry)}
                       >
-                        <span className="transaction-saved-list__name">상호 {entry.name}</span>
-                        <span className="transaction-saved-list__meta">
-                          저장 {formatSavedListDateTime(entry.savedAt)} ·{" "}
-                          {entry.documentType === "estimate" ? "견적서" : "거래명세서"}
-                        </span>
                         {previewRows.length === 0 ? (
-                          <span className="transaction-saved-list__no-items">품목 없음</span>
+                          <span className="transaction-saved-list__preview-line">{entry.name}</span>
                         ) : (
-                          <ul className="transaction-saved-list__items">
-                            {previewRows.map((row, index) => (
-                              <li key={`${entry.id}-item-${index}`} className="transaction-saved-list__item-line">
-                                <span className="transaction-saved-list__item-col">품목 {row.name.trim() || "—"}</span>
-                                <span className="transaction-saved-list__item-col">규격 {row.spec.trim() || "—"}</span>
-                                <span className="transaction-saved-list__item-col">
-                                  수량 {row.qty.trim() ? `${row.qty.trim()}${row.unit || "개"}` : "—"}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
+                          previewRows.map((row, index) => (
+                            <span key={`${entry.id}-item-${index}`} className="transaction-saved-list__preview-line">
+                              {formatSavedListPreviewLine(entry.name, row)}
+                            </span>
+                          ))
                         )}
                       </button>
                       <button

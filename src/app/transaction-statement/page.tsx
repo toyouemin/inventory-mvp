@@ -740,6 +740,7 @@ export default function TransactionStatementPage() {
                   const previewRows = entry.snapshot.items.filter(
                     (row) => row.name.trim() || row.spec.trim() || row.qty.trim()
                   );
+                  const firstRow = previewRows[0];
                   return (
                     <div key={entry.id} className="transaction-saved-list__row" role="listitem">
                       <button
@@ -747,20 +748,21 @@ export default function TransactionStatementPage() {
                         className="transaction-saved-list__item"
                         onClick={() => applySavedList(entry)}
                       >
-                        {previewRows.length === 0 ? (
-                          <span className="transaction-saved-list__preview-line">{entry.name}</span>
-                        ) : (
-                          previewRows.map((row, index) => (
-                            <span key={`${entry.id}-item-${index}`} className="transaction-saved-list__preview-line">
-                              {formatSavedListPreviewLine(entry.name, row)}
-                            </span>
-                          ))
-                        )}
+                        <span className="transaction-saved-list__preview-primary">
+                          {firstRow ? formatSavedListPreviewLine(entry.name, firstRow) : entry.name}
+                        </span>
+                        <span className="transaction-saved-list__preview-meta">
+                          저장 {formatSavedListDateTime(entry.savedAt)} ·{" "}
+                          {entry.documentType === "estimate" ? "견적서" : "거래명세서"}
+                        </span>
                       </button>
                       <button
                         type="button"
-                        className="btn btn-danger transaction-saved-list__delete"
-                        onClick={() => handleDeleteSavedList(entry)}
+                        className="transaction-saved-list__delete"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDeleteSavedList(entry);
+                        }}
                         aria-label={`${entry.name} 리스트 삭제`}
                       >
                         삭제

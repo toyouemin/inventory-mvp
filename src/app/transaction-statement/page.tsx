@@ -273,12 +273,6 @@ export default function TransactionStatementPage() {
       setErrorMessage(documentType === "estimate" ? "행사명을 입력한 뒤 저장해 주세요." : "상호/클럽을 입력한 뒤 저장해 주세요.");
       return;
     }
-    const hasItem = formData.items.some((row) => row.name.trim() !== "");
-    if (!hasItem) {
-      setErrorMessage("품목명을 1개 이상 입력한 뒤 저장해 주세요.");
-      return;
-    }
-
     const entry: SavedTransactionListEntry = {
       id: `ts-list-${Date.now()}`,
       name: listName,
@@ -291,7 +285,7 @@ export default function TransactionStatementPage() {
     setSavedLists(next);
     setListSaveMessage(`「${listName}」 리스트를 저장했습니다. (${formatSavedListDateTime(entry.savedAt)})`);
     setShowSavedListPanel(true);
-  }, [buildListSnapshot, documentType, formData.customerName, formData.items]);
+  }, [buildListSnapshot, documentType, formData.customerName]);
 
   const applySavedList = useCallback((entry: SavedTransactionListEntry): void => {
     setErrorMessage("");
@@ -330,11 +324,10 @@ export default function TransactionStatementPage() {
   }, []);
 
   const handleDeleteSavedList = useCallback((entry: SavedTransactionListEntry): void => {
-    if (!window.confirm(`「${entry.name}」 리스트를 삭제할까요?`)) return;
     setErrorMessage("");
+    setListSaveMessage("");
     const next = deleteSavedTransactionList(entry.id);
     setSavedLists(next);
-    setListSaveMessage(`「${entry.name}」 리스트를 삭제했습니다.`);
   }, []);
   const computedRows = useMemo(
     () =>
@@ -742,30 +735,49 @@ export default function TransactionStatementPage() {
               <p className="transaction-saved-list-panel__empty muted">저장된 리스트가 없습니다. 거래 요약 아래 「리스트 저장」으로 추가하세요.</p>
             ) : (
               <div className="transaction-saved-list" role="list" aria-label="저장된 리스트 목록">
-                {savedLists.map((entry) => (
-                  <div key={entry.id} className="transaction-saved-list__row" role="listitem">
-                    <button
-                      type="button"
-                      className="transaction-saved-list__item"
-                      onClick={() => applySavedList(entry)}
-                    >
-                      <span className="transaction-saved-list__name">{entry.name}</span>
-                      <span className="transaction-saved-list__meta">
-                        저장 {formatSavedListDateTime(entry.savedAt)} ·{" "}
-                        {entry.documentType === "estimate" ? "견적서" : "거래명세서"} · 품목{" "}
-                        {entry.snapshot.items.filter((row) => row.name.trim() !== "").length}개
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-compact transaction-saved-list__delete"
-                      onClick={() => handleDeleteSavedList(entry)}
-                      aria-label={`${entry.name} 리스트 삭제`}
-                    >
-                      삭제
-                    </button>
-                  </div>
-                ))}
+                {savedLists.map((entry) => {
+                  const previewRows = entry.snapshot.items.filter(
+                    (row) => row.name.trim() || row.spec.trim() || row.qty.trim()
+                  );
+                  return (
+                    <div key={entry.id} className="transaction-saved-list__row" role="listitem">
+                      <button
+                        type="button"
+                        className="transaction-saved-list__item"
+                        onClick={() => applySavedList(entry)}
+                      >
+                        <span className="transaction-saved-list__name">상호 {entry.name}</span>
+                        <span className="transaction-saved-list__meta">
+                          저장 {formatSavedListDateTime(entry.savedAt)} ·{" "}
+                          {entry.documentType === "estimate" ? "견적서" : "거래명세서"}
+                        </span>
+                        {previewRows.length === 0 ? (
+                          <span className="transaction-saved-list__no-items">품목 없음</span>
+                        ) : (
+                          <ul className="transaction-saved-list__items">
+                            {previewRows.map((row, index) => (
+                              <li key={`${entry.id}-item-${index}`} className="transaction-saved-list__item-line">
+                                <span className="transaction-saved-list__item-col">품목 {row.name.trim() || "—"}</span>
+                                <span className="transaction-saved-list__item-col">규격 {row.spec.trim() || "—"}</span>
+                                <span className="transaction-saved-list__item-col">
+                                  수량 {row.qty.trim() ? `${row.qty.trim()}${row.unit || "개"}` : "—"}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger transaction-saved-list__delete"
+                        onClick={() => handleDeleteSavedList(entry)}
+                        aria-label={`${entry.name} 리스트 삭제`}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

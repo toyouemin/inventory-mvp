@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createProduct, uploadProductImage } from "./actions";
 import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
-import { VariantEditor, getPersistableVariantRows, type VariantRow } from "./VariantEditor";
+import {
+  VariantEditor,
+  fillMissingPricesFromSourceRow,
+  getPersistableVariantRows,
+  type VariantRow,
+} from "./VariantEditor";
 import { variantCompositeKey } from "./variantOptions";
 
 function parsePriceInput(value: string): number | null {
@@ -64,7 +69,7 @@ export function AddProductModal({
     if (!sku.trim() || !name.trim()) return;
     if (pending) return;
 
-    const rowsToPersist = getPersistableVariantRows(variantRows);
+    const rowsToPersist = getPersistableVariantRows(fillMissingPricesFromSourceRow(variantRows));
 
     const variantKeys = rowsToPersist.map((r) =>
       variantCompositeKey(r.color, r.gender, r.size)

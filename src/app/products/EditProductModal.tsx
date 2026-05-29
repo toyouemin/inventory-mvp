@@ -7,6 +7,7 @@ import { readAsDataURL, resizeAndCompressImage } from "./imageUtils";
 import type { Product, ProductVariant } from "./types";
 import {
   VariantEditor,
+  fillMissingPricesFromSourceRow,
   getPersistableVariantRows,
   type VariantRow,
   generateRowId,
@@ -191,7 +192,8 @@ export function EditProductModal({
     if (pending) return;
 
     const hadNoVariantsInitially = initialVariantIds.length === 0;
-    const rowsToPersist = getPersistableVariantRows(variantRows, {
+    const rowsWithFilledPrices = fillMissingPricesFromSourceRow(variantRows);
+    const rowsToPersist = getPersistableVariantRows(rowsWithFilledPrices, {
       excludeLegacyProductStockOnly: hadNoVariantsInitially,
     });
 

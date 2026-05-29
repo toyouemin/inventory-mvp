@@ -41,6 +41,59 @@ export function rowHasAnyPriceFields(r: VariantRow): boolean {
   return [r.wholesalePrice, r.msrpPrice, r.salePrice, r.extraPrice].some((p) => String(p ?? "").trim() !== "");
 }
 
+function parsePriceField(value: string): number {
+  const cleaned = String(value ?? "").replace(/,/g, "").trim();
+  if (!cleaned) return 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
+
+export function rowHasNonZeroPrice(r: VariantRow): boolean {
+  return [r.wholesalePrice, r.msrpPrice, r.salePrice, r.extraPrice].some((p) => parsePriceField(p) > 0);
+}
+
+/** 가격 칸이 모두 비어 있거나 0만 있는 행 */
+export function rowHasOnlyZeroOrEmptyPrices(r: VariantRow): boolean {
+  return [r.wholesalePrice, r.msrpPrice, r.salePrice, r.extraPrice].every((p) => parsePriceField(p) === 0);
+}
+
+/**
+ * 첫 번째로 금액이 입력된 행(0 초과 우선)의 가격을,
+ * 금액이 비어 있거나 0인 나머지 옵션 행에 복사합니다.
+ */
+export function fillMissingPricesFromSourceRow(rows: VariantRow[]): VariantRow[] {
+  let source: VariantRow | null = null;
+  for (const r of rows) {
+    if (isVacantScratchRow(r)) continue;
+    if (rowHasNonZeroPrice(r)) {
+      source = r;
+      break;
+    }
+  }
+  if (!source) {
+    for (const r of rows) {
+      if (isVacantScratchRow(r)) continue;
+      if (rowHasAnyPriceFields(r)) {
+        source = r;
+        break;
+      }
+    }
+  }
+  if (!source) return rows;
+
+  return rows.map((r) => {
+    if (isVacantScratchRow(r) || r.rowId === source!.rowId) return r;
+    if (!rowHasOnlyZeroOrEmptyPrices(r)) return r;
+    return {
+      ...r,
+      wholesalePrice: source!.wholesalePrice,
+      msrpPrice: source!.msrpPrice,
+      salePrice: source!.salePrice,
+      extraPrice: source!.extraPrice,
+    };
+  });
+}
+
 /** 표시용 empty-1 또는, 입력 전 템플릿 같은 빈 줄(옵션/가격/메모 없음·재고 0) */
 export function isVacantScratchRow(r: VariantRow): boolean {
   if (r.rowId === PLACEHOLDER_ROW_ID) return true;

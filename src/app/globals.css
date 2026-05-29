@@ -5190,21 +5190,22 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
 }
 
 .transaction-saved-list__delete {
-  flex: 0 0 32px;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  padding: 0;
+  flex: 0 0 auto;
+  width: 40px;
+  min-width: 40px;
+  height: 36px;
+  padding: 0 4px;
   margin: 0 2px 0 0;
   align-self: center;
-  font-size: 9px;
-  line-height: 1.1;
+  font-size: 11px;
+  line-height: 1.2;
   font-weight: 600;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
   background: #c0392b;
   color: #fff;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .transaction-saved-list__delete:hover {

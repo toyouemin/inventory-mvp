@@ -37,6 +37,7 @@ import {
   productStockXlsxFile,
 } from "@/lib/downloadFileNames";
 import { useProductImageExcelDownload } from "@/app/ProductImageExcelDownloadProvider";
+import { mergeProductStockChangeSummary } from "./stockChangeSummary";
 
 type ViewMode = "card" | "list";
 type ListStockUpdatedSort = "default" | "stock_updated_desc";
@@ -48,6 +49,25 @@ type CsvUploadMode = "merge" | "reset";
 const CSV_UPLOAD_HIGHLIGHT_MS = 6000;
 /** 검색어 반영 지연 — 타이핑 중 필터·병합·리스트 재계산 횟수 감소 */
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** ± 클릭 시 카드·목록의 수량변경 요약을 즉시 누적(서버 `mergeProductStockChangeSummary`와 동일 규칙) */
+function optimisticProductStockMeta(
+  product: Product,
+  delta: number,
+  label: string
+): { stockUpdatedAt: string; stockChangeSummary: string | null | undefined } {
+  const touchedAt = new Date().toISOString();
+  return {
+    stockUpdatedAt: touchedAt,
+    stockChangeSummary: mergeProductStockChangeSummary({
+      prevSummary: product.stockChangeSummary,
+      prevStockUpdatedAtIso: product.stockUpdatedAt,
+      nextStockUpdatedAtIso: touchedAt,
+      delta,
+      label,
+    }),
+  };
+}
 
 function variantsAfterZeroStockFilter(variants: ProductVariant[], hideZeroStock: boolean): ProductVariant[] {
   if (!hideZeroStock) return variants;
@@ -1107,17 +1127,19 @@ export function ProductsClient({
                 });
               } else if (saved) {
                 try {
+                  const bucketNow = productStockFlushRef.current.get(key);
+                  const keepOptimistic = (bucketNow?.pendingDelta ?? 0) !== 0;
                   setLocalProducts((prev) =>
-                    prev.map((x) =>
-                      x.id === productId
-                        ? {
-                            ...x,
-                            stock: saved.stock,
-                            stockUpdatedAt: saved.stockUpdatedAt,
-                            stockChangeSummary: saved.stockChangeSummary ?? null,
-                          }
-                        : x
-                    )
+                    prev.map((x) => {
+                      if (x.id !== productId) return x;
+                      if (keepOptimistic) return x;
+                      return {
+                        ...x,
+                        stock: saved.stock,
+                        stockUpdatedAt: saved.stockUpdatedAt,
+                        stockChangeSummary: saved.stockChangeSummary ?? null,
+                      };
+                    })
                   );
                 } catch (applyErr) {
                   logStockAdjust("product_apply_local_throw", {
@@ -1265,31 +1287,34 @@ export function ProductsClient({
                 });
               } else if (saved) {
                 try {
+                  const bucketNow = variantStockFlushRef.current.get(key);
+                  const keepOptimistic = (bucketNow?.pendingDelta ?? 0) !== 0;
                   setLocalVariantsByProductId((prev) => {
                     const list = prev[ownerId];
                     if (!list) return prev;
                     return {
                       ...prev,
-                      [ownerId]: list.map((v) =>
-                        v.id === variantId ? { ...v, stock: saved.variantStock } : v
-                      ),
+                      [ownerId]: list.map((v) => {
+                        if (v.id !== variantId) return v;
+                        return keepOptimistic ? v : { ...v, stock: saved.variantStock };
+                      }),
                     };
                   });
                   setLocalProducts((prev) =>
-                    prev.map((x) =>
-                      x.id === ownerId
-                        ? {
-                            ...x,
-                            stock: saved.productRow?.stock ?? saved.productStock,
-                            stockUpdatedAt:
-                              saved.productRow?.stock_updated_at ??
-                              saved.productUpdatedAt ??
-                              x.stockUpdatedAt ??
-                              null,
-                            stockChangeSummary: saved.stockChangeSummary ?? x.stockChangeSummary ?? null,
-                          }
-                        : x
-                    )
+                    prev.map((x) => {
+                      if (x.id !== ownerId) return x;
+                      if (keepOptimistic) return x;
+                      return {
+                        ...x,
+                        stock: saved.productRow?.stock ?? saved.productStock,
+                        stockUpdatedAt:
+                          saved.productRow?.stock_updated_at ??
+                          saved.productUpdatedAt ??
+                          x.stockUpdatedAt ??
+                          null,
+                        stockChangeSummary: saved.stockChangeSummary ?? x.stockChangeSummary ?? null,
+                      };
+                    })
                   );
                 } catch (applyErr) {
                   logStockAdjust("variant_apply_local_throw", {
@@ -1392,7 +1417,10 @@ export function ProductsClient({
           if (d < 0 && old < 1) return prev;
           changed = true;
           const next = Math.max(0, old + d);
-          return prev.map((x) => (x.id === pid ? { ...x, stock: next } : x));
+          const meta = optimisticProductStockMeta(p, d, "재고");
+          return prev.map((x) =>
+            x.id === pid ? { ...x, stock: next, ...meta } : x
+          );
         });
       });
 
@@ -1431,6 +1459,7 @@ export function ProductsClient({
       logStockAdjust("variant_click", { key, productId: pid, variantId: vid, delta: d });
 
       let changed = false;
+      let summaryLabel = "옵션";
       flushSync(() => {
         setLocalVariantsByProductId((prev) => {
           const list = prev[pid];
@@ -1443,10 +1472,18 @@ export function ProductsClient({
           const old = Number.isFinite(oldRaw) ? oldRaw : 0;
           if (d < 0 && old < 1) return prev;
           changed = true;
+          summaryLabel = formatGenderSizeDisplay(row.gender, row.size).trim() || "옵션";
           const next = Math.max(0, old + d);
           const nl = [...list];
           nl[idx] = { ...row, stock: next };
           return { ...prev, [pid]: nl };
+        });
+        setLocalProducts((prev) => {
+          if (!changed) return prev;
+          const p = prev.find((x) => x.id === pid);
+          if (!p) return prev;
+          const meta = optimisticProductStockMeta(p, d, summaryLabel);
+          return prev.map((x) => (x.id === pid ? { ...x, ...meta } : x));
         });
       });
 

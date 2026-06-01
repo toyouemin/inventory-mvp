@@ -1,7 +1,10 @@
 /**
  * products.stock_change_summary 문자열 형식:
- * `[남95: +2, 여90: -1]` — 표시 전용이며 같은 초( UNIX 초 ) 내 ±조정을 합산해 병합합니다.
+ * `[남95: +2, 여90: -1]` — 표시 전용이며 가까운 시각의 ±조정을 합산해 병합합니다.
  */
+
+/** 연속 ± 클릭·저장이 초 경계를 넘어도 요약이 끊기지 않도록 하는 병합 허용 구간(초) */
+export const STOCK_CHANGE_MERGE_WINDOW_SEC = 30;
 
 export function stockChangeEpochSec(iso: string | Date): number {
   const t = typeof iso === "string" ? Date.parse(iso) : iso.getTime();
@@ -43,6 +46,21 @@ export function formatStockChangeBracketFromMap(parts: Map<string, number>): str
   return `[${segments.join(", ")}]`;
 }
 
+export function canMergeStockChangeSummary(
+  prevSummary: string | null | undefined,
+  prevStockUpdatedAtIso: string | null | undefined,
+  nextStockUpdatedAtIso: string
+): boolean {
+  if (!prevSummary?.trim()) return false;
+  const nextSec = stockChangeEpochSec(nextStockUpdatedAtIso);
+  const prevSec =
+    typeof prevStockUpdatedAtIso === "string" && prevStockUpdatedAtIso.trim().length > 0
+      ? stockChangeEpochSec(prevStockUpdatedAtIso)
+      : NaN;
+  if (!Number.isFinite(prevSec) || !Number.isFinite(nextSec)) return false;
+  return Math.abs(nextSec - prevSec) <= STOCK_CHANGE_MERGE_WINDOW_SEC;
+}
+
 export function mergeProductStockChangeSummary(args: {
   prevSummary: string | null | undefined;
   prevStockUpdatedAtIso: string | null | undefined;
@@ -53,16 +71,9 @@ export function mergeProductStockChangeSummary(args: {
   const { prevSummary, prevStockUpdatedAtIso, nextStockUpdatedAtIso, delta, label } = args;
   if (!label || !Number.isFinite(delta) || delta === 0) return parseOnlyOrNull(prevSummary);
 
-  const nextSec = stockChangeEpochSec(nextStockUpdatedAtIso);
-  const prevSec =
-    typeof prevStockUpdatedAtIso === "string" && prevStockUpdatedAtIso.trim().length > 0
-      ? stockChangeEpochSec(prevStockUpdatedAtIso)
-      : NaN;
-
-  let map =
-    prevSec === nextSec && prevSummary?.trim()
-      ? parseStockChangeBracket(prevSummary)
-      : new Map<string, number>();
+  let map = canMergeStockChangeSummary(prevSummary, prevStockUpdatedAtIso, nextStockUpdatedAtIso)
+    ? parseStockChangeBracket(prevSummary)
+    : new Map<string, number>();
 
   const cur = map.get(label) ?? 0;
   const nv = cur + delta;

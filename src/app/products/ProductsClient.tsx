@@ -54,15 +54,15 @@ const SEARCH_DEBOUNCE_MS = 300;
 function optimisticProductStockMeta(
   product: Product,
   delta: number,
-  label: string
+  label: string,
+  burstTouchedAt: string
 ): { stockUpdatedAt: string; stockChangeSummary: string | null | undefined } {
-  const touchedAt = new Date().toISOString();
   return {
-    stockUpdatedAt: touchedAt,
+    stockUpdatedAt: burstTouchedAt,
     stockChangeSummary: mergeProductStockChangeSummary({
       prevSummary: product.stockChangeSummary,
       prevStockUpdatedAtIso: product.stockUpdatedAt,
-      nextStockUpdatedAtIso: touchedAt,
+      nextStockUpdatedAtIso: burstTouchedAt,
       delta,
       label,
     }),
@@ -606,8 +606,32 @@ function listRowAdjustKey(row: ProductRow): string {
 }
 
 /** 항목(`p:` / `v:`)별 재고 저장: 클릭은 즉시 낙관 반영, 서버는 누적 델타를 순서대로 전송(동시에 다른 항목은 독립). */
-type StockFlushBucket = { pendingDelta: number; running: boolean };
+type StockFlushBucket = {
+  pendingDelta: number;
+  running: boolean;
+  /** 연속 ± 클릭 구간 — 요약 병합·수량변경일에 동일 시각 사용(초 경계로 +1이 사라지는 것 방지) */
+  burstTouchedAt: string | null;
+};
 type VariantFlushBucket = StockFlushBucket & { productId: string };
+
+function ensureStockFlushBucket(
+  m: Map<string, StockFlushBucket>,
+  key: string,
+  init?: Partial<VariantFlushBucket>
+): StockFlushBucket {
+  let b = m.get(key);
+  if (!b) {
+    b = { pendingDelta: 0, running: false, burstTouchedAt: null, ...init };
+    m.set(key, b);
+  }
+  if (!b.burstTouchedAt) b.burstTouchedAt = new Date().toISOString();
+  return b;
+}
+
+function clearStockFlushBurstIfIdle(m: Map<string, StockFlushBucket>, key: string) {
+  const b = m.get(key);
+  if (b && b.pendingDelta === 0 && !b.running) b.burstTouchedAt = null;
+}
 
 function variantStockSumForProduct(
   variantsByPid: Record<string, ProductVariant[]>,
@@ -1073,7 +1097,7 @@ export function ProductsClient({
       const m = productStockFlushRef.current;
       let b = m.get(key);
       if (!b) {
-        b = { pendingDelta: 0, running: false };
+        b = { pendingDelta: 0, running: false, burstTouchedAt: null };
         m.set(key, b);
       }
       if (b.running) {
@@ -1206,6 +1230,8 @@ export function ProductsClient({
           const again = m.get(key);
           if (again && again.pendingDelta !== 0 && !again.running) {
             runProductStockFlushLoop(key, productId);
+          } else {
+            clearStockFlushBurstIfIdle(m, key);
           }
         }
       })();
@@ -1218,7 +1244,7 @@ export function ProductsClient({
       const m = variantStockFlushRef.current;
       let b = m.get(key);
       if (!b) {
-        b = { pendingDelta: 0, running: false, productId };
+        b = { pendingDelta: 0, running: false, burstTouchedAt: null, productId };
         m.set(key, b);
       } else {
         b.productId = productId;
@@ -1391,6 +1417,8 @@ export function ProductsClient({
           const again = m.get(key);
           if (again && again.pendingDelta !== 0 && !again.running) {
             runVariantStockFlushLoop(key, productId, variantId);
+          } else {
+            clearStockFlushBurstIfIdle(m, key);
           }
         }
       })();
@@ -1407,6 +1435,9 @@ export function ProductsClient({
       const key = `p:${pid}`;
       logStockAdjust("product_click", { key, productId: pid, delta: d });
 
+      const m = productStockFlushRef.current;
+      const burstTouchedAt = ensureStockFlushBucket(m, key).burstTouchedAt!;
+
       let changed = false;
       flushSync(() => {
         setLocalProducts((prev) => {
@@ -1417,7 +1448,7 @@ export function ProductsClient({
           if (d < 0 && old < 1) return prev;
           changed = true;
           const next = Math.max(0, old + d);
-          const meta = optimisticProductStockMeta(p, d, "재고");
+          const meta = optimisticProductStockMeta(p, d, "재고", burstTouchedAt);
           return prev.map((x) =>
             x.id === pid ? { ...x, stock: next, ...meta } : x
           );
@@ -1426,15 +1457,11 @@ export function ProductsClient({
 
       if (!changed) {
         logStockAdjust("product_click_skip_no_state_change", { key, productId: pid, delta: d });
+        clearStockFlushBurstIfIdle(m, key);
         return;
       }
 
-      const m = productStockFlushRef.current;
-      let b = m.get(key);
-      if (!b) {
-        b = { pendingDelta: 0, running: false };
-        m.set(key, b);
-      }
+      const b = m.get(key)!;
       b.pendingDelta += d;
       logStockAdjust("product_pendingDelta_after_click", {
         key,
@@ -1457,6 +1484,9 @@ export function ProductsClient({
       if (!Number.isFinite(d) || d === 0) return;
       const key = `v:${vid}`;
       logStockAdjust("variant_click", { key, productId: pid, variantId: vid, delta: d });
+
+      const m = variantStockFlushRef.current;
+      const burstTouchedAt = ensureStockFlushBucket(m, key, { productId: pid }).burstTouchedAt!;
 
       let changed = false;
       let summaryLabel = "옵션";
@@ -1482,24 +1512,19 @@ export function ProductsClient({
           if (!changed) return prev;
           const p = prev.find((x) => x.id === pid);
           if (!p) return prev;
-          const meta = optimisticProductStockMeta(p, d, summaryLabel);
+          const meta = optimisticProductStockMeta(p, d, summaryLabel, burstTouchedAt);
           return prev.map((x) => (x.id === pid ? { ...x, ...meta } : x));
         });
       });
 
       if (!changed) {
         logStockAdjust("variant_click_skip_no_state_change", { key, productId: pid, variantId: vid, delta: d });
+        clearStockFlushBurstIfIdle(m, key);
         return;
       }
 
-      const m = variantStockFlushRef.current;
-      let b = m.get(key);
-      if (!b) {
-        b = { pendingDelta: 0, running: false, productId: pid };
-        m.set(key, b);
-      } else {
-        b.productId = pid;
-      }
+      const b = m.get(key)!;
+      b.productId = pid;
       b.pendingDelta += d;
       logStockAdjust("variant_pendingDelta_after_click", {
         key,

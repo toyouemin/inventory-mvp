@@ -255,7 +255,6 @@ export async function updateProduct(
 
   if (data.stock !== undefined)
     updateData.stock = Number.isFinite(Number(data.stock)) ? Math.max(0, Number(data.stock)) : 0;
-  if (data.variants && data.variants.updates.length > 0) updateData.stock = 0;
   if (data.stock !== undefined) {
     stockTimestampForProduct = new Date().toISOString();
     updateData.stock_updated_at = stockTimestampForProduct;
@@ -265,17 +264,20 @@ export async function updateProduct(
     // 상품 메타 수정 기준 시각(재고 변경 시각은 stock_updated_at으로 분리)
     updateData.updated_at = new Date().toISOString();
   }
+  const hasProductUpdate = Object.keys(updateData).length > 0;
 
   const logStockUpdate =
     LOG_PRODUCT_STOCK_UPDATE &&
-    Object.keys(updateData).length > 0 &&
+    hasProductUpdate &&
     productEditTouchesStockForDebug(data, updateData);
   if (logStockUpdate) {
     debugLogProductsStockPayload("updateProduct.initial", productId, updateData);
   }
 
-  const { error } = await supabaseServer.from("products").update(updateData).eq("id", productId);
-  if (error) throw new Error(error.message);
+  if (hasProductUpdate) {
+    const { error } = await supabaseServer.from("products").update(updateData).eq("id", productId);
+    if (error) throw new Error(error.message);
+  }
 
   if (logStockUpdate) {
     await debugSelectProductsStockRow("updateProduct.initial", productId);

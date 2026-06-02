@@ -12,6 +12,11 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 const PRODUCT_VARIANTS_PAGE_SIZE = 1000;
 
+function toNonNegativeInt(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
+}
+
 export default async function StatusPage() {
   const categoryOrderFromDb = await fetchCategoryOrderMap();
 
@@ -81,7 +86,7 @@ export default async function StatusPage() {
       const chunk = variantsData ?? [];
       for (const v of chunk) {
         const pid = String((v as { product_id?: string }).product_id ?? "");
-        const qty = Number((v as { stock?: number }).stock ?? 0) || 0;
+        const qty = toNonNegativeInt((v as { stock?: number }).stock ?? 0);
         const wpRaw = (v as { wholesale_price?: number | string | null }).wholesale_price;
         const wp = wpRaw != null ? Number(wpRaw) : Number.NaN;
         variantsByProductId.set(pid, (variantsByProductId.get(pid) ?? 0) + qty);
@@ -96,7 +101,7 @@ export default async function StatusPage() {
 
   const rows = products.map((r) => {
     const hasVariants = variantsByProductId.has(r.id);
-    const stock = hasVariants ? variantsByProductId.get(r.id) ?? 0 : r.stock ?? 0;
+    const stock = hasVariants ? variantsByProductId.get(r.id) ?? 0 : toNonNegativeInt(r.stock ?? 0);
     const displayName = (r.name ?? r.sku).trim() || r.sku;
     const productWholesalePrice =
       r.wholesale_price != null && Number.isFinite(Number(r.wholesale_price))

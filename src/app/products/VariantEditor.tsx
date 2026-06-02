@@ -53,37 +53,40 @@ export function rowHasNonZeroPrice(r: VariantRow): boolean {
 }
 
 /**
- * 첫 번째로 금액이 입력된 행(0 초과 우선)의 가격을
- * 나머지 모든 옵션 행에 덮어씁니다.
+ * 특정 가격 칸(출고가/소비자가/실판매가/매장가)을 입력하면(0 초과),
+ * 나머지 옵션 행에도 해당 칸을 같은 값으로 덮어씁니다.
+ *
+ * 주의: 기존 로직은 "어떤 금액 컬럼이든 0 초과인 첫 행"을 source로 잡다 보니,
+ * source 행의 `wholesalePrice`가 비어 있으면 출고가 전파가 실패할 수 있었습니다.
+ * 필드별로 source를 따로 찾아 오동작을 막습니다.
  */
 export function fillMissingPricesFromSourceRow(rows: VariantRow[]): VariantRow[] {
-  let source: VariantRow | null = null;
+  let sourceWholesale: VariantRow | null = null;
+  let sourceMsrp: VariantRow | null = null;
+  let sourceSale: VariantRow | null = null;
+  let sourceExtra: VariantRow | null = null;
+
   for (const r of rows) {
     if (isVacantScratchRow(r)) continue;
-    if (rowHasNonZeroPrice(r)) {
-      source = r;
-      break;
-    }
+
+    if (!sourceWholesale && parsePriceField(r.wholesalePrice) > 0) sourceWholesale = r;
+    if (!sourceMsrp && parsePriceField(r.msrpPrice) > 0) sourceMsrp = r;
+    if (!sourceSale && parsePriceField(r.salePrice) > 0) sourceSale = r;
+    if (!sourceExtra && parsePriceField(r.extraPrice) > 0) sourceExtra = r;
+
+    if (sourceWholesale && sourceMsrp && sourceSale && sourceExtra) break;
   }
-  if (!source) {
-    for (const r of rows) {
-      if (isVacantScratchRow(r)) continue;
-      if (rowHasAnyPriceFields(r)) {
-        source = r;
-        break;
-      }
-    }
-  }
-  if (!source) return rows;
+
+  if (!sourceWholesale && !sourceMsrp && !sourceSale && !sourceExtra) return rows;
 
   return rows.map((r) => {
-    if (isVacantScratchRow(r) || r.rowId === source!.rowId) return r;
+    if (isVacantScratchRow(r)) return r;
     return {
       ...r,
-      wholesalePrice: source!.wholesalePrice,
-      msrpPrice: source!.msrpPrice,
-      salePrice: source!.salePrice,
-      extraPrice: source!.extraPrice,
+      ...(sourceWholesale ? { wholesalePrice: sourceWholesale.wholesalePrice } : {}),
+      ...(sourceMsrp ? { msrpPrice: sourceMsrp.msrpPrice } : {}),
+      ...(sourceSale ? { salePrice: sourceSale.salePrice } : {}),
+      ...(sourceExtra ? { extraPrice: sourceExtra.extraPrice } : {}),
     };
   });
 }

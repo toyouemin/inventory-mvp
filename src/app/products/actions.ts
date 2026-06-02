@@ -801,7 +801,8 @@ export async function adjustVariantStock(
 
   if (readErr || !row) throw new Error(readErr?.message ?? "Variant not found");
 
-  const prev = Number(row.stock) ?? 0;
+  const prevRaw = Number((row as { stock?: unknown }).stock);
+  const prev = Number.isFinite(prevRaw) ? Math.max(0, Math.trunc(prevRaw)) : 0;
   const next = Math.max(0, prev + delta);
   const actualDelta = next - prev;
   if (actualDelta === 0) return;
@@ -1506,8 +1507,8 @@ async function mergeProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promise<vo
         gender: String(v.gender ?? "").trim(),
         size: String(v.size ?? "").trim(),
         stock: Number.isFinite(Number(v.stock)) ? Math.max(0, Number(v.stock)) : 0,
-        memo: v.memo,
-        memo2: v.memo2,
+        memo: String(v.memo ?? "").trim() || null,
+        memo2: String(v.memo2 ?? "").trim() || null,
         wholesale_price:
           v.wholesalePrice != null && Number.isFinite(v.wholesalePrice) ? Math.round(v.wholesalePrice) : 0,
         msrp_price: v.msrpPrice != null && Number.isFinite(v.msrpPrice) ? Math.round(v.msrpPrice) : 0,
@@ -1668,8 +1669,8 @@ async function replaceAllProductsAndVariantsFromCsv(rows: ParsedCsvRow[]): Promi
         gender: String(v.gender ?? "").trim(),
         size: String(v.size ?? "").trim(),
         stock: Number.isFinite(Number(v.stock)) ? Math.max(0, Number(v.stock)) : 0,
-        memo: v.memo,
-        memo2: v.memo2,
+        memo: String(v.memo ?? "").trim() || null,
+        memo2: String(v.memo2 ?? "").trim() || null,
         wholesale_price:
           v.wholesalePrice != null && Number.isFinite(v.wholesalePrice) ? Math.round(v.wholesalePrice) : 0,
         msrp_price: v.msrpPrice != null && Number.isFinite(v.msrpPrice) ? Math.round(v.msrpPrice) : 0,

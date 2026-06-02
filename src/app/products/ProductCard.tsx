@@ -172,15 +172,18 @@ export const ProductCard = memo(function ProductCard({
     const n = Number(product?.stock);
     return Number.isFinite(n) ? n : 0;
   }, [product?.stock]);
-  /** 품명 옆 총재고: 옵션이 2개 이상일 때만 표시 */
-  const showNameTotalStock = sortedVariants.length >= 2;
+  /**
+   * 품명 옆 총재고는 "표시용 필터(재고0 숨김)"와 무관해야 하므로
+   * 원본 옵션 집합(priceSourceVariants, 없으면 variants) 기준으로 계산합니다.
+   */
+  const showNameTotalStock = sortedPriceSourceVariants.length >= 2;
   const totalVariantStock = useMemo(() => {
-    if (sortedVariants.length < 2) return 0;
-    return sortedVariants.reduce((sum, v) => {
+    if (sortedPriceSourceVariants.length < 2) return 0;
+    return sortedPriceSourceVariants.reduce((sum, v) => {
       const n = Number(v.stock);
       return sum + (Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0);
     }, 0);
-  }, [sortedVariants]);
+  }, [sortedPriceSourceVariants]);
 
   const hasAnyMemo = useMemo(() => {
     if ((product?.memo ?? "").trim() || (product?.memo2 ?? "").trim()) return true;

@@ -365,13 +365,15 @@ export function VariantEditor({
             />
           </div>
           <div className="variant-editor-delete-between">
-            <button
-              type="button"
-              onClick={() => removeRow(row.rowId)}
-              className="variant-editor-delete-between-btn"
-            >
-              {idx + 1}행 삭제
-            </button>
+            {row.rowId !== PLACEHOLDER_ROW_ID ? (
+              <button
+                type="button"
+                onClick={() => removeRow(row.rowId)}
+                className="variant-editor-delete-between-btn"
+              >
+                {idx + 1}행 삭제
+              </button>
+            ) : null}
           </div>
         </Fragment>
       ))}

@@ -9,8 +9,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { GarmentTypeId, MatchStatus, NormalizedStockLine, RequestLineInput } from "@/features/orderQuantityMatch/types";
 import { type SizePolicy, getSavedCategoryPolicyStore, saveCategoryPolicyStore } from "@/features/orderQuantityMatch/categoryPolicy";
-import { CLOTHING_DIMENSION_ORDER } from "@/features/orderQuantityMatch/clothingDimensionProfile";
-import { parseMatchKey } from "@/features/orderQuantityMatch/matchKey";
+import {
+  CLOTHING_DIMENSION_ORDER,
+  normalizeGenderValue,
+} from "@/features/orderQuantityMatch/clothingDimensionProfile";
+import { buildMatchKey, parseMatchKey } from "@/features/orderQuantityMatch/matchKey";
 import {
   matchOrderRowsToProducts,
   type ProductMatchResult,
@@ -489,7 +492,7 @@ export function OrderQuantityMatchClient({
                 </div>
               ) : null}
             </div>
-            <ResultCards items={productResults} productImageById={productImageById} />
+            <ResultCards items={productResults} productImageById={productImageById} stockLines={stockLines} />
           </section>
         </div>
       </div>
@@ -1141,12 +1144,115 @@ function OqmProductThumb({ url, name }: { url: string | null | undefined; name: 
   );
 }
 
+type OqmSizeStockRow = {
+  matchKey: string;
+  gender: string;
+  sizeLabel: string;
+  stock: number;
+  requested: number;
+  shortage: number;
+};
+
+function sortOqmSizeStockRows(rows: OqmSizeStockRow[]): OqmSizeStockRow[] {
+  return [...rows].sort((a, b) => {
+    const sa = oqmSizeOrderingForSort(a.sizeLabel);
+    const sb = oqmSizeOrderingForSort(b.sizeLabel);
+    if (sa[0] !== sb[0]) return sa[0] - sb[0];
+    if (sa[1] !== sb[1]) return sa[1] - sb[1];
+    return a.sizeLabel.localeCompare(b.sizeLabel, "ko", { numeric: true });
+  });
+}
+
+function buildProductFullSizeStockRows(
+  productId: string,
+  stockLines: NormalizedStockLine[],
+  details: ProductShortageDetail[]
+): OqmSizeStockRow[] {
+  const detailsByKey = new Map(details.map((d) => [d.matchKey, d]));
+  const stockByKey = new Map<string, number>();
+  for (const line of stockLines) {
+    if (line.productId !== productId) continue;
+    const key = buildMatchKey(CLOTHING_DIMENSION_ORDER, line.dimensions);
+    stockByKey.set(key, (stockByKey.get(key) ?? 0) + line.stock);
+  }
+  const rows: OqmSizeStockRow[] = [];
+  for (const [matchKey, stock] of stockByKey) {
+    const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, matchKey);
+    const sizeLabel = String(dims.size ?? "").trim() || "—";
+    const detail = detailsByKey.get(matchKey);
+    rows.push({
+      matchKey,
+      gender: normalizeGenderValue(String(dims.gender ?? "")),
+      sizeLabel,
+      stock,
+      requested: detail?.requested ?? 0,
+      shortage: detail?.shortage ?? 0,
+    });
+  }
+  return sortOqmSizeStockRows(rows);
+}
+
+function groupOqmSizeStockByGender(rows: OqmSizeStockRow[]) {
+  const female: OqmSizeStockRow[] = [];
+  const male: OqmSizeStockRow[] = [];
+  const unisex: OqmSizeStockRow[] = [];
+  const other: OqmSizeStockRow[] = [];
+  for (const row of rows) {
+    if (row.gender === "여") female.push(row);
+    else if (row.gender === "남") male.push(row);
+    else if (row.gender === "공용") unisex.push(row);
+    else other.push(row);
+  }
+  return {
+    female: sortOqmSizeStockRows(female),
+    male: sortOqmSizeStockRows(male),
+    unisex: sortOqmSizeStockRows(unisex),
+    other: sortOqmSizeStockRows(other),
+  };
+}
+
+function OqmDetailSheetStockChips({ rows }: { rows: OqmSizeStockRow[] }) {
+  if (rows.length === 0) {
+    return <span className="oqm-detail-sheet__gender-empty oqm-muted">—</span>;
+  }
+  return (
+    <>
+      {rows.map((row) => {
+        const shortage = row.shortage > 0;
+        const isZero = !shortage && row.stock === 0;
+        const chipKind = shortage
+          ? "oqm-result-chip--shortage"
+          : isZero
+            ? "oqm-result-chip--zero"
+            : "oqm-result-chip--ok";
+        const title =
+          row.requested > 0
+            ? shortage
+              ? `요청 ${row.requested.toLocaleString()} · 재고 ${row.stock.toLocaleString()} · 부족 ${row.shortage.toLocaleString()}`
+              : `요청 ${row.requested.toLocaleString()} · 재고 ${row.stock.toLocaleString()}`
+            : `재고 ${row.stock.toLocaleString()}`;
+        return (
+          <span key={row.matchKey} className={`oqm-result-chip ${chipKind}`} title={title}>
+            <span className="oqm-result-chip__size">{row.sizeLabel}</span>
+            <span className="oqm-result-chip__sep" aria-hidden="true">
+              :
+            </span>
+            <span className="oqm-result-chip__qty">{row.stock.toLocaleString()}</span>
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 function ResultCards({
   items,
   productImageById,
+  stockLines,
 }: {
   items: ProductMatchResult[];
   productImageById: Record<string, string | null>;
+  stockLines: NormalizedStockLine[];
 }) {
   const [sheetResult, setSheetResult] = useState<ProductMatchResult | null>(null);
   return (
@@ -1170,6 +1276,7 @@ function ResultCards({
         <OqmResultDetailSheet
           result={sheetResult}
           imageUrl={productImageById[sheetResult.productId] ?? null}
+          stockLines={stockLines}
           onClose={() => setSheetResult(null)}
         />
       ) : null}
@@ -1272,13 +1379,66 @@ function OqmResultRow({
   );
 }
 
+function OqmDetailSheetGenderStockRow({ label, rows }: { label: string; rows: OqmSizeStockRow[] }) {
+  return (
+    <div className="oqm-detail-sheet__gender-row">
+      <span className="oqm-detail-sheet__gender-label">{label}:</span>
+      <div className="oqm-detail-sheet__chips oqm-result-card__chips">
+        <OqmDetailSheetStockChips rows={rows} />
+      </div>
+    </div>
+  );
+}
+
+function OqmDetailSheetStockOverview({
+  productId,
+  stockLines,
+  details,
+}: {
+  productId: string;
+  stockLines: NormalizedStockLine[];
+  details: ProductShortageDetail[];
+}) {
+  const grouped = useMemo(() => {
+    const rows = buildProductFullSizeStockRows(productId, stockLines, details);
+    return { rows, ...groupOqmSizeStockByGender(rows) };
+  }, [productId, stockLines, details]);
+  if (grouped.rows.length === 0) return null;
+
+  const showGenderSplit =
+    grouped.female.length > 0 ||
+    grouped.male.length > 0 ||
+    grouped.unisex.length > 0;
+
+  return (
+    <div className="oqm-detail-sheet__stock-block" aria-label="사이즈별 재고">
+      <h4 className="oqm-detail-sheet__sub">사이즈별 재고</h4>
+      {showGenderSplit ? (
+        <div className="oqm-detail-sheet__gender-rows">
+          <OqmDetailSheetGenderStockRow label="여" rows={grouped.female} />
+          <OqmDetailSheetGenderStockRow label="남" rows={grouped.male} />
+          {grouped.unisex.length > 0 ? (
+            <OqmDetailSheetGenderStockRow label="공용" rows={grouped.unisex} />
+          ) : null}
+        </div>
+      ) : (
+        <div className="oqm-detail-sheet__chips oqm-result-card__chips">
+          <OqmDetailSheetStockChips rows={grouped.other} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OqmResultDetailSheet({
   result,
   imageUrl,
+  stockLines,
   onClose,
 }: {
   result: ProductMatchResult;
   imageUrl: string | null;
+  stockLines: NormalizedStockLine[];
   onClose: () => void;
 }) {
   const onKey = useCallback(
@@ -1336,12 +1496,17 @@ function OqmResultDetailSheet({
           )}
         </div>
         <p className="oqm-detail-sheet__sku">품번 {result.sku}</p>
-        <p>
+        <p className="oqm-detail-sheet__status">
           <span className={statusClass(result.status)}>{statusLabel(result.status)}</span>
         </p>
+        <OqmDetailSheetStockOverview
+          productId={result.productId}
+          stockLines={stockLines}
+          details={result.details}
+        />
         {result.status !== "full" ? (
           <div className="oqm-detail-sheet__detail-block">
-            <h4 className="oqm-detail-sheet__sub">부족·재고</h4>
+            <h4 className="oqm-detail-sheet__sub">부족 내역</h4>
             <OqmShortageListInSheet details={result.details} status={result.status} />
           </div>
         ) : null}

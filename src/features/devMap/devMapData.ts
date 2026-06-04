@@ -338,9 +338,18 @@ export const DEV_MAP: DevMapEntry[] = [
   {
     category: "주문수량 매칭",
     file: "src/app/order-quantity-match/OrderQuantityMatchClient.tsx",
-    role: "주문 입력·매칭 결과 UI",
-    editable: ["주문 입력판", "카테고리 선택", "사이즈 UI", "매칭 결과", "부족 상세", "카테고리 정책 저장"],
-    note: "주문수량 매칭 화면·입력 방식이 바뀜",
+    role: "주문 입력·매칭 결과·제품 목록 UI",
+    editable: [
+      "주문 입력판",
+      "카테고리·품목명 선택",
+      "전 제품 보기 / 전 사이즈 가능 (토글)",
+      "매칭 결과 카드 (여/남 사이즈 칩)",
+      "품목 상세 시트 (이미지·사이즈별 재고)",
+      "부족 상세",
+      "카테고리 정책 저장",
+      "모바일 배지·버튼 레이아웃 (globals.css oqm-*)",
+    ],
+    note: "입력·매칭 결과·전사이즈 제품 보기·카드/상세 UI가 바뀜",
   },
   {
     category: "주문수량 매칭",
@@ -355,6 +364,17 @@ export const DEV_MAP: DevMapEntry[] = [
     role: "주문→재고 매칭·부족 판정 핵심",
     editable: ["매칭", "부족", "배분", "full/partial/none", "정렬"],
     note: "매칭 결과·부족 수량이 바뀜",
+  },
+  {
+    category: "주문수량 매칭",
+    file: "src/features/orderQuantityMatch/oqmFullSizeFilter.ts",
+    role: "전 제품 보기·전 사이즈 가능 제품 필터",
+    editable: [
+      "필수 사이즈 목록 (티셔츠 여85-100·남95-110)",
+      "전 사이즈 가능 (재고>0, 여105·115·120 제외)",
+      "카테고리 입력판 칸 기준 사이즈",
+    ],
+    note: "전사이즈 제품 목록·재고 가능 판정이 바뀜",
   },
   {
     category: "주문수량 매칭",

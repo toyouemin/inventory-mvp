@@ -7252,10 +7252,15 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
   white-space: nowrap;
 }
 
-.oqm-gender-stock-row .oqm-result-card__chips {
-  flex: 0 1 auto;
-  width: auto;
-  margin-top: 0;
+/* 칩 래퍼 width:100% 제거 — 라벨 직후 칩이 이어지고 넘친 칩만 줄바꿈 */
+.oqm-gender-stock-row .oqm-result-card__chips,
+.oqm-gender-stock-row .oqm-detail-sheet__chips {
+  display: contents;
+}
+
+.oqm-gender-stock-row .oqm-result-chip,
+.oqm-gender-stock-row .oqm-gender-stock-empty {
+  flex: 0 0 auto;
 }
 
 .oqm-gender-stock-empty {
@@ -7798,11 +7803,6 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
   font-size: 0.78rem;
 }
 
-.oqm-detail-sheet__gender-rows .oqm-gender-stock-row .oqm-detail-sheet__chips {
-  flex: 0 1 auto;
-  width: auto;
-  min-width: 0;
-}
 
 .oqm-detail-sheet__detail-block {
   margin-top: 12px;

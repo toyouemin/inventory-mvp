@@ -6272,6 +6272,29 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
   font-size: 0.82rem;
 }
 
+.oqm-product-scope-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 4px 2px 0;
+}
+
+.oqm-product-scope-tools .oqm-category-hint {
+  margin: 0;
+}
+
+.oqm-product-browse-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.oqm-fullsize-filter-btn {
+  flex-shrink: 0;
+}
+
 .oqm-product-scope-selected {
   margin: 0 2px;
   display: flex;

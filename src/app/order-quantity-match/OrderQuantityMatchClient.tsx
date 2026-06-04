@@ -12,6 +12,7 @@ import { type SizePolicy, getSavedCategoryPolicyStore, saveCategoryPolicyStore }
 import {
   CLOTHING_DIMENSION_ORDER,
   normalizeGenderValue,
+  summarizeDimensions,
 } from "@/features/orderQuantityMatch/clothingDimensionProfile";
 import { buildMatchKey, parseMatchKey } from "@/features/orderQuantityMatch/matchKey";
 import {
@@ -19,6 +20,15 @@ import {
   type ProductMatchResult,
   type ProductShortageDetail,
 } from "@/features/orderQuantityMatch/matchOrderToProducts";
+import {
+  listOqmProductIdsWithFullSizes,
+  listOqmProductIdsWithStockCapableSizes,
+  resolveOqmFullSizeRequirements,
+  resolveOqmStockCapableRequirements,
+} from "@/features/orderQuantityMatch/oqmFullSizeFilter";
+
+/** 전 제품 보기 / 전 사이즈 가능 목록 필터 */
+type OqmProductBrowseFilter = "off" | "fullSku" | "stockCapable";
 import {
   buildOqmCategoryProfile,
   buildOqmQuickRequestLines,
@@ -185,6 +195,7 @@ export function OrderQuantityMatchClient({
   const [savedPolicyStore, setSavedPolicyStore] = useState<Record<string, SizePolicy>>({});
   /** 빠른 입력: 카테고리 내 재고를 선택한 상품 집합으로 한정(빈 배열 = 전체 상품) */
   const [quickProductScopeIds, setQuickProductScopeIds] = useState<string[]>([]);
+  const [productBrowseFilter, setProductBrowseFilter] = useState<OqmProductBrowseFilter>("off");
   const linesInQuickCategory = useMemo(() => {
     const c = quickCategory.trim();
     if (!c) return [];
@@ -256,6 +267,7 @@ export function OrderQuantityMatchClient({
     }
     return [...byId.values()].sort((a, b) => b.label.localeCompare(a.label, "ko", { numeric: true }));
   }, [linesInQuickCategory]);
+
   const quickCategoryKind = useMemo<QuickCategoryKind>(() => {
     if (categoryProfile.stockScopeType === "set") return "training";
     if (categoryProfile.stockScopeType === "other") return "general";
@@ -276,6 +288,61 @@ export function OrderQuantityMatchClient({
   // 입력판은 카테고리명/정책 fallback이 아니라 현재 선택 범위의 실제 size 데이터 구조만 따른다.
   const canShowUnisexInput = categoryProfile.hasUnisexData;
   const canShowGenderSplitInput = categoryProfile.hasGenderSplitData;
+
+  const fullSizeRequirements = useMemo(
+    () =>
+      resolveOqmFullSizeRequirements(quickCategory, categoryProfile, quickCategoryKind, apparelSizeType),
+    [quickCategory, categoryProfile, quickCategoryKind, apparelSizeType]
+  );
+
+  const stockCapableRequirements = useMemo(
+    () =>
+      resolveOqmStockCapableRequirements(quickCategory, categoryProfile, quickCategoryKind, apparelSizeType),
+    [quickCategory, categoryProfile, quickCategoryKind, apparelSizeType]
+  );
+
+  const fullSkuProductIds = useMemo(
+    () => listOqmProductIdsWithFullSizes(linesInQuickCategory, fullSizeRequirements, categoryProfile.sizePolicy),
+    [linesInQuickCategory, fullSizeRequirements, categoryProfile.sizePolicy]
+  );
+
+  const stockCapableProductIds = useMemo(
+    () =>
+      listOqmProductIdsWithStockCapableSizes(
+        linesInQuickCategory,
+        stockCapableRequirements,
+        categoryProfile.sizePolicy
+      ),
+    [linesInQuickCategory, stockCapableRequirements, categoryProfile.sizePolicy]
+  );
+
+  const activeBrowseProductIds = useMemo(() => {
+    if (productBrowseFilter === "fullSku") return fullSkuProductIds;
+    if (productBrowseFilter === "stockCapable") return stockCapableProductIds;
+    return [];
+  }, [productBrowseFilter, fullSkuProductIds, stockCapableProductIds]);
+
+  const activeBrowseProductIdSet = useMemo(() => new Set(activeBrowseProductIds), [activeBrowseProductIds]);
+
+  const visibleProductScopeOptions = useMemo(() => {
+    if (productBrowseFilter === "off") return quickScopeProductOptions;
+    return quickScopeProductOptions.filter((o) => activeBrowseProductIdSet.has(o.productId));
+  }, [productBrowseFilter, quickScopeProductOptions, activeBrowseProductIdSet]);
+
+  function applyProductBrowseFilter(mode: "fullSku" | "stockCapable") {
+    if (productBrowseFilter === mode) {
+      setProductBrowseFilter("off");
+      setQuickProductScopeIds([]);
+      return;
+    }
+    const ids =
+      mode === "fullSku"
+        ? fullSkuProductIds
+        : stockCapableProductIds;
+    const scoped = ids.filter((id) => quickScopeProductOptions.some((o) => o.productId === id));
+    setProductBrowseFilter(mode);
+    setQuickProductScopeIds(scoped);
+  }
 
   useEffect(() => {
     setSavedPolicyStore(getSavedCategoryPolicyStore());
@@ -308,14 +375,24 @@ export function OrderQuantityMatchClient({
 
   useEffect(() => {
     setQuickProductScopeIds([]);
+    setProductBrowseFilter("off");
   }, [quickCategory]);
 
   useEffect(() => {
+    if (productBrowseFilter === "off") return;
+    const valid = activeBrowseProductIdSet;
+    setQuickProductScopeIds((prev) => {
+      const next = prev.filter((id) => valid.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [productBrowseFilter, activeBrowseProductIdSet]);
+
+  useEffect(() => {
     if (quickProductScopeIds.length === 0) return;
-    const validIdSet = new Set(quickScopeProductOptions.map((o) => o.productId));
+    const validIdSet = new Set(visibleProductScopeOptions.map((o) => o.productId));
     const next = quickProductScopeIds.filter((id) => validIdSet.has(id));
     if (next.length !== quickProductScopeIds.length) setQuickProductScopeIds(next);
-  }, [quickProductScopeIds, quickScopeProductOptions]);
+  }, [quickProductScopeIds, visibleProductScopeOptions]);
 
   useEffect(() => {
     if (quickCategoryKind !== "general") return;
@@ -410,6 +487,13 @@ export function OrderQuantityMatchClient({
     [requestInputs]
   );
 
+  const productBrowseResults = useMemo(
+    () => buildFullSizeProductBrowseResults(activeBrowseProductIds, linesInQuickCategory),
+    [activeBrowseProductIds, linesInQuickCategory]
+  );
+
+  const productBrowseFilterOn = productBrowseFilter !== "off";
+
   return (
     <div className="products-page oqm-page">
       <div className="products-content-container">
@@ -431,9 +515,16 @@ export function OrderQuantityMatchClient({
                 generalItemDatalistOptions={generalItemDatalistOptions}
                 quickCategory={quickCategory}
                 setQuickCategory={setQuickCategory}
-                productScopeOptions={quickScopeProductOptions}
+                productScopeOptions={visibleProductScopeOptions}
+                allProductScopeOptions={quickScopeProductOptions}
                 quickProductScopeIds={quickProductScopeIds}
                 setQuickProductScopeIds={setQuickProductScopeIds}
+                productBrowseFilter={productBrowseFilter}
+                fullSkuProductCount={fullSkuProductIds.length}
+                stockCapableProductCount={stockCapableProductIds.length}
+                canUseProductBrowseFilter={fullSizeRequirements != null}
+                onToggleFullSkuBrowse={() => applyProductBrowseFilter("fullSku")}
+                onToggleStockCapableBrowse={() => applyProductBrowseFilter("stockCapable")}
                 categoryProfile={categoryProfile}
                 quickCategoryKind={quickCategoryKind}
                 apparelSizeType={apparelSizeType}
@@ -472,9 +563,20 @@ export function OrderQuantityMatchClient({
           >
             <div className="oqm-results-panel__head">
               <h2 id="oqm-result-heading" className="oqm-section-title oqm-results-panel__title">
-                매칭 결과
+                {productBrowseFilter === "fullSku"
+                  ? "전 제품"
+                  : productBrowseFilter === "stockCapable"
+                    ? "전 사이즈 가능"
+                    : "매칭 결과"}
               </h2>
-              {productResults.length > 0 ? (
+              {productBrowseFilterOn ? (
+                <div className="oqm-results-summary-badges" aria-label="제품 목록 수">
+                  <span className={`oqm-badge ${productBrowseFilter === "stockCapable" ? "oqm-badge--ok" : "oqm-badge--ok"}`}>
+                    {productBrowseFilter === "stockCapable" ? "재고 가능" : "전 제품"}{" "}
+                    {productBrowseResults.length}
+                  </span>
+                </div>
+              ) : productResults.length > 0 ? (
                 <div className="oqm-results-summary-badges" aria-label="매칭 상태 요약">
                   {resultStatusCounts.full > 0 ? (
                     <span className="oqm-badge oqm-badge--ok">
@@ -492,7 +594,22 @@ export function OrderQuantityMatchClient({
                 </div>
               ) : null}
             </div>
-            <ResultCards items={productResults} productImageById={productImageById} stockLines={stockLines} />
+            {productBrowseFilterOn ? (
+              <ResultCards
+                items={productBrowseResults}
+                productImageById={productImageById}
+                stockLines={stockLines}
+                browseMode
+                browseLabel={productBrowseFilter === "stockCapable" ? "전 사이즈 가능" : "전 제품"}
+                emptyMessage={
+                  productBrowseFilter === "stockCapable"
+                    ? "필수 사이즈 재고가 모두 있는 제품이 없습니다."
+                    : "이 카테고리에 전사이즈 옵션을 갖춘 제품이 없습니다."
+                }
+              />
+            ) : (
+              <ResultCards items={productResults} productImageById={productImageById} stockLines={stockLines} />
+            )}
           </section>
         </div>
       </div>
@@ -532,8 +649,15 @@ function QuickInputPanel(props: {
   quickCategory: string;
   setQuickCategory: (v: string) => void;
   productScopeOptions: { productId: string; label: string }[];
+  allProductScopeOptions: { productId: string; label: string }[];
   quickProductScopeIds: string[];
   setQuickProductScopeIds: (v: string[]) => void;
+  productBrowseFilter: OqmProductBrowseFilter;
+  fullSkuProductCount: number;
+  stockCapableProductCount: number;
+  canUseProductBrowseFilter: boolean;
+  onToggleFullSkuBrowse: () => void;
+  onToggleStockCapableBrowse: () => void;
   categoryProfile: CategoryProfile;
   quickCategoryKind: QuickCategoryKind;
   apparelSizeType: ApparelSizeType;
@@ -555,8 +679,15 @@ function QuickInputPanel(props: {
     quickCategory,
     setQuickCategory,
     productScopeOptions,
+    allProductScopeOptions,
     quickProductScopeIds,
     setQuickProductScopeIds,
+    productBrowseFilter,
+    fullSkuProductCount,
+    stockCapableProductCount,
+    canUseProductBrowseFilter,
+    onToggleFullSkuBrowse,
+    onToggleStockCapableBrowse,
     categoryProfile,
     quickCategoryKind,
     apparelSizeType,
@@ -574,6 +705,7 @@ function QuickInputPanel(props: {
   } = props;
   const selectedCategoryValue =
     quickCategory.trim() !== "" && categories.includes(quickCategory.trim()) ? quickCategory.trim() : "__empty__";
+  const productBrowseFilterOn = productBrowseFilter !== "off";
   const [productPickerValue, setProductPickerValue] = useState("");
   useEffect(() => {
     setProductPickerValue("");
@@ -637,12 +769,41 @@ function QuickInputPanel(props: {
             ) : null}
           </div>
         </div>
-        {quickCategory.trim() !== "" && productScopeOptions.length > 0 ? (
-          <p className="oqm-muted oqm-category-hint">
-            품목명을 여러 개 선택하면 선택 범위로만 매칭. (미선택 시 전체)
-          </p>
+        {quickCategory.trim() !== "" && allProductScopeOptions.length > 0 ? (
+          <div className="oqm-product-scope-tools">
+            {canUseProductBrowseFilter ? (
+              <div className="oqm-product-browse-btns">
+                <button
+                  type="button"
+                  className={`oqm-size-mode-btn oqm-fullsize-filter-btn${productBrowseFilter === "fullSku" ? " oqm-size-mode-btn--active" : ""}`}
+                  onClick={onToggleFullSkuBrowse}
+                  aria-pressed={productBrowseFilter === "fullSku"}
+                >
+                  전 제품 보기
+                  {fullSkuProductCount > 0 ? ` (${fullSkuProductCount})` : ""}
+                </button>
+                <button
+                  type="button"
+                  className={`oqm-size-mode-btn oqm-fullsize-filter-btn${productBrowseFilter === "stockCapable" ? " oqm-size-mode-btn--active" : ""}`}
+                  onClick={onToggleStockCapableBrowse}
+                  aria-pressed={productBrowseFilter === "stockCapable"}
+                >
+                  전 사이즈 가능
+                  {stockCapableProductCount > 0 ? ` (${stockCapableProductCount})` : ""}
+                </button>
+              </div>
+            ) : null}
+            <p className="oqm-muted oqm-category-hint">
+              품목명을 여러 개 선택하면 선택 범위로만 매칭. (미선택 시 전체)
+              {productBrowseFilter === "fullSku"
+                ? " · 전 제품 목록 표시 중"
+                : productBrowseFilter === "stockCapable"
+                  ? " · 필수 사이즈 재고 가능 제품만 (여 105·115·120 제외)"
+                  : ""}
+            </p>
+          </div>
         ) : null}
-        {quickCategory.trim() !== "" ? (
+        {quickCategory.trim() !== "" && !productBrowseFilterOn ? (
           <div className="oqm-product-scope-selected">
             <span className="oqm-muted">선택 품목명:</span>
             {quickProductScopeIds.length === 0 ? (
@@ -668,6 +829,9 @@ function QuickInputPanel(props: {
               </div>
             )}
           </div>
+        ) : null}
+        {productBrowseFilterOn ? (
+          <p className="oqm-muted oqm-category-hint">오른쪽 목록에서 품목을 눌러 사이즈·재고를 확인하세요.</p>
         ) : null}
       </div>
 
@@ -1245,20 +1409,66 @@ function OqmDetailSheetStockChips({ rows }: { rows: OqmSizeStockRow[] }) {
   );
 }
 
+function buildFullSizeProductBrowseResults(
+  productIds: string[],
+  linesInCategory: NormalizedStockLine[]
+): ProductMatchResult[] {
+  const out: ProductMatchResult[] = [];
+  for (const productId of productIds) {
+    const lines = linesInCategory.filter((l) => l.productId === productId);
+    if (lines.length === 0) continue;
+    const first = lines[0]!;
+    const stockRows = buildProductFullSizeStockRows(productId, linesInCategory, []);
+    const details: ProductShortageDetail[] = stockRows.map((row) => {
+      const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, row.matchKey);
+      return {
+        matchKey: row.matchKey,
+        dimensionSummary: summarizeDimensions(dims, CLOTHING_DIMENSION_ORDER),
+        requested: 0,
+        allocated: 0,
+        shortage: 0,
+        availableStock: row.stock,
+      };
+    });
+    out.push({
+      productId,
+      sku: first.sku,
+      displayName: first.displayName,
+      status: "full",
+      totalRequested: 0,
+      totalAllocated: 0,
+      totalShortage: 0,
+      shortageKinds: 0,
+      details,
+    });
+  }
+  out.sort((a, b) => b.displayName.localeCompare(a.displayName, "ko", { numeric: true }));
+  return out;
+}
+
 function ResultCards({
   items,
   productImageById,
   stockLines,
+  browseMode = false,
+  browseLabel = "전 제품",
+  emptyMessage,
 }: {
   items: ProductMatchResult[];
   productImageById: Record<string, string | null>;
   stockLines: NormalizedStockLine[];
+  browseMode?: boolean;
+  browseLabel?: string;
+  emptyMessage?: string;
 }) {
   const [sheetResult, setSheetResult] = useState<ProductMatchResult | null>(null);
+  const defaultEmpty = browseMode
+    ? "표시할 전사이즈 제품이 없습니다."
+    : "표시할 주문이 없습니다. 행을 추가하고 수량을 입력하세요.";
   return (
     <>
       {items.length === 0 ? (
-        <p className="oqm-muted oqm-result-empty">표시할 주문이 없습니다. 행을 추가하고 수량을 입력하세요.</p>
+        <p className="oqm-muted oqm-result-empty">{emptyMessage ?? defaultEmpty}</p>
       ) : (
         <ul className="oqm-result-list" role="list">
           {items.map((item) => (
@@ -1267,6 +1477,8 @@ function ResultCards({
                 result={item}
                 imageUrl={productImageById[item.productId] ?? null}
                 onOpenDetail={() => setSheetResult(item)}
+                browseMode={browseMode}
+                browseLabel={browseLabel}
               />
             </li>
           ))}
@@ -1277,6 +1489,8 @@ function ResultCards({
           result={sheetResult}
           imageUrl={productImageById[sheetResult.productId] ?? null}
           stockLines={stockLines}
+          browseMode={browseMode}
+          browseLabel={browseLabel}
           onClose={() => setSheetResult(null)}
         />
       ) : null}
@@ -1291,31 +1505,63 @@ function oqmResultRowClass(status: MatchStatus): string {
   return `${base} oqm-result-row--impossible`;
 }
 
-function OqmResultStockChips({ details }: { details: ProductMatchResult["details"] }) {
-  const active = details.filter((d) => d.requested > 0);
+function OqmResultStockChips({
+  details,
+  browseMode = false,
+}: {
+  details: ProductMatchResult["details"];
+  browseMode?: boolean;
+}) {
+  const active = browseMode
+    ? details.filter((d) => {
+        const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, d.matchKey);
+        return String(dims.size ?? "").trim() !== "";
+      })
+    : details.filter((d) => d.requested > 0);
   if (active.length === 0) return null;
-  const sorted = oqmSortStockDetails(active);
+  const sorted = browseMode
+    ? sortOqmSizeStockRows(
+        active.map((d) => {
+          const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, d.matchKey);
+          return {
+            matchKey: d.matchKey,
+            gender: normalizeGenderValue(String(dims.gender ?? "")),
+            sizeLabel: String(dims.size ?? "").trim() || "—",
+            stock: d.availableStock,
+            requested: d.requested,
+            shortage: d.shortage,
+          };
+        })
+      )
+    : oqmSortStockDetails(active);
   const max = 16;
   const shown = sorted.slice(0, max);
   const rest = sorted.length - shown.length;
   return (
     <div className="oqm-result-card__chips">
       {shown.map((d) => {
-        const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, d.matchKey);
-        const sizeLabel = String(dims.size ?? "").trim() || "—";
-        const shortage = d.shortage > 0;
-        const isZero = !shortage && d.availableStock === 0;
+        const isBrowseRow = browseMode && "stock" in d;
+        const matchKey = d.matchKey;
+        const availableStock = isBrowseRow ? (d as OqmSizeStockRow).stock : (d as ProductShortageDetail).availableStock;
+        const sizeLabel = isBrowseRow
+          ? (d as OqmSizeStockRow).sizeLabel
+          : String(parseMatchKey(CLOTHING_DIMENSION_ORDER, matchKey).size ?? "").trim() || "—";
+        const detail = d as ProductShortageDetail;
+        const shortage = !browseMode && detail.shortage > 0;
+        const isZero = availableStock === 0;
         const chipKind = shortage
           ? "oqm-result-chip--shortage"
           : isZero
             ? "oqm-result-chip--zero"
             : "oqm-result-chip--ok";
-        const title = shortage
-          ? `요청 ${d.requested.toLocaleString()} · 재고 ${d.availableStock.toLocaleString()} · 부족 ${d.shortage.toLocaleString()}`
-          : `재고 ${d.availableStock.toLocaleString()}`;
+        const title = browseMode
+          ? `재고 ${availableStock.toLocaleString()}`
+          : shortage
+            ? `요청 ${detail.requested.toLocaleString()} · 재고 ${availableStock.toLocaleString()} · 부족 ${detail.shortage.toLocaleString()}`
+            : `재고 ${availableStock.toLocaleString()}`;
         return (
           <span
-            key={d.matchKey}
+            key={matchKey}
             className={`oqm-result-chip ${chipKind}`}
             title={title}
           >
@@ -1323,7 +1569,7 @@ function OqmResultStockChips({ details }: { details: ProductMatchResult["details
             <span className="oqm-result-chip__sep" aria-hidden="true">
               :
             </span>
-            <span className="oqm-result-chip__qty">{d.availableStock.toLocaleString()}</span>
+            <span className="oqm-result-chip__qty">{availableStock.toLocaleString()}</span>
           </span>
         );
       })}
@@ -1340,19 +1586,23 @@ function OqmResultRow({
   result,
   imageUrl,
   onOpenDetail,
+  browseMode = false,
+  browseLabel = "전 제품",
 }: {
   result: ProductMatchResult;
   imageUrl: string | null;
   onOpenDetail: () => void;
+  browseMode?: boolean;
+  browseLabel?: string;
 }) {
   const domId = resultCardDomIdByProduct(result);
   const shortageText = oqmCompactShortageSummary(result);
-  const hasShort = result.status !== "full" && shortageText;
+  const hasShort = !browseMode && result.status !== "full" && shortageText;
   return (
     <button
       type="button"
       id={domId}
-      className={oqmResultRowClass(result.status)}
+      className={browseMode ? "oqm-result-row oqm-result-card oqm-result-row--full" : oqmResultRowClass(result.status)}
       onClick={onOpenDetail}
     >
       <OqmProductThumb url={imageUrl} name={result.displayName} />
@@ -1370,10 +1620,12 @@ function OqmResultRow({
             </span>
           ) : null}
         </div>
-        <OqmResultStockChips details={result.details} />
+        <OqmResultStockChips details={result.details} browseMode={browseMode} />
       </div>
-      <span className={`oqm-result-row__badge oqm-result-card__status-badge ${statusClass(result.status)}`}>
-        {statusLabel(result.status)}
+      <span
+        className={`oqm-result-row__badge oqm-result-card__status-badge ${browseMode ? "oqm-badge oqm-badge--ok" : statusClass(result.status)}`}
+      >
+        {browseMode ? browseLabel : statusLabel(result.status)}
       </span>
     </button>
   );
@@ -1434,11 +1686,15 @@ function OqmResultDetailSheet({
   result,
   imageUrl,
   stockLines,
+  browseMode = false,
+  browseLabel = "전 제품",
   onClose,
 }: {
   result: ProductMatchResult;
   imageUrl: string | null;
   stockLines: NormalizedStockLine[];
+  browseMode?: boolean;
+  browseLabel?: string;
   onClose: () => void;
 }) {
   const onKey = useCallback(
@@ -1497,7 +1753,9 @@ function OqmResultDetailSheet({
         </div>
         <p className="oqm-detail-sheet__sku">품번 {result.sku}</p>
         <p className="oqm-detail-sheet__status">
-          <span className={statusClass(result.status)}>{statusLabel(result.status)}</span>
+          <span className={browseMode ? "oqm-badge oqm-badge--ok" : statusClass(result.status)}>
+            {browseMode ? browseLabel : statusLabel(result.status)}
+          </span>
         </p>
         <OqmDetailSheetStockOverview
           productId={result.productId}

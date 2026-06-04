@@ -1375,9 +1375,21 @@ function groupOqmSizeStockByGender(rows: OqmSizeStockRow[]) {
   };
 }
 
-function OqmDetailSheetStockChips({ rows }: { rows: OqmSizeStockRow[] }) {
+function detailToSizeStockRow(d: ProductShortageDetail): OqmSizeStockRow {
+  const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, d.matchKey);
+  return {
+    matchKey: d.matchKey,
+    gender: normalizeGenderValue(String(dims.gender ?? "")),
+    sizeLabel: String(dims.size ?? "").trim() || "—",
+    stock: d.availableStock,
+    requested: d.requested,
+    shortage: d.shortage,
+  };
+}
+
+function OqmSizeStockChipList({ rows }: { rows: OqmSizeStockRow[] }) {
   if (rows.length === 0) {
-    return <span className="oqm-detail-sheet__gender-empty oqm-muted">—</span>;
+    return <span className="oqm-gender-stock-empty oqm-muted">—</span>;
   }
   return (
     <>
@@ -1406,6 +1418,25 @@ function OqmDetailSheetStockChips({ rows }: { rows: OqmSizeStockRow[] }) {
         );
       })}
     </>
+  );
+}
+
+function OqmGenderStockRow({
+  label,
+  rows,
+  chipWrapClassName = "oqm-result-card__chips",
+}: {
+  label: string;
+  rows: OqmSizeStockRow[];
+  chipWrapClassName?: string;
+}) {
+  return (
+    <div className="oqm-gender-stock-row">
+      <span className="oqm-gender-stock-row__label">{label}:</span>
+      <div className={chipWrapClassName}>
+        <OqmSizeStockChipList rows={rows} />
+      </div>
+    </div>
   );
 }
 
@@ -1519,65 +1550,28 @@ function OqmResultStockChips({
       })
     : details.filter((d) => d.requested > 0);
   if (active.length === 0) return null;
-  const sorted = browseMode
-    ? sortOqmSizeStockRows(
-        active.map((d) => {
-          const dims = parseMatchKey(CLOTHING_DIMENSION_ORDER, d.matchKey);
-          return {
-            matchKey: d.matchKey,
-            gender: normalizeGenderValue(String(dims.gender ?? "")),
-            sizeLabel: String(dims.size ?? "").trim() || "—",
-            stock: d.availableStock,
-            requested: d.requested,
-            shortage: d.shortage,
-          };
-        })
-      )
-    : oqmSortStockDetails(active);
-  const max = 16;
-  const shown = sorted.slice(0, max);
-  const rest = sorted.length - shown.length;
+
+  const rows = sortOqmSizeStockRows(active.map(detailToSizeStockRow));
+  const grouped = groupOqmSizeStockByGender(rows);
+  const showGenderSplit =
+    grouped.female.length > 0 || grouped.male.length > 0 || grouped.unisex.length > 0;
+
+  if (!showGenderSplit) {
+    return (
+      <div className="oqm-result-card__chips">
+        <OqmSizeStockChipList rows={grouped.other} />
+      </div>
+    );
+  }
+
   return (
-    <div className="oqm-result-card__chips">
-      {shown.map((d) => {
-        const isBrowseRow = browseMode && "stock" in d;
-        const matchKey = d.matchKey;
-        const availableStock = isBrowseRow ? (d as OqmSizeStockRow).stock : (d as ProductShortageDetail).availableStock;
-        const sizeLabel = isBrowseRow
-          ? (d as OqmSizeStockRow).sizeLabel
-          : String(parseMatchKey(CLOTHING_DIMENSION_ORDER, matchKey).size ?? "").trim() || "—";
-        const detail = d as ProductShortageDetail;
-        const shortage = !browseMode && detail.shortage > 0;
-        const isZero = availableStock === 0;
-        const chipKind = shortage
-          ? "oqm-result-chip--shortage"
-          : isZero
-            ? "oqm-result-chip--zero"
-            : "oqm-result-chip--ok";
-        const title = browseMode
-          ? `재고 ${availableStock.toLocaleString()}`
-          : shortage
-            ? `요청 ${detail.requested.toLocaleString()} · 재고 ${availableStock.toLocaleString()} · 부족 ${detail.shortage.toLocaleString()}`
-            : `재고 ${availableStock.toLocaleString()}`;
-        return (
-          <span
-            key={matchKey}
-            className={`oqm-result-chip ${chipKind}`}
-            title={title}
-          >
-            <span className="oqm-result-chip__size">{sizeLabel}</span>
-            <span className="oqm-result-chip__sep" aria-hidden="true">
-              :
-            </span>
-            <span className="oqm-result-chip__qty">{availableStock.toLocaleString()}</span>
-          </span>
-        );
-      })}
-      {rest > 0 ? (
-        <span className="oqm-result-chip oqm-result-chip--more" title={`추가 ${rest}건`}>
-          +{rest}
-        </span>
+    <div className="oqm-result-card__gender-rows">
+      {grouped.female.length > 0 ? <OqmGenderStockRow label="여" rows={grouped.female} /> : null}
+      {grouped.male.length > 0 ? <OqmGenderStockRow label="남" rows={grouped.male} /> : null}
+      {grouped.unisex.length > 0 ? (
+        <OqmGenderStockRow label="공용" rows={grouped.unisex} />
       ) : null}
+      {grouped.other.length > 0 ? <OqmGenderStockRow label="기타" rows={grouped.other} /> : null}
     </div>
   );
 }
@@ -1633,12 +1627,11 @@ function OqmResultRow({
 
 function OqmDetailSheetGenderStockRow({ label, rows }: { label: string; rows: OqmSizeStockRow[] }) {
   return (
-    <div className="oqm-detail-sheet__gender-row">
-      <span className="oqm-detail-sheet__gender-label">{label}:</span>
-      <div className="oqm-detail-sheet__chips oqm-result-card__chips">
-        <OqmDetailSheetStockChips rows={rows} />
-      </div>
-    </div>
+    <OqmGenderStockRow
+      label={label}
+      rows={rows}
+      chipWrapClassName="oqm-detail-sheet__chips oqm-result-card__chips"
+    />
   );
 }
 
@@ -1675,7 +1668,7 @@ function OqmDetailSheetStockOverview({
         </div>
       ) : (
         <div className="oqm-detail-sheet__chips oqm-result-card__chips">
-          <OqmDetailSheetStockChips rows={grouped.other} />
+          <OqmSizeStockChipList rows={grouped.other} />
         </div>
       )}
     </div>

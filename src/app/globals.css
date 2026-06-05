@@ -7236,15 +7236,16 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
 .oqm-gender-stock-row {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-wrap: nowrap;
+  align-items: flex-start;
   gap: 2px 4px;
+  width: 100%;
 }
 
 .oqm-gender-stock-row__label {
   flex: 0 0 auto;
   margin: 0;
-  padding: 0;
+  padding: 2px 0 0;
   font-size: 0.68rem;
   font-weight: 800;
   color: #5c564c;
@@ -7252,10 +7253,15 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
   white-space: nowrap;
 }
 
-/* 칩 래퍼 width:100% 제거 — 라벨 직후 칩이 이어지고 넘친 칩만 줄바꿈 */
+/* 칩은 라벨 오른쪽 영역 안에서만 줄바꿈 — 115 등이 95와 같은 열에서 시작 */
 .oqm-gender-stock-row .oqm-result-card__chips,
 .oqm-gender-stock-row .oqm-detail-sheet__chips {
-  display: contents;
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+  min-width: 0;
 }
 
 .oqm-gender-stock-row .oqm-result-chip,

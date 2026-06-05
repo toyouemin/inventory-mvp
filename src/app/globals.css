@@ -7237,19 +7237,22 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  align-items: flex-start;
+  align-items: center;
   gap: 2px 4px;
   width: 100%;
 }
 
 .oqm-gender-stock-row__label {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
   margin: 0;
-  padding: 2px 0 0;
+  padding: 0;
   font-size: 0.68rem;
   font-weight: 800;
   color: #5c564c;
-  line-height: 1.2;
+  line-height: 1;
   white-space: nowrap;
 }
 
@@ -7555,7 +7558,13 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
     flex-shrink: 0;
   }
 
-  /* PC: ??? chip ????? ??? ???????8px), ???????????*/
+  .oqm-result-row .oqm-gender-stock-row__label {
+    min-height: 28px;
+    font-size: 0.82rem;
+    line-height: 1;
+  }
+
+  /* PC: 결과 칩 — 둥근 모서리·최소 높이 28px */
   .oqm-result-row .oqm-result-chip:not(.oqm-result-chip--more) {
     border-radius: 8px;
     padding: 5px 9px;

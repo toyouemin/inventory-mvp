@@ -20,6 +20,11 @@ const TRAINING_FULL_MALE = ["95", "100", "105", "110", "115"] as const;
 /** 전 사이즈 가능: 여성 105·115·120 은 없어도 됨 */
 const OPTIONAL_FEMALE_SIZES = new Set(["105", "115", "120"]);
 
+/** 전사이즈 가능: 옵션(SKU) 존재만 보며 재고 무관 — 없어도 전사이즈로 인정 */
+const FULL_SIZE_BROWSE_OPTIONAL_FEMALE = new Set(["105"]);
+const FULL_SIZE_BROWSE_OPTIONAL_MALE = new Set(["115"]);
+const FULL_SIZE_BROWSE_OPTIONAL_UNISEX = new Set(["115"]);
+
 export type OqmFullSizeRequirements =
   | { kind: "genderSplit"; female: readonly string[]; male: readonly string[] }
   | { kind: "unisex"; sizes: readonly string[] };
@@ -62,6 +67,36 @@ export function resolveOqmFullSizeRequirements(
     profile.sizePolicy === "unisexAlpha" ? profile.unisexAlphaSizes : profile.unisexSizes;
   if (sizes.length === 0) return null;
   return { kind: "unisex", sizes };
+}
+
+export function applyOqmFullSizeBrowseOptionalExclusions(
+  requirements: OqmFullSizeRequirements
+): OqmFullSizeRequirements {
+  if (requirements.kind === "genderSplit") {
+    const female = requirements.female.filter(
+      (s) => !FULL_SIZE_BROWSE_OPTIONAL_FEMALE.has(normalizeOqmSizeToken(s))
+    );
+    const male = requirements.male.filter(
+      (s) => !FULL_SIZE_BROWSE_OPTIONAL_MALE.has(normalizeOqmSizeToken(s))
+    );
+    return { kind: "genderSplit", female, male };
+  }
+  const sizes = requirements.sizes.filter(
+    (s) => !FULL_SIZE_BROWSE_OPTIONAL_UNISEX.has(normalizeOqmSizeToken(s))
+  );
+  return { kind: "unisex", sizes };
+}
+
+/** 전사이즈 가능 판정용 — 여105·남115·공용115 옵션 없어도 전사이즈(재고 무관) */
+export function resolveOqmFullSizeBrowseRequirements(
+  category: string,
+  profile: OqmCategoryProfile,
+  categoryKind: OqmQuickCategoryKind,
+  apparelSizeType: OqmApparelSizeType
+): OqmFullSizeRequirements | null {
+  const base = resolveOqmFullSizeRequirements(category, profile, categoryKind, apparelSizeType);
+  if (!base) return null;
+  return applyOqmFullSizeBrowseOptionalExclusions(base);
 }
 
 /** 전 사이즈 가능 판정용 — 여 105·115·120 제외 */
@@ -176,6 +211,27 @@ function productMeetsStockCapable(
     return requirements.female.length > 0 || requirements.male.length > 0;
   }
   return hasUnisexSizesWithStock(stockByKey, requirements.sizes);
+}
+
+/** 카테고리 내 사이즈 옵션이 1개 이상 있는 productId (재고 0 포함) */
+export function listOqmProductIdsWithAnySizeOptions(
+  linesInCategory: NormalizedStockLine[],
+  sizePolicy: SizePolicy
+): string[] {
+  const byProduct = collectProductSizeKeys(linesInCategory, sizePolicy);
+  return [...byProduct.keys()];
+}
+
+/** 전 제품 보기: 일반 물품은 카테고리 전체, 의류·트레이닝은 사이즈 옵션이 있는 상품 */
+export function listOqmProductIdsForAllProductsBrowse(
+  linesInCategory: NormalizedStockLine[],
+  sizePolicy: SizePolicy,
+  categoryKind: OqmQuickCategoryKind
+): string[] {
+  if (categoryKind === "general") {
+    return [...new Set(linesInCategory.map((l) => l.productId))];
+  }
+  return listOqmProductIdsWithAnySizeOptions(linesInCategory, sizePolicy);
 }
 
 /** 카테고리 재고 중 전사이즈 옵션(SKU)을 모두 갖춘 productId 목록 */

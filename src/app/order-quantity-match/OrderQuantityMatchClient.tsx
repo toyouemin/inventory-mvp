@@ -21,14 +21,13 @@ import {
   type ProductShortageDetail,
 } from "@/features/orderQuantityMatch/matchOrderToProducts";
 import {
+  listOqmProductIdsForAllProductsBrowse,
   listOqmProductIdsWithFullSizes,
-  listOqmProductIdsWithStockCapableSizes,
-  resolveOqmFullSizeRequirements,
-  resolveOqmStockCapableRequirements,
+  resolveOqmFullSizeBrowseRequirements,
 } from "@/features/orderQuantityMatch/oqmFullSizeFilter";
 
-/** 전 제품 보기 / 전 사이즈 가능 목록 필터 */
-type OqmProductBrowseFilter = "off" | "fullSku" | "stockCapable";
+/** 전 제품 보기 / 전사이즈 가능 목록 필터 */
+type OqmProductBrowseFilter = "off" | "allProducts" | "fullSku";
 import {
   buildOqmCategoryProfile,
   buildOqmQuickRequestLines,
@@ -289,38 +288,37 @@ export function OrderQuantityMatchClient({
   const canShowUnisexInput = categoryProfile.hasUnisexData;
   const canShowGenderSplitInput = categoryProfile.hasGenderSplitData;
 
-  const fullSizeRequirements = useMemo(
+  const fullSizeBrowseRequirements = useMemo(
     () =>
-      resolveOqmFullSizeRequirements(quickCategory, categoryProfile, quickCategoryKind, apparelSizeType),
+      resolveOqmFullSizeBrowseRequirements(quickCategory, categoryProfile, quickCategoryKind, apparelSizeType),
     [quickCategory, categoryProfile, quickCategoryKind, apparelSizeType]
   );
 
-  const stockCapableRequirements = useMemo(
+  const allProductsBrowseIds = useMemo(
     () =>
-      resolveOqmStockCapableRequirements(quickCategory, categoryProfile, quickCategoryKind, apparelSizeType),
-    [quickCategory, categoryProfile, quickCategoryKind, apparelSizeType]
+      listOqmProductIdsForAllProductsBrowse(
+        linesInQuickCategory,
+        categoryProfile.sizePolicy,
+        quickCategoryKind
+      ),
+    [linesInQuickCategory, categoryProfile.sizePolicy, quickCategoryKind]
   );
 
   const fullSkuProductIds = useMemo(
-    () => listOqmProductIdsWithFullSizes(linesInQuickCategory, fullSizeRequirements, categoryProfile.sizePolicy),
-    [linesInQuickCategory, fullSizeRequirements, categoryProfile.sizePolicy]
-  );
-
-  const stockCapableProductIds = useMemo(
     () =>
-      listOqmProductIdsWithStockCapableSizes(
+      listOqmProductIdsWithFullSizes(
         linesInQuickCategory,
-        stockCapableRequirements,
+        fullSizeBrowseRequirements,
         categoryProfile.sizePolicy
       ),
-    [linesInQuickCategory, stockCapableRequirements, categoryProfile.sizePolicy]
+    [linesInQuickCategory, fullSizeBrowseRequirements, categoryProfile.sizePolicy]
   );
 
   const activeBrowseProductIds = useMemo(() => {
+    if (productBrowseFilter === "allProducts") return allProductsBrowseIds;
     if (productBrowseFilter === "fullSku") return fullSkuProductIds;
-    if (productBrowseFilter === "stockCapable") return stockCapableProductIds;
     return [];
-  }, [productBrowseFilter, fullSkuProductIds, stockCapableProductIds]);
+  }, [productBrowseFilter, allProductsBrowseIds, fullSkuProductIds]);
 
   const activeBrowseProductIdSet = useMemo(() => new Set(activeBrowseProductIds), [activeBrowseProductIds]);
 
@@ -329,16 +327,13 @@ export function OrderQuantityMatchClient({
     return quickScopeProductOptions.filter((o) => activeBrowseProductIdSet.has(o.productId));
   }, [productBrowseFilter, quickScopeProductOptions, activeBrowseProductIdSet]);
 
-  function applyProductBrowseFilter(mode: "fullSku" | "stockCapable") {
+  function applyProductBrowseFilter(mode: "allProducts" | "fullSku") {
     if (productBrowseFilter === mode) {
       setProductBrowseFilter("off");
       setQuickProductScopeIds([]);
       return;
     }
-    const ids =
-      mode === "fullSku"
-        ? fullSkuProductIds
-        : stockCapableProductIds;
+    const ids = mode === "allProducts" ? allProductsBrowseIds : fullSkuProductIds;
     const scoped = ids.filter((id) => quickScopeProductOptions.some((o) => o.productId === id));
     setProductBrowseFilter(mode);
     setQuickProductScopeIds(scoped);
@@ -520,11 +515,12 @@ export function OrderQuantityMatchClient({
                 quickProductScopeIds={quickProductScopeIds}
                 setQuickProductScopeIds={setQuickProductScopeIds}
                 productBrowseFilter={productBrowseFilter}
+                allProductsBrowseCount={allProductsBrowseIds.length}
                 fullSkuProductCount={fullSkuProductIds.length}
-                stockCapableProductCount={stockCapableProductIds.length}
-                canUseProductBrowseFilter={fullSizeRequirements != null}
+                canBrowseAllProducts={allProductsBrowseIds.length > 0}
+                canUseFullSizeBrowse={fullSizeBrowseRequirements != null}
+                onToggleAllProductsBrowse={() => applyProductBrowseFilter("allProducts")}
                 onToggleFullSkuBrowse={() => applyProductBrowseFilter("fullSku")}
-                onToggleStockCapableBrowse={() => applyProductBrowseFilter("stockCapable")}
                 categoryProfile={categoryProfile}
                 quickCategoryKind={quickCategoryKind}
                 apparelSizeType={apparelSizeType}
@@ -563,16 +559,16 @@ export function OrderQuantityMatchClient({
           >
             <div className="oqm-results-panel__head">
               <h2 id="oqm-result-heading" className="oqm-section-title oqm-results-panel__title">
-                {productBrowseFilter === "fullSku"
+                {productBrowseFilter === "allProducts"
                   ? "전 제품"
-                  : productBrowseFilter === "stockCapable"
-                    ? "전 사이즈 가능"
+                  : productBrowseFilter === "fullSku"
+                    ? "전사이즈 가능"
                     : "매칭 결과"}
               </h2>
               {productBrowseFilterOn ? (
                 <div className="oqm-results-summary-badges" aria-label="제품 목록 수">
-                  <span className={`oqm-badge ${productBrowseFilter === "stockCapable" ? "oqm-badge--ok" : "oqm-badge--ok"}`}>
-                    {productBrowseFilter === "stockCapable" ? "재고 가능" : "전 제품"}{" "}
+                  <span className="oqm-badge oqm-badge--ok">
+                    {productBrowseFilter === "allProducts" ? "전 제품" : "전사이즈 가능"}{" "}
                     {productBrowseResults.length}
                   </span>
                 </div>
@@ -600,10 +596,10 @@ export function OrderQuantityMatchClient({
                 productImageById={productImageById}
                 stockLines={stockLines}
                 browseMode
-                browseLabel={productBrowseFilter === "stockCapable" ? "전 사이즈 가능" : "전 제품"}
+                browseLabel={productBrowseFilter === "allProducts" ? "전 제품" : "전사이즈 가능"}
                 emptyMessage={
-                  productBrowseFilter === "stockCapable"
-                    ? "필수 사이즈 재고가 모두 있는 제품이 없습니다."
+                  productBrowseFilter === "allProducts"
+                    ? "이 카테고리에 사이즈 옵션이 있는 제품이 없습니다."
                     : "이 카테고리에 전사이즈 옵션을 갖춘 제품이 없습니다."
                 }
               />
@@ -653,11 +649,12 @@ function QuickInputPanel(props: {
   quickProductScopeIds: string[];
   setQuickProductScopeIds: (v: string[]) => void;
   productBrowseFilter: OqmProductBrowseFilter;
+  allProductsBrowseCount: number;
   fullSkuProductCount: number;
-  stockCapableProductCount: number;
-  canUseProductBrowseFilter: boolean;
+  canBrowseAllProducts: boolean;
+  canUseFullSizeBrowse: boolean;
+  onToggleAllProductsBrowse: () => void;
   onToggleFullSkuBrowse: () => void;
-  onToggleStockCapableBrowse: () => void;
   categoryProfile: CategoryProfile;
   quickCategoryKind: QuickCategoryKind;
   apparelSizeType: ApparelSizeType;
@@ -683,11 +680,12 @@ function QuickInputPanel(props: {
     quickProductScopeIds,
     setQuickProductScopeIds,
     productBrowseFilter,
+    allProductsBrowseCount,
     fullSkuProductCount,
-    stockCapableProductCount,
-    canUseProductBrowseFilter,
+    canBrowseAllProducts,
+    canUseFullSizeBrowse,
+    onToggleAllProductsBrowse,
     onToggleFullSkuBrowse,
-    onToggleStockCapableBrowse,
     categoryProfile,
     quickCategoryKind,
     apparelSizeType,
@@ -771,34 +769,38 @@ function QuickInputPanel(props: {
         </div>
         {quickCategory.trim() !== "" && allProductScopeOptions.length > 0 ? (
           <div className="oqm-product-scope-tools">
-            {canUseProductBrowseFilter ? (
+            {canBrowseAllProducts || canUseFullSizeBrowse ? (
               <div className="oqm-product-browse-btns">
-                <button
-                  type="button"
-                  className={`oqm-size-mode-btn oqm-fullsize-filter-btn${productBrowseFilter === "fullSku" ? " oqm-size-mode-btn--active" : ""}`}
-                  onClick={onToggleFullSkuBrowse}
-                  aria-pressed={productBrowseFilter === "fullSku"}
-                >
-                  전 제품 보기
-                  {fullSkuProductCount > 0 ? ` (${fullSkuProductCount})` : ""}
-                </button>
-                <button
-                  type="button"
-                  className={`oqm-size-mode-btn oqm-fullsize-filter-btn${productBrowseFilter === "stockCapable" ? " oqm-size-mode-btn--active" : ""}`}
-                  onClick={onToggleStockCapableBrowse}
-                  aria-pressed={productBrowseFilter === "stockCapable"}
-                >
-                  전 사이즈 가능
-                  {stockCapableProductCount > 0 ? ` (${stockCapableProductCount})` : ""}
-                </button>
+                {canBrowseAllProducts ? (
+                  <button
+                    type="button"
+                    className={`oqm-size-mode-btn oqm-fullsize-filter-btn${productBrowseFilter === "allProducts" ? " oqm-size-mode-btn--active" : ""}`}
+                    onClick={onToggleAllProductsBrowse}
+                    aria-pressed={productBrowseFilter === "allProducts"}
+                  >
+                    전 제품 보기
+                    {allProductsBrowseCount > 0 ? ` (${allProductsBrowseCount})` : ""}
+                  </button>
+                ) : null}
+                {canUseFullSizeBrowse ? (
+                  <button
+                    type="button"
+                    className={`oqm-size-mode-btn oqm-fullsize-filter-btn${productBrowseFilter === "fullSku" ? " oqm-size-mode-btn--active" : ""}`}
+                    onClick={onToggleFullSkuBrowse}
+                    aria-pressed={productBrowseFilter === "fullSku"}
+                  >
+                    전사이즈 가능
+                    {fullSkuProductCount > 0 ? ` (${fullSkuProductCount})` : ""}
+                  </button>
+                ) : null}
               </div>
             ) : null}
             <p className="oqm-muted oqm-category-hint">
               품목명을 여러 개 선택하면 선택 범위로만 매칭. (미선택 시 전체)
-              {productBrowseFilter === "fullSku"
-                ? " · 전 제품 목록 표시 중"
-                : productBrowseFilter === "stockCapable"
-                  ? " · 필수 사이즈 재고 가능 제품만 (여 105·115·120 제외)"
+              {productBrowseFilter === "allProducts"
+                ? " · 사이즈 옵션 있는 제품 전체 (재고 0 포함)"
+                : productBrowseFilter === "fullSku"
+                  ? " · 전사이즈 옵션 보유 (여105·남115·공용115 없어도 됨, 재고 0 포함)"
                   : ""}
             </p>
           </div>
@@ -1494,7 +1496,7 @@ function ResultCards({
 }) {
   const [sheetResult, setSheetResult] = useState<ProductMatchResult | null>(null);
   const defaultEmpty = browseMode
-    ? "표시할 전사이즈 제품이 없습니다."
+    ? "표시할 전사이즈 가능 제품이 없습니다."
     : "표시할 주문이 없습니다. 행을 추가하고 수량을 입력하세요.";
   return (
     <>

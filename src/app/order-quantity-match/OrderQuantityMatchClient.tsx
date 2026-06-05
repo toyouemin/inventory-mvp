@@ -22,7 +22,7 @@ import {
 } from "@/features/orderQuantityMatch/matchOrderToProducts";
 import {
   listOqmProductIdsForAllProductsBrowse,
-  listOqmProductIdsWithFullSizes,
+  listOqmProductIdsWithStockCapableSizes,
   resolveOqmFullSizeBrowseRequirements,
 } from "@/features/orderQuantityMatch/oqmFullSizeFilter";
 
@@ -306,7 +306,7 @@ export function OrderQuantityMatchClient({
 
   const fullSkuProductIds = useMemo(
     () =>
-      listOqmProductIdsWithFullSizes(
+      listOqmProductIdsWithStockCapableSizes(
         linesInQuickCategory,
         fullSizeBrowseRequirements,
         categoryProfile.sizePolicy
@@ -600,7 +600,7 @@ export function OrderQuantityMatchClient({
                 emptyMessage={
                   productBrowseFilter === "allProducts"
                     ? "이 카테고리에 사이즈 옵션이 있는 제품이 없습니다."
-                    : "이 카테고리에 전사이즈 옵션을 갖춘 제품이 없습니다."
+                    : "필수 사이즈 재고가 모두 있는 제품이 없습니다."
                 }
               />
             ) : (
@@ -800,7 +800,7 @@ function QuickInputPanel(props: {
               {productBrowseFilter === "allProducts"
                 ? " · 사이즈 옵션 있는 제품 전체 (재고 0 포함)"
                 : productBrowseFilter === "fullSku"
-                  ? " · 전사이즈 옵션 보유 (여105·남115·공용115 없어도 됨, 재고 0 포함)"
+                  ? " · 여85~100·남95~110·공용85~110 재고 1+ (여105·남115·공용115 무관)"
                   : ""}
             </p>
           </div>

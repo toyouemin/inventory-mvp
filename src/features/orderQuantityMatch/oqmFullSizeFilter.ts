@@ -20,10 +20,10 @@ const TRAINING_FULL_MALE = ["95", "100", "105", "110", "115"] as const;
 /** 전 사이즈 가능: 여성 105·115·120 은 없어도 됨 */
 const OPTIONAL_FEMALE_SIZES = new Set(["105", "115", "120"]);
 
-/** 전사이즈 가능: 옵션(SKU) 존재만 보며 재고 무관 — 없어도 전사이즈로 인정 */
-const FULL_SIZE_BROWSE_OPTIONAL_FEMALE = new Set(["105"]);
-const FULL_SIZE_BROWSE_OPTIONAL_MALE = new Set(["115"]);
-const FULL_SIZE_BROWSE_OPTIONAL_UNISEX = new Set(["115"]);
+/** 전사이즈 가능 — 필수 사이즈(재고 1 이상). 여105·남115·공용115는 판정 제외 */
+const FULL_SIZE_CAPABLE_FEMALE = ["85", "90", "95", "100"] as const;
+const FULL_SIZE_CAPABLE_MALE = ["95", "100", "105", "110"] as const;
+const FULL_SIZE_CAPABLE_UNISEX = ["85", "90", "95", "100", "105", "110"] as const;
 
 export type OqmFullSizeRequirements =
   | { kind: "genderSplit"; female: readonly string[]; male: readonly string[] }
@@ -69,34 +69,48 @@ export function resolveOqmFullSizeRequirements(
   return { kind: "unisex", sizes };
 }
 
-export function applyOqmFullSizeBrowseOptionalExclusions(
-  requirements: OqmFullSizeRequirements
-): OqmFullSizeRequirements {
-  if (requirements.kind === "genderSplit") {
-    const female = requirements.female.filter(
-      (s) => !FULL_SIZE_BROWSE_OPTIONAL_FEMALE.has(normalizeOqmSizeToken(s))
-    );
-    const male = requirements.male.filter(
-      (s) => !FULL_SIZE_BROWSE_OPTIONAL_MALE.has(normalizeOqmSizeToken(s))
-    );
-    return { kind: "genderSplit", female, male };
-  }
-  const sizes = requirements.sizes.filter(
-    (s) => !FULL_SIZE_BROWSE_OPTIONAL_UNISEX.has(normalizeOqmSizeToken(s))
-  );
-  return { kind: "unisex", sizes };
+/**
+ * 의류·트레이닝복 공통 — 입력판(남/여·공용)과 동일하게 모드를 정한 뒤 고정 눈금 적용.
+ * 카테고리별(티셔츠/트레이닝 등) 예외 없음.
+ */
+function resolveOqmFullSizeBrowseInputMode(
+  categoryKind: OqmQuickCategoryKind,
+  profile: OqmCategoryProfile,
+  apparelSizeType: OqmApparelSizeType
+): "genderSplit" | "unisex" | null {
+  if (categoryKind === "general") return null;
+  if (categoryKind === "training") return "genderSplit";
+
+  const canUnisex =
+    profile.hasUnisexData ||
+    profile.sizePolicy === "unisexNumeric" ||
+    profile.sizePolicy === "unisexAlpha" ||
+    profile.sizePolicy === "free";
+  const canGenderSplit = profile.hasGenderSplitData || profile.sizePolicy === "genderSplit";
+
+  if (canGenderSplit && canUnisex) return apparelSizeType;
+  if (canGenderSplit) return "genderSplit";
+  if (canUnisex) return "unisex";
+  return null;
 }
 
-/** 전사이즈 가능 판정용 — 여105·남115·공용115 옵션 없어도 전사이즈(재고 무관) */
+/** 전사이즈 가능 — 의류 전 카테고리 동일 고정 눈금, 필수 사이즈 재고 1+ (여105·남115·공용115 무관) */
 export function resolveOqmFullSizeBrowseRequirements(
   category: string,
   profile: OqmCategoryProfile,
   categoryKind: OqmQuickCategoryKind,
   apparelSizeType: OqmApparelSizeType
 ): OqmFullSizeRequirements | null {
-  const base = resolveOqmFullSizeRequirements(category, profile, categoryKind, apparelSizeType);
-  if (!base) return null;
-  return applyOqmFullSizeBrowseOptionalExclusions(base);
+  if (!category.trim() || categoryKind === "general") return null;
+
+  const mode = resolveOqmFullSizeBrowseInputMode(categoryKind, profile, apparelSizeType);
+  if (mode === "genderSplit") {
+    return { kind: "genderSplit", female: FULL_SIZE_CAPABLE_FEMALE, male: FULL_SIZE_CAPABLE_MALE };
+  }
+  if (mode === "unisex") {
+    return { kind: "unisex", sizes: FULL_SIZE_CAPABLE_UNISEX };
+  }
+  return null;
 }
 
 /** 전 사이즈 가능 판정용 — 여 105·115·120 제외 */

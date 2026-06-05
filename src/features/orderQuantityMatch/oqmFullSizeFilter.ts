@@ -1,3 +1,11 @@
+/**
+ * 주문수량매칭 — 전 제품 보기·전사이즈 가능 제품 필터.
+ *
+ * - 전 제품 보기: 사이즈 옵션 1개+ (재고 0 포함). 일반 물품은 카테고리 전체.
+ * - 전사이즈 가능: 의류·트레이닝 공통 고정 눈금, 필수 사이즈 재고 1+.
+ *   여105·남115·공용115는 옵션·재고 무관(판정 제외).
+ * - resolveOqmFullSizeRequirements: 입력판용(카테고리별 가변). UI 브라우즈와 별도.
+ */
 import { normalizeGenderValue } from "./clothingDimensionProfile";
 import {
   parseGenderAndSize,
@@ -17,7 +25,7 @@ const TSHIRT_FULL_MALE = ["95", "100", "105", "110"] as const;
 const TRAINING_FULL_FEMALE = ["85", "90", "95", "100", "105"] as const;
 const TRAINING_FULL_MALE = ["95", "100", "105", "110", "115"] as const;
 
-/** 전 사이즈 가능: 여성 105·115·120 은 없어도 됨 */
+/** @deprecated UI 미사용 — resolveOqmFullSizeRequirements 연동 레거시 */
 const OPTIONAL_FEMALE_SIZES = new Set(["105", "115", "120"]);
 
 /** 전사이즈 가능 — 필수 사이즈(재고 1 이상). 여105·남115·공용115는 판정 제외 */
@@ -113,7 +121,7 @@ export function resolveOqmFullSizeBrowseRequirements(
   return null;
 }
 
-/** 전 사이즈 가능 판정용 — 여 105·115·120 제외 */
+/** @deprecated UI 미사용 — resolveOqmFullSizeRequirements 기반 레거시 */
 export function resolveOqmStockCapableRequirements(
   category: string,
   profile: OqmCategoryProfile,
@@ -248,7 +256,7 @@ export function listOqmProductIdsForAllProductsBrowse(
   return listOqmProductIdsWithAnySizeOptions(linesInCategory, sizePolicy);
 }
 
-/** 카테고리 재고 중 전사이즈 옵션(SKU)을 모두 갖춘 productId 목록 */
+/** 옵션(SKU) 존재만 검사 — @deprecated UI 브라우즈는 listOqmProductIdsWithStockCapableSizes 사용 */
 export function listOqmProductIdsWithFullSizes(
   linesInCategory: NormalizedStockLine[],
   requirements: OqmFullSizeRequirements | null,
@@ -263,7 +271,7 @@ export function listOqmProductIdsWithFullSizes(
   return out;
 }
 
-/** 필수 사이즈마다 재고 1 이상인 productId (여 105·115·120 제외 규칙은 requirements에 반영) */
+/** 전사이즈 가능 — 필수 사이즈마다 재고 1+ (requirements는 resolveOqmFullSizeBrowseRequirements) */
 export function listOqmProductIdsWithStockCapableSizes(
   linesInCategory: NormalizedStockLine[],
   requirements: OqmFullSizeRequirements | null,

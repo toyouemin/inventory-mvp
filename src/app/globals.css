@@ -5961,7 +5961,7 @@ button.status-stock-stat.status-stock-stat--asset-toggle[aria-pressed="true"] {
     min-width: 0;
   }
 
-  /* 기본 정보: 카테고리 선택 · 전 제품/전 사이즈 버튼 간격 축소 */
+  /* 기본 정보: 카테고리 선택 · 전 제품/전사이즈 가능 버튼 간격 축소 */
   .oqm-sidebar-stack {
     gap: 8px;
   }

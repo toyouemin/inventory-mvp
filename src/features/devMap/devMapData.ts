@@ -342,14 +342,14 @@ export const DEV_MAP: DevMapEntry[] = [
     editable: [
       "주문 입력판",
       "카테고리·품목명 선택",
-      "전 제품 보기 / 전 사이즈 가능 (토글)",
+      "전 제품 보기 / 전사이즈 가능 (토글)",
       "매칭 결과 카드 (여/남 사이즈 칩)",
       "품목 상세 시트 (이미지·사이즈별 재고)",
       "부족 상세",
       "카테고리 정책 저장",
       "모바일 배지·버튼 레이아웃 (globals.css oqm-*)",
     ],
-    note: "입력·매칭 결과·전사이즈 제품 보기·카드/상세 UI가 바뀜",
+    note: "입력·매칭 결과·전 제품/전사이즈 가능 목록·카드/상세 UI가 바뀜",
   },
   {
     category: "주문수량 매칭",
@@ -368,13 +368,16 @@ export const DEV_MAP: DevMapEntry[] = [
   {
     category: "주문수량 매칭",
     file: "src/features/orderQuantityMatch/oqmFullSizeFilter.ts",
-    role: "전 제품 보기·전 사이즈 가능 제품 필터",
+    role: "전 제품 보기·전사이즈 가능 제품 필터",
     editable: [
-      "필수 사이즈 목록 (티셔츠 여85-100·남95-110)",
-      "전 사이즈 가능 (재고>0, 여105·115·120 제외)",
-      "카테고리 입력판 칸 기준 사이즈",
+      "FULL_SIZE_CAPABLE_FEMALE (여85·90·95·100)",
+      "FULL_SIZE_CAPABLE_MALE (남95·100·105·110)",
+      "FULL_SIZE_CAPABLE_UNISEX (85~110, 115 제외)",
+      "resolveOqmFullSizeBrowseRequirements",
+      "listOqmProductIdsForAllProductsBrowse",
+      "listOqmProductIdsWithStockCapableSizes",
     ],
-    note: "전사이즈 제품 목록·재고 가능 판정이 바뀜",
+    note: "전 제품(옵션만)·전사이즈 가능(필수 사이즈 재고 1+) 판정이 바뀜",
   },
   {
     category: "주문수량 매칭",

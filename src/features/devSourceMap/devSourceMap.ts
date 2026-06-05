@@ -243,7 +243,7 @@ export const DEV_SOURCE_MAP: Record<DevSourcePageKey, DevSourceItem[]> = {
     {
       label: "주문수량 매칭 메인 화면",
       description:
-        "주문 입력판, 전 제품 보기/전 사이즈 가능 토글, 매칭·제품 목록 카드(여/남 칩), 품목 탭 상세 시트, 부족 표시",
+        "주문 입력판, 전 제품 보기·전사이즈 가능 토글, 매칭·제품 목록 카드(여/남 칩), 품목 탭 상세 시트, 부족 표시",
       file: "src/app/order-quantity-match/OrderQuantityMatchClient.tsx",
       keywords: [
         "매칭",
@@ -251,8 +251,10 @@ export const DEV_SOURCE_MAP: Record<DevSourcePageKey, DevSourceItem[]> = {
         "부족",
         "결과",
         "전 제품 보기",
-        "전 사이즈 가능",
-        "전사이즈",
+        "전사이즈 가능",
+        "productBrowseFilter",
+        "allProducts",
+        "fullSku",
         "여",
         "남",
         "상세",
@@ -277,11 +279,19 @@ export const DEV_SOURCE_MAP: Record<DevSourcePageKey, DevSourceItem[]> = {
       keywords: ["매칭", "부족", "배분", "상태"],
     },
     {
-      label: "전사이즈·재고 가능 제품 필터",
+      label: "전 제품·전사이즈 가능 제품 필터",
       description:
-        "전 제품 보기(SKU 전사이즈 보유), 전 사이즈 가능(필수 사이즈 재고 1+, 여105·115·120 제외), 카테고리별 필수 눈금",
+        "전 제품 보기(사이즈 옵션 1개+, 재고 0 포함), 전사이즈 가능(의류 공통 고정 눈금·필수 사이즈 재고 1+, 여105·남115·공용115 무관). 남/여·공용 모드는 입력판과 동일",
       file: "src/features/orderQuantityMatch/oqmFullSizeFilter.ts",
-      keywords: ["전 제품", "전 사이즈", "전사이즈", "필터", "재고", "티셔츠"],
+      keywords: [
+        "전 제품",
+        "전사이즈 가능",
+        "필터",
+        "재고",
+        "FULL_SIZE_CAPABLE",
+        "listOqmProductIdsForAllProductsBrowse",
+        "listOqmProductIdsWithStockCapableSizes",
+      ],
     },
     {
       label: "OQM 입력·주문 row 생성",

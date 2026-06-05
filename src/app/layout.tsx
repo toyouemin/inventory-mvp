@@ -10,10 +10,14 @@ const icon192 = withAssetVersion("/icons/icon-192.png");
 const icon512 = withAssetVersion("/icons/icon-512.png");
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: "#1a3059",
 };
 
 export const metadata: Metadata = {
+  title: "재고관리",
+  description: "타고스포츠 재고관리 프로그램",
+  applicationName: "재고관리",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     title: "재고관리",
@@ -24,7 +28,8 @@ export const metadata: Metadata = {
       { url: icon192, sizes: "192x192", type: "image/png" },
       { url: icon512, sizes: "512x512", type: "image/png" },
     ],
-    apple: icon192,
+    apple: [{ url: icon192, sizes: "192x192", type: "image/png" }],
+    shortcut: icon192,
   },
 };
 

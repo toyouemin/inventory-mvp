@@ -3,7 +3,7 @@
  * 아이콘/매니페스트를 바꾼 뒤 배포 전에 숫자만 올리거나, Vercel에 NEXT_PUBLIC_ASSET_VERSION 설정.
  */
 export function getAssetVersion(): string {
-  return (process.env.NEXT_PUBLIC_ASSET_VERSION ?? "1").trim() || "1";
+  return (process.env.NEXT_PUBLIC_ASSET_VERSION ?? "2").trim() || "2";
 }
 
 export function withAssetVersion(path: string): string {

@@ -275,10 +275,6 @@ export default function TransactionStatementPage() {
     setErrorMessage("");
     setListSaveMessage("");
     const listName = formData.customerName.trim();
-    if (!listName) {
-      setErrorMessage(documentType === "estimate" ? "행사명을 입력한 뒤 저장해 주세요." : "상호/클럽을 입력한 뒤 저장해 주세요.");
-      return;
-    }
     const entry: SavedTransactionListEntry = {
       id: `ts-list-${Date.now()}`,
       name: listName,
@@ -289,7 +285,8 @@ export default function TransactionStatementPage() {
     const next = [entry, ...loadSavedTransactionLists()];
     persistSavedTransactionLists(next);
     setSavedLists(next);
-    setListSaveMessage(`「${listName}」 리스트를 저장했습니다. (${formatSavedListDateTime(entry.savedAt)})`);
+    const savedLabel = listName ? `「${listName}」 ` : "";
+    setListSaveMessage(`${savedLabel}리스트를 저장했습니다. (${formatSavedListDateTime(entry.savedAt)})`);
     setShowSavedListPanel(true);
   }, [buildListSnapshot, documentType, formData.customerName]);
 

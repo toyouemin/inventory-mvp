@@ -73,7 +73,7 @@ const FIXED_SUPPLIER = {
 } as const;
 
 const TRANSACTION_STATEMENT_GUIDE_TEXT = "정보 입력→명세표 미리보기→JPG 저장→발송";
-const ITEM_UNIT_OPTIONS = ["개", "장", "타", "세트", "자루"] as const;
+const ITEM_UNIT_OPTIONS = ["개", "장", "타", "족", "세트", "자루"] as const;
 
 /** 출력 푸터(은행·URL 등은 사업 정보에 맞게 수정) */
 const STATEMENT_PRINT_FOOTER: TransactionStatementPrintFooter = {

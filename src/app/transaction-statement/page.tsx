@@ -396,8 +396,7 @@ export default function TransactionStatementPage() {
     [printLines]
   );
 
-  const shouldShowErrorMessage =
-    !!errorMessage && !(documentType === "estimate" && errorMessage === "공급받는자 상호를 입력해 주세요.");
+  const shouldShowErrorMessage = !!errorMessage;
 
   const printSheetProps = useMemo(
     () => ({
@@ -569,10 +568,6 @@ export default function TransactionStatementPage() {
         note: row.note.trim(),
       }));
 
-    if (!formData.customerName.trim()) {
-      setErrorMessage("공급받는자 상호를 입력해 주세요.");
-      return;
-    }
     if (payloadItems.length === 0) {
       setErrorMessage("품목명을 1개 이상 입력해 주세요.");
       return;
@@ -644,9 +639,6 @@ export default function TransactionStatementPage() {
         setErrorMessage("수신자를 입력해 주세요.");
         return;
       }
-    } else if (!formData.customerName.trim()) {
-      setErrorMessage("공급받는자 상호를 입력해 주세요.");
-      return;
     }
     if (itemCount === 0) {
       setErrorMessage("품목명을 1개 이상 입력해 주세요.");
